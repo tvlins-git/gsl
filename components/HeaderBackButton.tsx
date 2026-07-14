@@ -8,9 +8,20 @@ import { theme } from '@/constants/theme';
 // a tinted PNG Image, which relies on react-native-web's SVG tint filter and can
 // render blank on web when that filter definition is missing.
 export function HeaderBackButton() {
+  // When the thread is opened directly (deep link / page refresh) there is no
+  // navigation history, so router.back() throws "GO_BACK was not handled".
+  // Fall back to the chat list in that case.
+  const handlePress = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/chat');
+    }
+  };
+
   return (
     <Pressable
-      onPress={() => router.back()}
+      onPress={handlePress}
       hitSlop={12}
       accessibilityRole="button"
       accessibilityLabel="Go back"
