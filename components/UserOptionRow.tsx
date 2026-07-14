@@ -1,10 +1,10 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { UserAvatar } from '@/components/UserAvatar';
-import type { HardcodedUser } from '@/constants/hardcoded-user';
+import type { AppUser } from '@/constants/hardcoded-user';
 import { theme } from '@/constants/theme';
 
 interface UserOptionRowProps {
-  user: HardcodedUser;
+  user: AppUser;
   selected: boolean;
   onSelect: () => void;
 }

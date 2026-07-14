@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
-import type { HardcodedUser } from '@/constants/hardcoded-user';
+import type { AppUser } from '@/constants/hardcoded-user';
+import { ensureAppUsersLoaded } from '@/lib/app-users';
 import {
   activateLocalMode,
   clearLoggedOut,
@@ -24,19 +25,21 @@ interface AuthContextValue {
   loggedOut: boolean;
   refreshMember: () => Promise<void>;
   signOut: () => Promise<void>;
-  signIn: (user: HardcodedUser, password: string) => Promise<{ ok: true } | { ok: false; error: string }>;
+  signIn: (user: AppUser, password: string) => Promise<{ ok: true } | { ok: false; error: string }>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 async function bootstrapSession(
-  user: HardcodedUser,
+  user: AppUser,
   setSession: (s: Session | null) => void,
   setMember: (m: Member | null) => void,
   setLocalMode: (v: boolean) => void,
   setLoggedOut: (v: boolean) => void,
   refreshMember: () => Promise<void>
 ) {
+  await ensureAppUsersLoaded();
+
   if (await isLoggedOut()) {
     setLoggedOut(true);
     return;
@@ -79,7 +82,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoggedOut(true);
   }, []);
 
-  const signIn = useCallback(async (user: HardcodedUser, password: string) => {
+  const signIn = useCallback(async (user: AppUser, password: string) => {
     const result = await signInWithPassword(user, password);
     if (!result.ok) return result;
 
@@ -91,6 +94,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await bootstrapSession(user, setSession, setMember, setLocalMode, setLoggedOut, refreshMember);
       return { ok: true as const };
     } catch {
+      await ensureAppUsersLoaded();
       const localMember = activateLocalMode(user);
       setLocalMode(true);
       setMember(localMember);
@@ -102,17 +106,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [refreshMember]);
 
   useEffect(() => {
-    getStoredUser()
+    ensureAppUsersLoaded()
+      .then(() => getStoredUser())
       .then((user) =>
         bootstrapSession(user, setSession, setMember, setLocalMode, setLoggedOut, refreshMember)
       )
       .catch(() =>
-        getStoredUser().then((user) => {
-          const localMember = activateLocalMode(user);
-          setLocalMode(true);
-          setMember(localMember);
-          setLoggedOut(false);
-        })
+        ensureAppUsersLoaded()
+          .then(() => getStoredUser())
+          .then((user) => {
+            const localMember = activateLocalMode(user);
+            setLocalMode(true);
+            setMember(localMember);
+            setLoggedOut(false);
+          })
       )
       .finally(() => setLoading(false));
 
