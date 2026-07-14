@@ -1,0 +1,337 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { DEFAULT_HARDCODED_USER, HARDCODED_USERS, type HardcodedUser } from '@/constants/hardcoded-user';
+import { summarizePollAcceptance } from './polls';
+import type {
+  HostAssignment,
+  Member,
+  Message,
+  Photo,
+  PhotoEvent,
+  Poll,
+  PollResponse,
+  PollSlot,
+  Thread,
+} from './database.types';
+
+export const LOCAL_GROUP_ID = '00000000-0000-4000-8000-000000000001';
+
+const LOCAL_USER_IDS: Record<HardcodedUser['id'], { memberId: string; userId: string }> = {
+  'hr-lins': {
+    memberId: '00000000-0000-4000-8000-000000000002',
+    userId: '00000000-0000-4000-8000-000000000003',
+  },
+  'hr-andersen': {
+    memberId: '00000000-0000-4000-8000-000000000004',
+    userId: '00000000-0000-4000-8000-000000000005',
+  },
+};
+
+const STORAGE_KEY = 'gsl_local_data_v1';
+
+let localModeActive = false;
+let activeLocalUser: HardcodedUser = DEFAULT_HARDCODED_USER;
+
+export function setActiveLocalUser(user: HardcodedUser) {
+  activeLocalUser = user;
+}
+
+export function enableLocalMode() {
+  localModeActive = true;
+}
+
+export function disableLocalMode() {
+  localModeActive = false;
+}
+
+export function isLocalMode() {
+  return localModeActive;
+}
+
+export function createLocalMember(): Member {
+  const ids = LOCAL_USER_IDS[activeLocalUser.id];
+  return {
+    id: ids.memberId,
+    group_id: LOCAL_GROUP_ID,
+    user_id: ids.userId,
+    display_name: activeLocalUser.displayName,
+    avatar_url: null,
+    role: 'admin',
+    created_at: new Date().toISOString(),
+  };
+}
+
+export function getLocalGroupMembers(): Member[] {
+  return HARDCODED_USERS.map((user) => {
+    const ids = LOCAL_USER_IDS[user.id];
+    return {
+      id: ids.memberId,
+      group_id: LOCAL_GROUP_ID,
+      user_id: ids.userId,
+      display_name: user.displayName,
+      avatar_url: null,
+      role: 'admin',
+      created_at: new Date().toISOString(),
+    };
+  });
+}
+
+interface LocalData {
+  host_assignments: HostAssignment[];
+  polls: Poll[];
+  poll_slots: PollSlot[];
+  poll_responses: PollResponse[];
+  threads: Thread[];
+  messages: Message[];
+  photo_events: PhotoEvent[];
+  photos: Photo[];
+}
+
+const emptyData = (): LocalData => ({
+  host_assignments: [],
+  polls: [],
+  poll_slots: [],
+  poll_responses: [],
+  threads: [],
+  messages: [],
+  photo_events: [],
+  photos: [],
+});
+
+async function readData(): Promise<LocalData> {
+  const raw = await AsyncStorage.getItem(STORAGE_KEY);
+  if (!raw) return emptyData();
+  try {
+    return { ...emptyData(), ...JSON.parse(raw) };
+  } catch {
+    return emptyData();
+  }
+}
+
+async function writeData(data: LocalData) {
+  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+
+function uuid() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
+export const localStore = {
+  async getHostAssignments(groupId: string) {
+    const data = await readData();
+    return data.host_assignments.filter((a) => a.group_id === groupId);
+  },
+
+  async upsertHostAssignment(
+    groupId: string,
+    year: number,
+    month: number,
+    assignedMemberId: string | null,
+    userId: string
+  ) {
+    const data = await readData();
+    const idx = data.host_assignments.findIndex(
+      (a) => a.group_id === groupId && a.year === year && a.month === month
+    );
+    const row: HostAssignment = {
+      id: idx >= 0 ? data.host_assignments[idx].id : uuid(),
+      group_id: groupId,
+      year,
+      month,
+      assigned_member_id: assignedMemberId,
+      updated_by: userId,
+      updated_at: new Date().toISOString(),
+    };
+    if (idx >= 0) data.host_assignments[idx] = row;
+    else data.host_assignments.push(row);
+    await writeData(data);
+    return row;
+  },
+
+  async getPolls(groupId: string) {
+    const data = await readData();
+    return data.polls.filter((p) => p.group_id === groupId).sort((a, b) => b.created_at.localeCompare(a.created_at));
+  },
+
+  async getPollSlots(pollId: string) {
+    const data = await readData();
+    return data.poll_slots.filter((s) => s.poll_id === pollId);
+  },
+
+  async getPollResponses(slotIds: string[]) {
+    const data = await readData();
+    return data.poll_responses.filter((r) => slotIds.includes(r.slot_id));
+  },
+
+  async createPoll(groupId: string, title: string, userId: string, slots: { startsAt: string; endsAt: string }[]) {
+    const data = await readData();
+    const poll: Poll = {
+      id: uuid(),
+      group_id: groupId,
+      title,
+      created_by: userId,
+      status: 'open',
+      created_at: new Date().toISOString(),
+    };
+    data.polls.push(poll);
+    for (const s of slots) {
+      data.poll_slots.push({
+        id: uuid(),
+        poll_id: poll.id,
+        starts_at: s.startsAt,
+        ends_at: s.endsAt,
+      });
+    }
+    await writeData(data);
+    return poll;
+  },
+
+  async upsertPollResponse(slotId: string, memberId: string, response: 'yes' | 'maybe' | 'no') {
+    const data = await readData();
+    const idx = data.poll_responses.findIndex((r) => r.slot_id === slotId && r.member_id === memberId);
+    const row: PollResponse = {
+      id: idx >= 0 ? data.poll_responses[idx].id : uuid(),
+      slot_id: slotId,
+      member_id: memberId,
+      response,
+    };
+    if (idx >= 0) data.poll_responses[idx] = row;
+    else data.poll_responses.push(row);
+    await writeData(data);
+  },
+
+  async getPollSummaries(polls: Poll[], memberNamesById: Record<string, string>) {
+    const data = await readData();
+    const summaries: Record<string, string> = {};
+    for (const poll of polls) {
+      const slotIds = data.poll_slots.filter((s) => s.poll_id === poll.id).map((s) => s.id);
+      const responses = data.poll_responses.filter((r) => slotIds.includes(r.slot_id));
+      summaries[poll.id] = summarizePollAcceptance(
+        responses.map((r) => ({
+          slotId: r.slot_id,
+          memberId: r.member_id,
+          response: r.response,
+        })),
+        memberNamesById
+      );
+    }
+    return summaries;
+  },
+
+  async deletePoll(pollId: string) {
+    const data = await readData();
+    const slotIds = data.poll_slots.filter((s) => s.poll_id === pollId).map((s) => s.id);
+    data.polls = data.polls.filter((p) => p.id !== pollId);
+    data.poll_slots = data.poll_slots.filter((s) => s.poll_id !== pollId);
+    data.poll_responses = data.poll_responses.filter((r) => !slotIds.includes(r.slot_id));
+    await writeData(data);
+  },
+
+  async getThreads(groupId: string) {
+    const data = await readData();
+    return data.threads.filter((t) => t.group_id === groupId).sort((a, b) => b.created_at.localeCompare(a.created_at));
+  },
+
+  async createThread(groupId: string, name: string, userId: string) {
+    const data = await readData();
+    const thread: Thread = {
+      id: uuid(),
+      group_id: groupId,
+      name,
+      created_by: userId,
+      created_at: new Date().toISOString(),
+    };
+    data.threads.push(thread);
+    await writeData(data);
+    return thread;
+  },
+
+  async deleteThread(threadId: string) {
+    const data = await readData();
+    data.threads = data.threads.filter((t) => t.id !== threadId);
+    data.messages = data.messages.filter((m) => m.thread_id !== threadId);
+    await writeData(data);
+  },
+
+  async getMessages(threadId: string) {
+    const data = await readData();
+    return data.messages.filter((m) => m.thread_id === threadId).sort((a, b) => a.created_at.localeCompare(b.created_at));
+  },
+
+  async addMessage(threadId: string, senderId: string, body: string) {
+    const data = await readData();
+    const message: Message = {
+      id: uuid(),
+      thread_id: threadId,
+      sender_id: senderId,
+      body,
+      created_at: new Date().toISOString(),
+    };
+    data.messages.push(message);
+    await writeData(data);
+    return message;
+  },
+
+  async getPhotoEvents(groupId: string) {
+    const data = await readData();
+    return data.photo_events.filter((e) => e.group_id === groupId).sort((a, b) => b.created_at.localeCompare(a.created_at));
+  },
+
+  async getPhotoEventSummaries(groupId: string) {
+    const data = await readData();
+    const events = data.photo_events
+      .filter((e) => e.group_id === groupId)
+      .sort((a, b) => b.created_at.localeCompare(a.created_at));
+    return events.map((event) => ({
+      event,
+      photoCount: data.photos.filter((p) => p.event_id === event.id).length,
+    }));
+  },
+
+  async createPhotoEvent(groupId: string, title: string, userId: string, eventDate?: string) {
+    const data = await readData();
+    const event: PhotoEvent = {
+      id: uuid(),
+      group_id: groupId,
+      title,
+      event_date: eventDate ?? null,
+      created_by: userId,
+      created_at: new Date().toISOString(),
+    };
+    data.photo_events.push(event);
+    await writeData(data);
+    return event;
+  },
+
+  async getPhotos(eventId: string) {
+    const data = await readData();
+    return data.photos.filter((p) => p.event_id === eventId).sort((a, b) => (b.ai_score ?? 0) - (a.ai_score ?? 0));
+  },
+
+  async addPhoto(eventId: string, userId: string, storagePath: string, thumbPath?: string) {
+    const data = await readData();
+    const photo: Photo = {
+      id: uuid(),
+      event_id: eventId,
+      uploaded_by: userId,
+      storage_path: storagePath,
+      thumb_path: thumbPath ?? storagePath,
+      ai_score: Math.random(),
+      width: null,
+      height: null,
+      created_at: new Date().toISOString(),
+    };
+    data.photos.push(photo);
+    await writeData(data);
+    return photo;
+  },
+
+  async deletePhoto(photoId: string) {
+    const data = await readData();
+    data.photos = data.photos.filter((p) => p.id !== photoId);
+    await writeData(data);
+  },
+};
