@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { FlatList, StyleSheet, Text } from 'react-native';
+import { FlatList, Pressable, StyleSheet, Text } from 'react-native';
 import { HostMonthRow } from '@/components/HostMonthRow';
 import { Screen } from '@/components/ui/Screen';
 import { useAuth } from '@/contexts/AuthContext';
@@ -14,7 +14,8 @@ export default function HostsScreen() {
   const [members, setMembers] = useState<Member[]>([]);
   const [assignments, setAssignments] = useState<HostAssignment[]>([]);
   const [loading, setLoading] = useState(true);
-  const months = generateMonthList(12);
+  const [monthCount, setMonthCount] = useState(12);
+  const months = generateMonthList(monthCount);
 
   const loadData = useCallback(async () => {
     if (!member) return;
@@ -97,6 +98,17 @@ export default function HostsScreen() {
             onAssign={(id) => handleAssign(item.year, item.month, id)}
           />
         )}
+        ListFooterComponent={
+          <Pressable
+            style={[styles.addBtn, sharedStyles.secondaryBtn]}
+            onPress={() => setMonthCount((count) => count + 1)}
+            testID="add-month-btn"
+            accessibilityRole="button"
+            accessibilityLabel="Add next month"
+          >
+            <Text style={sharedStyles.secondaryBtnText}>+ Add month</Text>
+          </Pressable>
+        }
       />
     </Screen>
   );
@@ -113,5 +125,9 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
     fontSize: 14,
     lineHeight: 20,
+  },
+  addBtn: {
+    marginHorizontal: theme.spacing.lg,
+    marginTop: theme.spacing.sm,
   },
 });
