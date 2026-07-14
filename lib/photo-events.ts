@@ -47,3 +47,26 @@ export async function loadPhotoEventSummaries(groupId: string): Promise<PhotoEve
     photoCount: counts.get(event.id) ?? 0,
   }));
 }
+
+export async function deletePhotoEvent(eventId: string) {
+  if (isLocalMode()) {
+    await localStore.deletePhotoEvent(eventId);
+    return;
+  }
+
+  const { data: photos } = await supabase
+    .from('photos')
+    .select('storage_path, thumb_path')
+    .eq('event_id', eventId);
+
+  const paths = [...new Set(
+    (photos ?? []).flatMap((p) => [p.storage_path, p.thumb_path].filter(Boolean) as string[])
+  )];
+
+  if (paths.length > 0) {
+    await supabase.storage.from('photos').remove(paths).catch(() => undefined);
+  }
+
+  const { error } = await supabase.from('photo_events').delete().eq('id', eventId);
+  if (error) throw error;
+}

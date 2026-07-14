@@ -334,4 +334,11 @@ export const localStore = {
     data.photos = data.photos.filter((p) => p.id !== photoId);
     await writeData(data);
   },
+
+  async deletePhotoEvent(eventId: string) {
+    const data = await readData();
+    data.photo_events = data.photo_events.filter((e) => e.id !== eventId);
+    data.photos = data.photos.filter((p) => p.event_id !== eventId);
+    await writeData(data);
+  },
 };

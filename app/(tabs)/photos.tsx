@@ -18,6 +18,7 @@ import type { Photo, PhotoEvent } from '@/lib/database.types';
 import { compressImage } from '@/lib/image-compress';
 import { isLocalMode, localStore } from '@/lib/local-store';
 import {
+  deletePhotoEvent,
   formatEventDate,
   formatPhotoCount,
   loadPhotoEventSummaries,
@@ -173,6 +174,15 @@ export default function PhotosScreen() {
     await loadSummaries();
   };
 
+  const handleDeleteEvent = async (eventId: string) => {
+    await deletePhotoEvent(eventId);
+    if (selectedEvent?.id === eventId) {
+      setSelectedEvent(null);
+      setPhotos([]);
+    }
+    await loadSummaries();
+  };
+
   if (loading) {
     return <Screen loading />;
   }
@@ -184,11 +194,19 @@ export default function PhotosScreen() {
           <Text style={styles.back}>← Back to events</Text>
         </Pressable>
         <View style={[styles.detailHeader, sharedStyles.card]}>
-          <Text style={styles.detailTitle}>{selectedEvent.title}</Text>
-          <Text style={styles.detailMeta}>
-            Added {formatEventDate(selectedEvent.created_at)}
-            {selectedSummary ? ` · ${formatPhotoCount(selectedSummary.photoCount)}` : ''}
-          </Text>
+          <View style={styles.detailTitleBlock}>
+            <Text style={styles.detailTitle}>{selectedEvent.title}</Text>
+            <Text style={styles.detailMeta}>
+              Added {formatEventDate(selectedEvent.created_at)}
+              {selectedSummary ? ` · ${formatPhotoCount(selectedSummary.photoCount)}` : ''}
+            </Text>
+          </View>
+          <Pressable
+            onPress={() => handleDeleteEvent(selectedEvent.id)}
+            testID="delete-photo-event-detail"
+          >
+            <Text style={styles.deleteText}>Delete</Text>
+          </Pressable>
         </View>
 
         {topPhotoIds.size > 0 && (
@@ -243,6 +261,7 @@ export default function PhotosScreen() {
           <PhotoEventRow
             summary={item}
             onPress={() => setSelectedEvent(item.event)}
+            onDelete={() => handleDeleteEvent(item.event.id)}
           />
         )}
         ListEmptyComponent={
@@ -294,9 +313,16 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   detailHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
     marginHorizontal: theme.spacing.lg,
     marginBottom: theme.spacing.md,
     padding: theme.spacing.lg,
+    gap: theme.spacing.md,
+  },
+  detailTitleBlock: {
+    flex: 1,
     gap: theme.spacing.xs,
   },
   detailTitle: {
@@ -307,6 +333,11 @@ const styles = StyleSheet.create({
   detailMeta: {
     fontSize: 14,
     color: theme.colors.textSecondary,
+  },
+  deleteText: {
+    color: theme.colors.danger,
+    fontWeight: '600',
+    fontSize: 14,
   },
   topBanner: {
     marginHorizontal: theme.spacing.lg,

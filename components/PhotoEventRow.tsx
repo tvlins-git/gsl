@@ -7,40 +7,50 @@ interface PhotoEventRowProps {
   summary: PhotoEventSummary;
   selected?: boolean;
   onPress: () => void;
+  onDelete?: () => void;
 }
 
-export function PhotoEventRow({ summary, selected, onPress }: PhotoEventRowProps) {
+export function PhotoEventRow({ summary, selected, onPress, onDelete }: PhotoEventRowProps) {
   const { event, photoCount } = summary;
 
   return (
-    <Pressable
-      onPress={onPress}
-      style={[styles.row, sharedStyles.card, selected && styles.rowSelected]}
-      testID={`photo-event-${event.id}`}
-    >
-      <View style={styles.main}>
+    <View style={[styles.row, sharedStyles.card, selected && styles.rowSelected]}>
+      <Pressable
+        style={styles.main}
+        onPress={onPress}
+        testID={`photo-event-${event.id}`}
+      >
         <Text style={styles.title}>{event.title}</Text>
         <Text style={styles.meta}>
           Added {formatEventDate(event.created_at)} · {formatPhotoCount(photoCount)}
         </Text>
-      </View>
-      <Text style={styles.chevron}>›</Text>
-    </Pressable>
+      </Pressable>
+      {onDelete && (
+        <Pressable
+          style={styles.deleteBtn}
+          onPress={onDelete}
+          testID={`delete-photo-event-${event.id}`}
+        >
+          <Text style={styles.deleteText}>Delete</Text>
+        </Pressable>
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
-    alignItems: 'center',
-    padding: theme.spacing.lg,
+    alignItems: 'stretch',
     marginBottom: theme.spacing.sm,
+    overflow: 'hidden',
   },
   rowSelected: {
     borderColor: theme.colors.primary,
   },
   main: {
     flex: 1,
+    padding: theme.spacing.lg,
     gap: 4,
   },
   title: {
@@ -52,9 +62,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: theme.colors.textSecondary,
   },
-  chevron: {
-    fontSize: 22,
-    color: theme.colors.textMuted,
-    marginLeft: theme.spacing.sm,
+  deleteBtn: {
+    justifyContent: 'center',
+    paddingHorizontal: theme.spacing.lg,
+    borderLeftWidth: StyleSheet.hairlineWidth,
+    borderLeftColor: theme.colors.border,
+  },
+  deleteText: {
+    color: theme.colors.danger,
+    fontWeight: '600',
+    fontSize: 14,
   },
 });
