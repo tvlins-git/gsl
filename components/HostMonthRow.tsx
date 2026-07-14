@@ -1,5 +1,6 @@
 import { Picker } from '@react-native-picker/picker';
-import { StyleSheet, Text, View } from 'react-native';
+import { SymbolView } from 'expo-symbols';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { sharedStyles, theme } from '@/constants/theme';
 import type { Member } from '@/lib/database.types';
 import type { MonthEntry } from '@/lib/hosts';
@@ -9,6 +10,7 @@ interface HostMonthRowProps {
   members: Member[];
   assignedMemberId: string | null;
   onAssign: (memberId: string | null) => void;
+  onDelete?: () => void;
   disabled?: boolean;
 }
 
@@ -17,6 +19,7 @@ export function HostMonthRow({
   members,
   assignedMemberId,
   onAssign,
+  onDelete,
   disabled = false,
 }: HostMonthRowProps) {
   return (
@@ -48,6 +51,40 @@ export function HostMonthRow({
           ))}
         </Picker>
       </View>
+      {assignedMemberId ? (
+        <Pressable
+          onPress={() => onAssign(null)}
+          disabled={disabled}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={`Remove host for ${month.label}`}
+          style={styles.iconBtn}
+          testID={`host-remove-${month.year}-${month.month}`}
+        >
+          <SymbolView
+            name={{ ios: 'xmark', android: 'close', web: 'close' }}
+            tintColor={theme.colors.textMuted}
+            size={16}
+          />
+        </Pressable>
+      ) : null}
+      {onDelete ? (
+        <Pressable
+          onPress={onDelete}
+          disabled={disabled}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={`Delete ${month.label} row`}
+          style={styles.iconBtn}
+          testID={`host-delete-${month.year}-${month.month}`}
+        >
+          <SymbolView
+            name={{ ios: 'trash', android: 'delete', web: 'delete' }}
+            tintColor={theme.colors.danger}
+            size={18}
+          />
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -98,5 +135,11 @@ const styles = StyleSheet.create({
   },
   picker: {
     height: 44,
+  },
+  iconBtn: {
+    marginLeft: theme.spacing.sm,
+    padding: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

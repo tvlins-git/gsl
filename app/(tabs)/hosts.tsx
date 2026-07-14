@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { FlatList, StyleSheet, Text } from 'react-native';
+import { FlatList, Pressable, StyleSheet, Text } from 'react-native';
 import { HostMonthRow } from '@/components/HostMonthRow';
 import { Screen } from '@/components/ui/Screen';
 import { useAuth } from '@/contexts/AuthContext';
@@ -14,7 +14,12 @@ export default function HostsScreen() {
   const [members, setMembers] = useState<Member[]>([]);
   const [assignments, setAssignments] = useState<HostAssignment[]>([]);
   const [loading, setLoading] = useState(true);
-  const months = generateMonthList(12);
+  const [monthCount, setMonthCount] = useState(12);
+  const [removedKeys, setRemovedKeys] = useState<string[]>([]);
+  const rowKey = (year: number, month: number) => `${year}-${month}`;
+  const months = generateMonthList(monthCount).filter(
+    (m) => !removedKeys.includes(rowKey(m.year, m.month))
+  );
 
   const loadData = useCallback(async () => {
     if (!member) return;
@@ -95,8 +100,22 @@ export default function HostsScreen() {
             members={members}
             assignedMemberId={getAssignment(item.year, item.month)}
             onAssign={(id) => handleAssign(item.year, item.month, id)}
+            onDelete={() =>
+              setRemovedKeys((keys) => [...keys, rowKey(item.year, item.month)])
+            }
           />
         )}
+        ListFooterComponent={
+          <Pressable
+            style={[styles.addBtn, sharedStyles.secondaryBtn]}
+            onPress={() => setMonthCount((count) => count + 1)}
+            testID="add-month-btn"
+            accessibilityRole="button"
+            accessibilityLabel="Add next month"
+          >
+            <Text style={sharedStyles.secondaryBtnText}>+ Add month</Text>
+          </Pressable>
+        }
       />
     </Screen>
   );
@@ -113,5 +132,9 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
     fontSize: 14,
     lineHeight: 20,
+  },
+  addBtn: {
+    marginHorizontal: theme.spacing.lg,
+    marginTop: theme.spacing.sm,
   },
 });

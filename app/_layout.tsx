@@ -9,6 +9,7 @@ import 'react-native-reanimated';
 
 import { useColorScheme } from '@/components/useColorScheme';
 import { GslNavTitle } from '@/components/GslNavTitle';
+import { HeaderBackButton } from '@/components/HeaderBackButton';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { getDeepLinkPath, parseNotificationData } from '@/lib/notifications';
 
@@ -78,7 +79,10 @@ function RootLayoutNav() {
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen
             name="thread/[id]"
-            options={{ headerTitle: () => <GslNavTitle suffix="Chat" /> }}
+            options={{
+              headerTitle: () => <GslNavTitle suffix="Chat" />,
+              headerLeft: () => <HeaderBackButton />,
+            }}
           />
         </Stack>
       </LoadingGate>
