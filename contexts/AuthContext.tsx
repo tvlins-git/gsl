@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import type { AppUser } from '@/constants/hardcoded-user';
 import { ensureAppUsersLoaded } from '@/lib/app-users';
@@ -9,6 +9,7 @@ import {
   getCurrentMember,
   getStoredUser,
   isLoggedOut,
+  setStoredUser,
   signInWithPassword,
   signOutUser,
 } from '@/lib/auth';
@@ -65,6 +66,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [localMode, setLocalMode] = useState(false);
   const [loggedOut, setLoggedOut] = useState(false);
+  const loggedOutRef = useRef(loggedOut);
+  loggedOutRef.current = loggedOut;
 
   const refreshMember = useCallback(async () => {
     const m = await getCurrentMember();
@@ -87,6 +90,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!result.ok) return result;
 
     setLoading(true);
+    // Persist the chosen account before clearing logged-out so no race can
+    // bootstrap a previous user from storage.
+    await setStoredUser(user);
     await clearLoggedOut();
     setLoggedOut(false);
     setLocalMode(false);
@@ -106,32 +112,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [refreshMember]);
 
   useEffect(() => {
+    let cancelled = false;
+
     ensureAppUsersLoaded()
       .then(() => getStoredUser())
-      .then((user) =>
-        bootstrapSession(user, setSession, setMember, setLocalMode, setLoggedOut, refreshMember)
-      )
+      .then(async (user) => {
+        if (cancelled) return;
+        await bootstrapSession(user, setSession, setMember, setLocalMode, setLoggedOut, refreshMember);
+      })
       .catch(() =>
         ensureAppUsersLoaded()
           .then(() => getStoredUser())
           .then((user) => {
+            if (cancelled) return;
             const localMember = activateLocalMode(user);
             setLocalMode(true);
             setMember(localMember);
             setLoggedOut(false);
           })
       )
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
-      if (!isLocalMode() && !loggedOut) {
+      if (!isLocalMode() && !loggedOutRef.current) {
         setSession(s);
         if (s) refreshMember();
       }
     });
 
-    return () => subscription.unsubscribe();
-  }, [refreshMember, loggedOut]);
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
+  }, [refreshMember]);
 
   const value = useMemo(
     () => ({ session, member, loading, localMode, loggedOut, refreshMember, signOut, signIn }),
