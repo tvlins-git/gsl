@@ -34,14 +34,40 @@ describe('app-users', () => {
     __resetAppUsersCacheForTests();
   });
 
-  it('seeds Hr. Lins as admin and Hr. Andersen as member', async () => {
+  it('seeds only Hr. Lins as the default admin', async () => {
     await ensureAppUsersLoaded();
     const users = await listAppUsers();
-    const admin = users.find((user) => user.id === ADMIN_USER_ID);
-    const andersen = users.find((user) => user.id === 'hr-andersen');
-    expect(admin?.role).toBe('admin');
-    expect(admin?.displayName).toBe('Hr. Lins');
-    expect(andersen?.role).toBe('member');
+    expect(users).toHaveLength(1);
+    expect(users[0].id).toBe(ADMIN_USER_ID);
+    expect(users[0].role).toBe('admin');
+    expect(users[0].displayName).toBe('Hr. Lins');
+  });
+
+  it('strips legacy Hr. Andersen from stored users', async () => {
+    storage['gsl_app_users_v1'] = JSON.stringify([
+      {
+        id: ADMIN_USER_ID,
+        email: 'hr.lins@gsl.local',
+        password: 'thomas',
+        displayName: 'Hr. Lins',
+        role: 'admin',
+        localMemberId: '00000000-0000-4000-8000-000000000002',
+        localUserId: '00000000-0000-4000-8000-000000000003',
+      },
+      {
+        id: 'hr-andersen',
+        email: 'hr.andersen@gsl.local',
+        password: 'jesper',
+        displayName: 'Hr. Andersen',
+        role: 'member',
+        localMemberId: '00000000-0000-4000-8000-000000000004',
+        localUserId: '00000000-0000-4000-8000-000000000005',
+      },
+    ]);
+
+    await ensureAppUsersLoaded();
+    const users = await listAppUsers();
+    expect(users.map((user) => user.id)).toEqual([ADMIN_USER_ID]);
   });
 
   it('creates a new member user', async () => {
@@ -78,14 +104,17 @@ describe('app-users', () => {
     expect(result).toEqual({ ok: false, error: 'Password must be at least 4 characters.' });
   });
 
-  it('keeps seed passwords available', () => {
+  it('keeps admin seed password available', () => {
+    expect(HARDCODED_USERS).toHaveLength(1);
     expect(HARDCODED_USERS[0].password).toBe('thomas');
-    expect(HARDCODED_USERS[1].password).toBe('jesper');
   });
 
   it('cannot delete own account', async () => {
     await ensureAppUsersLoaded();
-    const result = await deleteAppUser('hr-andersen', 'hr-andersen');
+    const created = await createAppUser({ displayName: 'Self', password: 'self1' });
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+    const result = await deleteAppUser(created.user.id, created.user.id);
     expect(result).toEqual({ ok: false, error: 'You cannot delete your own account.' });
   });
 });

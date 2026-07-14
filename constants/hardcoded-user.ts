@@ -16,7 +16,10 @@ export type HardcodedUser = AppUser;
 
 export const ADMIN_USER_ID = 'hr-lins';
 
-/** Seeded GSL members for first launch / demo login */
+/** Removed from the seed roster; still stripped from any stored login list. */
+export const LEGACY_REMOVED_USER_IDS = ['hr-andersen'] as const;
+
+/** Seeded GSL members for first launch / demo login — only the main admin. */
 export const HARDCODED_USERS: AppUser[] = [
   {
     id: ADMIN_USER_ID,
@@ -26,15 +29,6 @@ export const HARDCODED_USERS: AppUser[] = [
     role: 'admin',
     localMemberId: '00000000-0000-4000-8000-000000000002',
     localUserId: '00000000-0000-4000-8000-000000000003',
-  },
-  {
-    id: 'hr-andersen',
-    email: 'hr.andersen@gsl.local',
-    password: 'jesper',
-    displayName: 'Hr. Andersen',
-    role: 'member',
-    localMemberId: '00000000-0000-4000-8000-000000000004',
-    localUserId: '00000000-0000-4000-8000-000000000005',
   },
 ];
 

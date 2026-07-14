@@ -3,6 +3,7 @@ import {
   ADMIN_USER_ID,
   DEFAULT_HARDCODED_USER,
   HARDCODED_USERS,
+  LEGACY_REMOVED_USER_IDS,
   type AppUser,
   type AppUserRole,
 } from '@/constants/hardcoded-user';
@@ -48,7 +49,10 @@ function normalizeUser(raw: Partial<AppUser> & Pick<AppUser, 'id' | 'displayName
 
 function ensureAdminPresent(users: AppUser[]): AppUser[] {
   const adminSeed = HARDCODED_USERS.find((user) => user.id === ADMIN_USER_ID)!;
-  const withoutDupAdmin = users.filter((user) => user.id !== ADMIN_USER_ID);
+  const legacyRemoved = new Set<string>(LEGACY_REMOVED_USER_IDS);
+  const withoutDupAdmin = users.filter(
+    (user) => user.id !== ADMIN_USER_ID && !legacyRemoved.has(user.id)
+  );
   const existingAdmin = users.find((user) => user.id === ADMIN_USER_ID);
   const admin = normalizeUser({
     ...adminSeed,

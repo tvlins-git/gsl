@@ -215,7 +215,8 @@ export default function SettingsScreen() {
               <View style={[styles.sectionCard, sharedStyles.card]} testID="admin-users-section">
                 <Text style={sharedStyles.sectionTitle}>Users</Text>
                 <Text style={styles.sectionHint}>
-                  Create and delete login accounts. Hr. Lins is the main admin and cannot be deleted.
+                  Create and delete login accounts. Only Hr. Lins is the default admin and cannot be
+                  deleted.
                 </Text>
 
                 <View style={styles.userMgmtList}>
