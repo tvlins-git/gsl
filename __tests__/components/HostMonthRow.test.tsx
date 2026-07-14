@@ -31,11 +31,12 @@ describe('HostMonthRow', () => {
     expect(screen.getByTestId('host-row-2026-7')).toBeTruthy();
   });
 
-  it('hides the remove button when unassigned', () => {
+  it('hides the remove control when unassigned but keeps layout slot', () => {
     render(
       <HostMonthRow month={month} members={members} assignedMemberId={null} onAssign={() => {}} />
     );
     expect(screen.queryByTestId('host-remove-2026-7')).toBeNull();
+    expect(screen.getByTestId('host-row-2026-7')).toBeTruthy();
   });
 
   it('shows the remove button when assigned and clears on press', () => {
