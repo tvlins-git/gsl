@@ -51,40 +51,45 @@ export function HostMonthRow({
           ))}
         </Picker>
       </View>
-      {assignedMemberId ? (
-        <Pressable
-          onPress={() => onAssign(null)}
-          disabled={disabled}
-          hitSlop={8}
-          accessibilityRole="button"
-          accessibilityLabel={`Remove host for ${month.label}`}
-          style={styles.iconBtn}
-          testID={`host-remove-${month.year}-${month.month}`}
-        >
-          <SymbolView
-            name={{ ios: 'xmark', android: 'close', web: 'close' }}
-            tintColor={theme.colors.textMuted}
-            size={16}
-          />
-        </Pressable>
-      ) : null}
-      {onDelete ? (
-        <Pressable
-          onPress={onDelete}
-          disabled={disabled}
-          hitSlop={8}
-          accessibilityRole="button"
-          accessibilityLabel={`Delete ${month.label} row`}
-          style={styles.iconBtn}
-          testID={`host-delete-${month.year}-${month.month}`}
-        >
-          <SymbolView
-            name={{ ios: 'trash', android: 'delete', web: 'delete' }}
-            tintColor={theme.colors.danger}
-            size={18}
-          />
-        </Pressable>
-      ) : null}
+      <View style={styles.actions}>
+        {assignedMemberId ? (
+          <Pressable
+            onPress={() => onAssign(null)}
+            disabled={disabled}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={`Remove host for ${month.label}`}
+            style={styles.iconBtn}
+            testID={`host-remove-${month.year}-${month.month}`}
+          >
+            <SymbolView
+              name={{ ios: 'xmark', android: 'close', web: 'close' }}
+              tintColor={theme.colors.textMuted}
+              size={16}
+            />
+          </Pressable>
+        ) : (
+          // Reserve the clear-button slot so the picker stays aligned across rows.
+          <View style={styles.iconPlaceholder} />
+        )}
+        {onDelete ? (
+          <Pressable
+            onPress={onDelete}
+            disabled={disabled}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={`Delete ${month.label} row`}
+            style={styles.iconBtn}
+            testID={`host-delete-${month.year}-${month.month}`}
+          >
+            <SymbolView
+              name={{ ios: 'trash', android: 'delete', web: 'delete' }}
+              tintColor={theme.colors.danger}
+              size={18}
+            />
+          </Pressable>
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -136,10 +141,18 @@ const styles = StyleSheet.create({
   picker: {
     height: 44,
   },
+  actions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   iconBtn: {
     marginLeft: theme.spacing.sm,
     padding: 4,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  iconPlaceholder: {
+    marginLeft: theme.spacing.sm,
+    width: 24,
   },
 });
