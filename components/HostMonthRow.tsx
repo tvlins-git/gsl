@@ -22,6 +22,8 @@ export function HostMonthRow({
   onDelete,
   disabled = false,
 }: HostMonthRowProps) {
+  const canClear = !!assignedMemberId;
+
   return (
     <View
       style={[
@@ -51,43 +53,50 @@ export function HostMonthRow({
           ))}
         </Picker>
       </View>
-      {assignedMemberId ? (
-        <Pressable
-          onPress={() => onAssign(null)}
-          disabled={disabled}
-          hitSlop={8}
-          accessibilityRole="button"
-          accessibilityLabel={`Remove host for ${month.label}`}
-          style={styles.iconBtn}
-          testID={`host-remove-${month.year}-${month.month}`}
-        >
-          <SymbolView
-            name={{ ios: 'xmark', android: 'close', web: 'close' }}
-            tintColor={theme.colors.textMuted}
-            size={16}
-          />
-        </Pressable>
-      ) : null}
+      {/* Always reserve this slot so assigned/unassigned rows stay left-aligned. */}
+      <View style={styles.iconSlot}>
+        {canClear ? (
+          <Pressable
+            onPress={() => onAssign(null)}
+            disabled={disabled}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={`Remove host for ${month.label}`}
+            style={styles.iconBtn}
+            testID={`host-remove-${month.year}-${month.month}`}
+          >
+            <SymbolView
+              name={{ ios: 'xmark', android: 'close', web: 'close' }}
+              tintColor={theme.colors.textMuted}
+              size={16}
+            />
+          </Pressable>
+        ) : null}
+      </View>
       {onDelete ? (
-        <Pressable
-          onPress={onDelete}
-          disabled={disabled}
-          hitSlop={8}
-          accessibilityRole="button"
-          accessibilityLabel={`Delete ${month.label} row`}
-          style={styles.iconBtn}
-          testID={`host-delete-${month.year}-${month.month}`}
-        >
-          <SymbolView
-            name={{ ios: 'trash', android: 'delete', web: 'delete' }}
-            tintColor={theme.colors.danger}
-            size={18}
-          />
-        </Pressable>
+        <View style={styles.iconSlot}>
+          <Pressable
+            onPress={onDelete}
+            disabled={disabled}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={`Delete ${month.label} row`}
+            style={styles.iconBtn}
+            testID={`host-delete-${month.year}-${month.month}`}
+          >
+            <SymbolView
+              name={{ ios: 'trash', android: 'delete', web: 'delete' }}
+              tintColor={theme.colors.danger}
+              size={18}
+            />
+          </Pressable>
+        </View>
       ) : null}
     </View>
   );
 }
+
+const ICON_SLOT = 28;
 
 const styles = StyleSheet.create({
   card: {
@@ -108,6 +117,7 @@ const styles = StyleSheet.create({
   },
   labelCol: {
     flex: 1,
+    minWidth: 0,
   },
   monthLabel: {
     fontSize: 16,
@@ -132,13 +142,21 @@ const styles = StyleSheet.create({
   },
   pickerCol: {
     flex: 1.2,
+    minWidth: 0,
   },
   picker: {
     height: 44,
   },
-  iconBtn: {
+  iconSlot: {
+    width: ICON_SLOT,
+    height: ICON_SLOT,
     marginLeft: theme.spacing.sm,
-    padding: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconBtn: {
+    width: ICON_SLOT,
+    height: ICON_SLOT,
     alignItems: 'center',
     justifyContent: 'center',
   },
