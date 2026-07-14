@@ -217,14 +217,14 @@ export default function PlanScreen() {
         {polls.map((poll) => (
           <View key={poll.id} style={[styles.pollCard, sharedStyles.card]}>
             <Pressable style={styles.pollCardMain} onPress={() => loadPollDetail(poll)}>
-              <View style={styles.pollCardHeader}>
-                <Text style={styles.pollCardTitle}>{poll.title}</Text>
-                <StatusBadge status={poll.status} />
-              </View>
+              <Text style={styles.pollCardTitle}>{poll.title}</Text>
               <Text style={styles.pollCardSummary}>
                 {pollSummaries[poll.id] ?? 'Loading…'}
               </Text>
             </Pressable>
+            <View style={styles.pollCardStatus}>
+              <StatusBadge status={poll.status} />
+            </View>
             <Pressable
               style={styles.deleteBtn}
               onPress={() => handleDeletePoll(poll.id)}
@@ -295,15 +295,17 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   pollCardMain: { flex: 1, padding: theme.spacing.lg },
-  pollCardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: theme.spacing.sm,
+  pollCardTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: theme.colors.text,
     marginBottom: theme.spacing.sm,
   },
-  pollCardTitle: { fontSize: 17, fontWeight: '600', color: theme.colors.text, flex: 1 },
   pollCardSummary: { color: theme.colors.textSecondary, fontSize: 14, lineHeight: 20 },
+  pollCardStatus: {
+    justifyContent: 'center',
+    paddingRight: theme.spacing.md,
+  },
   deleteBtn: {
     justifyContent: 'center',
     paddingHorizontal: theme.spacing.lg,
