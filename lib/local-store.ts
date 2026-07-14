@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { DEFAULT_HARDCODED_USER, HARDCODED_USERS, type HardcodedUser } from '@/constants/hardcoded-user';
+import { DEFAULT_HARDCODED_USER, type AppUser } from '@/constants/hardcoded-user';
+import { getAppUsersSync } from './app-users';
 import { summarizePollAcceptance } from './polls';
 import type {
   HostAssignment,
@@ -15,23 +16,24 @@ import type {
 
 export const LOCAL_GROUP_ID = '00000000-0000-4000-8000-000000000001';
 
-const LOCAL_USER_IDS: Record<HardcodedUser['id'], { memberId: string; userId: string }> = {
-  'hr-lins': {
-    memberId: '00000000-0000-4000-8000-000000000002',
-    userId: '00000000-0000-4000-8000-000000000003',
-  },
-  'hr-andersen': {
-    memberId: '00000000-0000-4000-8000-000000000004',
-    userId: '00000000-0000-4000-8000-000000000005',
-  },
-};
-
 const STORAGE_KEY = 'gsl_local_data_v1';
 
 let localModeActive = false;
-let activeLocalUser: HardcodedUser = DEFAULT_HARDCODED_USER;
+let activeLocalUser: AppUser = DEFAULT_HARDCODED_USER;
 
-export function setActiveLocalUser(user: HardcodedUser) {
+function memberFromAppUser(user: AppUser): Member {
+  return {
+    id: user.localMemberId,
+    group_id: LOCAL_GROUP_ID,
+    user_id: user.localUserId,
+    display_name: user.displayName,
+    avatar_url: null,
+    role: user.role,
+    created_at: new Date().toISOString(),
+  };
+}
+
+export function setActiveLocalUser(user: AppUser) {
   activeLocalUser = user;
 }
 
@@ -48,31 +50,12 @@ export function isLocalMode() {
 }
 
 export function createLocalMember(): Member {
-  const ids = LOCAL_USER_IDS[activeLocalUser.id];
-  return {
-    id: ids.memberId,
-    group_id: LOCAL_GROUP_ID,
-    user_id: ids.userId,
-    display_name: activeLocalUser.displayName,
-    avatar_url: null,
-    role: 'admin',
-    created_at: new Date().toISOString(),
-  };
+  const live = getAppUsersSync().find((user) => user.id === activeLocalUser.id) ?? activeLocalUser;
+  return memberFromAppUser(live);
 }
 
 export function getLocalGroupMembers(): Member[] {
-  return HARDCODED_USERS.map((user) => {
-    const ids = LOCAL_USER_IDS[user.id];
-    return {
-      id: ids.memberId,
-      group_id: LOCAL_GROUP_ID,
-      user_id: ids.userId,
-      display_name: user.displayName,
-      avatar_url: null,
-      role: 'admin',
-      created_at: new Date().toISOString(),
-    };
-  });
+  return getAppUsersSync().map(memberFromAppUser);
 }
 
 interface LocalData {

@@ -1,6 +1,7 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
-import type { HardcodedUser } from '@/constants/hardcoded-user';
+import type { AppUser } from '@/constants/hardcoded-user';
+import { ensureAppUsersLoaded } from '@/lib/app-users';
 import {
   activateLocalMode,
   clearLoggedOut,
@@ -8,6 +9,7 @@ import {
   getCurrentMember,
   getStoredUser,
   isLoggedOut,
+  setStoredUser,
   signInWithPassword,
   signOutUser,
 } from '@/lib/auth';
@@ -24,19 +26,21 @@ interface AuthContextValue {
   loggedOut: boolean;
   refreshMember: () => Promise<void>;
   signOut: () => Promise<void>;
-  signIn: (user: HardcodedUser, password: string) => Promise<{ ok: true } | { ok: false; error: string }>;
+  signIn: (user: AppUser, password: string) => Promise<{ ok: true } | { ok: false; error: string }>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 async function bootstrapSession(
-  user: HardcodedUser,
+  user: AppUser,
   setSession: (s: Session | null) => void,
   setMember: (m: Member | null) => void,
   setLocalMode: (v: boolean) => void,
   setLoggedOut: (v: boolean) => void,
   refreshMember: () => Promise<void>
 ) {
+  await ensureAppUsersLoaded();
+
   if (await isLoggedOut()) {
     setLoggedOut(true);
     return;
@@ -62,6 +66,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [localMode, setLocalMode] = useState(false);
   const [loggedOut, setLoggedOut] = useState(false);
+  const loggedOutRef = useRef(loggedOut);
+  loggedOutRef.current = loggedOut;
 
   const refreshMember = useCallback(async () => {
     const m = await getCurrentMember();
@@ -79,11 +85,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoggedOut(true);
   }, []);
 
-  const signIn = useCallback(async (user: HardcodedUser, password: string) => {
+  const signIn = useCallback(async (user: AppUser, password: string) => {
     const result = await signInWithPassword(user, password);
     if (!result.ok) return result;
 
     setLoading(true);
+    // Persist the chosen account before clearing logged-out so no race can
+    // bootstrap a previous user from storage.
+    await setStoredUser(user);
     await clearLoggedOut();
     setLoggedOut(false);
     setLocalMode(false);
@@ -91,6 +100,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await bootstrapSession(user, setSession, setMember, setLocalMode, setLoggedOut, refreshMember);
       return { ok: true as const };
     } catch {
+      await ensureAppUsersLoaded();
       const localMember = activateLocalMode(user);
       setLocalMode(true);
       setMember(localMember);
@@ -102,29 +112,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [refreshMember]);
 
   useEffect(() => {
-    getStoredUser()
-      .then((user) =>
-        bootstrapSession(user, setSession, setMember, setLocalMode, setLoggedOut, refreshMember)
-      )
+    let cancelled = false;
+
+    ensureAppUsersLoaded()
+      .then(() => getStoredUser())
+      .then(async (user) => {
+        if (cancelled) return;
+        await bootstrapSession(user, setSession, setMember, setLocalMode, setLoggedOut, refreshMember);
+      })
       .catch(() =>
-        getStoredUser().then((user) => {
-          const localMember = activateLocalMode(user);
-          setLocalMode(true);
-          setMember(localMember);
-          setLoggedOut(false);
-        })
+        ensureAppUsersLoaded()
+          .then(() => getStoredUser())
+          .then((user) => {
+            if (cancelled) return;
+            const localMember = activateLocalMode(user);
+            setLocalMode(true);
+            setMember(localMember);
+            setLoggedOut(false);
+          })
       )
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
-      if (!isLocalMode() && !loggedOut) {
+      if (!isLocalMode() && !loggedOutRef.current) {
         setSession(s);
         if (s) refreshMember();
       }
     });
 
-    return () => subscription.unsubscribe();
-  }, [refreshMember, loggedOut]);
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
+  }, [refreshMember]);
 
   const value = useMemo(
     () => ({ session, member, loading, localMode, loggedOut, refreshMember, signOut, signIn }),

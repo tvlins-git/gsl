@@ -1,11 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { HardcodedUser } from '@/constants/hardcoded-user';
+import type { AppUser } from '@/constants/hardcoded-user';
 import { isLocalMode } from './local-store';
 import { supabase } from './supabase';
 
 const STORAGE_KEY = 'gsl_user_passwords_v1';
 
-type PasswordOverrides = Partial<Record<HardcodedUser['id'], string>>;
+type PasswordOverrides = Record<string, string>;
 
 async function readOverrides(): Promise<PasswordOverrides> {
   const raw = await AsyncStorage.getItem(STORAGE_KEY);
@@ -21,18 +21,25 @@ async function writeOverrides(overrides: PasswordOverrides) {
   await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(overrides));
 }
 
-export async function getEffectivePassword(user: HardcodedUser): Promise<string> {
+export async function getEffectivePassword(user: AppUser): Promise<string> {
   const overrides = await readOverrides();
   return overrides[user.id] ?? user.password;
 }
 
-export async function validateUserPassword(user: HardcodedUser, password: string): Promise<boolean> {
+export async function validateUserPassword(user: AppUser, password: string): Promise<boolean> {
   const expected = await getEffectivePassword(user);
   return password === expected;
 }
 
+export async function clearPasswordOverride(userId: string) {
+  const overrides = await readOverrides();
+  if (!(userId in overrides)) return;
+  delete overrides[userId];
+  await writeOverrides(overrides);
+}
+
 export async function resetUserPassword(
-  user: HardcodedUser,
+  user: AppUser,
   currentPassword: string,
   newPassword: string,
   confirmPassword: string
