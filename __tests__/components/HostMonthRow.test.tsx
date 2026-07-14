@@ -47,4 +47,27 @@ describe('HostMonthRow', () => {
     fireEvent.press(removeBtn);
     expect(onAssign).toHaveBeenCalledWith(null);
   });
+
+  it('renders the delete button and calls onDelete on press', () => {
+    const onDelete = jest.fn();
+    render(
+      <HostMonthRow
+        month={month}
+        members={members}
+        assignedMemberId={null}
+        onAssign={() => {}}
+        onDelete={onDelete}
+      />
+    );
+    const deleteBtn = screen.getByTestId('host-delete-2026-7');
+    fireEvent.press(deleteBtn);
+    expect(onDelete).toHaveBeenCalledTimes(1);
+  });
+
+  it('hides the delete button when onDelete is not provided', () => {
+    render(
+      <HostMonthRow month={month} members={members} assignedMemberId={null} onAssign={() => {}} />
+    );
+    expect(screen.queryByTestId('host-delete-2026-7')).toBeNull();
+  });
 });

@@ -15,7 +15,11 @@ export default function HostsScreen() {
   const [assignments, setAssignments] = useState<HostAssignment[]>([]);
   const [loading, setLoading] = useState(true);
   const [monthCount, setMonthCount] = useState(12);
-  const months = generateMonthList(monthCount);
+  const [removedKeys, setRemovedKeys] = useState<string[]>([]);
+  const rowKey = (year: number, month: number) => `${year}-${month}`;
+  const months = generateMonthList(monthCount).filter(
+    (m) => !removedKeys.includes(rowKey(m.year, m.month))
+  );
 
   const loadData = useCallback(async () => {
     if (!member) return;
@@ -96,6 +100,9 @@ export default function HostsScreen() {
             members={members}
             assignedMemberId={getAssignment(item.year, item.month)}
             onAssign={(id) => handleAssign(item.year, item.month, id)}
+            onDelete={() =>
+              setRemovedKeys((keys) => [...keys, rowKey(item.year, item.month)])
+            }
           />
         )}
         ListFooterComponent={
