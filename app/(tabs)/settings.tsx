@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -15,18 +15,27 @@ import { UserAvatar } from '@/components/UserAvatar';
 import { UserOptionRow } from '@/components/UserOptionRow';
 import { useAuth } from '@/contexts/AuthContext';
 import {
+  ADMIN_USER_ID,
   DEFAULT_HARDCODED_USER,
-  HARDCODED_USERS,
-  getHardcodedUser,
+  isAdminUser,
+  type AppUser,
 } from '@/constants/hardcoded-user';
+import {
+  createAppUser,
+  deleteAppUser,
+  listAppUsers,
+  resolveSignedInAppUser,
+} from '@/lib/app-users';
 import { getStoredUser, updateMemberContactEmail } from '@/lib/auth';
 import { isValidContactEmail } from '@/lib/calendar-invite';
-import { resetUserPassword } from '@/lib/user-passwords';
+import { clearPasswordOverride, resetUserPassword } from '@/lib/user-passwords';
+import { APP_VERSION } from '@/constants/brand';
 import { sharedStyles, theme } from '@/constants/theme';
 
 export default function SettingsScreen() {
   const { member, loggedOut, signOut, signIn, loading, localMode, refreshMember } = useAuth();
   const [busy, setBusy] = useState(false);
+  const [users, setUsers] = useState<AppUser[]>([]);
   const [selectedUserId, setSelectedUserId] = useState(DEFAULT_HARDCODED_USER.id);
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
@@ -35,9 +44,23 @@ export default function SettingsScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [resetError, setResetError] = useState('');
   const [resetSuccess, setResetSuccess] = useState('');
+  const [newUserName, setNewUserName] = useState('');
+  const [newUserPassword, setNewUserPassword] = useState('');
+  const [userMgmtError, setUserMgmtError] = useState('');
+  const [userMgmtSuccess, setUserMgmtSuccess] = useState('');
   const [contactEmail, setContactEmail] = useState('');
   const [emailError, setEmailError] = useState('');
   const [emailSuccess, setEmailSuccess] = useState('');
+
+  const refreshUsers = useCallback(async () => {
+    const list = await listAppUsers();
+    setUsers(list);
+    return list;
+  }, []);
+
+  useEffect(() => {
+    refreshUsers().catch(() => undefined);
+  }, [refreshUsers, member, loggedOut]);
 
   useEffect(() => {
     if (!loggedOut && member) return;
@@ -50,10 +73,12 @@ export default function SettingsScreen() {
     setEmailSuccess('');
   }, [member?.id, member?.contact_email]);
 
-  const selectedUser = getHardcodedUser(selectedUserId) ?? DEFAULT_HARDCODED_USER;
-  const signedInUser = member
-    ? HARDCODED_USERS.find((user) => user.displayName === member.display_name)
-    : undefined;
+  const selectedUser =
+    users.find((user) => user.id === selectedUserId) ??
+    users[0] ??
+    DEFAULT_HARDCODED_USER;
+  const signedInUser = resolveSignedInAppUser(member?.display_name);
+  const isAdmin = isAdminUser(member) || isAdminUser(signedInUser);
 
   const handleSignOut = async () => {
     setBusy(true);
@@ -65,6 +90,10 @@ export default function SettingsScreen() {
       setConfirmPassword('');
       setResetError('');
       setResetSuccess('');
+      setUserMgmtError('');
+      setUserMgmtSuccess('');
+      setNewUserName('');
+      setNewUserPassword('');
       setContactEmail('');
       setEmailError('');
       setEmailSuccess('');
@@ -119,6 +148,50 @@ export default function SettingsScreen() {
     }
   };
 
+  const handleCreateUser = async () => {
+    if (!signedInUser || !isAdmin) return;
+
+    setBusy(true);
+    setUserMgmtError('');
+    setUserMgmtSuccess('');
+    try {
+      const result = await createAppUser({
+        displayName: newUserName,
+        password: newUserPassword,
+      });
+      if (!result.ok) {
+        setUserMgmtError(result.error);
+        return;
+      }
+      setNewUserName('');
+      setNewUserPassword('');
+      setUserMgmtSuccess(`Created ${result.user.displayName}.`);
+      await refreshUsers();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleDeleteUser = async (user: AppUser) => {
+    if (!signedInUser || !isAdmin) return;
+
+    setBusy(true);
+    setUserMgmtError('');
+    setUserMgmtSuccess('');
+    try {
+      const result = await deleteAppUser(user.id, signedInUser.id);
+      if (!result.ok) {
+        setUserMgmtError(result.error);
+        return;
+      }
+      await clearPasswordOverride(user.id);
+      setUserMgmtSuccess(`Deleted ${user.displayName}.`);
+      await refreshUsers();
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const handleSaveEmail = async () => {
     if (!member) return;
 
@@ -163,6 +236,11 @@ export default function SettingsScreen() {
               <Text style={styles.profileName}>{member.display_name}</Text>
               <View style={styles.badgeRow}>
                 <StatusBadge status="signed in" />
+                {isAdmin && (
+                  <View style={styles.adminBadge}>
+                    <Text style={styles.adminBadgeText}>Admin</Text>
+                  </View>
+                )}
                 {localMode && (
                   <View style={styles.localBadge}>
                     <Text style={styles.localBadgeText}>Local mode</Text>
@@ -170,6 +248,94 @@ export default function SettingsScreen() {
                 )}
               </View>
             </View>
+
+            {isAdmin ? (
+              <View style={[styles.sectionCard, sharedStyles.card]} testID="admin-users-section">
+                <Text style={sharedStyles.sectionTitle}>Users</Text>
+                <Text style={styles.sectionHint}>
+                  Create and delete login accounts. Only Hr. Lins is the default admin and cannot be
+                  deleted.
+                </Text>
+
+                <View style={styles.userMgmtList}>
+                  {users.map((user) => {
+                    const canDelete =
+                      user.id !== ADMIN_USER_ID &&
+                      user.id !== signedInUser?.id &&
+                      user.role !== 'admin';
+                    return (
+                      <View key={user.id} style={styles.userMgmtRow} testID={`managed-user-${user.id}`}>
+                        <UserAvatar name={user.displayName} size={40} />
+                        <View style={styles.userMgmtText}>
+                          <Text style={styles.userMgmtName}>{user.displayName}</Text>
+                          <Text style={styles.userMgmtMeta}>
+                            {user.role === 'admin' ? 'Admin' : 'Member'}
+                          </Text>
+                        </View>
+                        {canDelete ? (
+                          <Pressable
+                            style={styles.deleteUserBtn}
+                            onPress={() => handleDeleteUser(user)}
+                            disabled={busy}
+                            testID={`delete-user-${user.id}`}
+                          >
+                            <Text style={styles.deleteUserText}>Delete</Text>
+                          </Pressable>
+                        ) : (
+                          <Text style={styles.userMgmtLocked}>Protected</Text>
+                        )}
+                      </View>
+                    );
+                  })}
+                </View>
+
+                <Text style={styles.fieldLabel}>New user name</Text>
+                <TextInput
+                  style={sharedStyles.input}
+                  placeholder="Display name"
+                  placeholderTextColor={theme.colors.textMuted}
+                  value={newUserName}
+                  onChangeText={(value) => {
+                    setNewUserName(value);
+                    setUserMgmtError('');
+                    setUserMgmtSuccess('');
+                  }}
+                  autoCapitalize="words"
+                  autoCorrect={false}
+                  testID="new-user-name-input"
+                />
+                <Text style={styles.fieldLabel}>Temporary password</Text>
+                <TextInput
+                  style={sharedStyles.input}
+                  placeholder="Password"
+                  placeholderTextColor={theme.colors.textMuted}
+                  value={newUserPassword}
+                  onChangeText={(value) => {
+                    setNewUserPassword(value);
+                    setUserMgmtError('');
+                    setUserMgmtSuccess('');
+                  }}
+                  secureTextEntry
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  testID="new-user-password-input"
+                />
+                {userMgmtError ? <Text style={styles.errorText}>{userMgmtError}</Text> : null}
+                {userMgmtSuccess ? <Text style={styles.successText}>{userMgmtSuccess}</Text> : null}
+                <Pressable
+                  style={[sharedStyles.primaryBtn, busy && styles.btnDisabled]}
+                  onPress={handleCreateUser}
+                  disabled={busy}
+                  testID="create-user-btn"
+                >
+                  {busy ? (
+                    <ActivityIndicator color={theme.colors.onPrimary} />
+                  ) : (
+                    <Text style={sharedStyles.primaryBtnText}>Create user</Text>
+                  )}
+                </Pressable>
+              </View>
+            ) : null}
 
             <View style={[styles.sectionCard, sharedStyles.card]}>
               <Text style={sharedStyles.sectionTitle}>Email</Text>
@@ -294,6 +460,10 @@ export default function SettingsScreen() {
                 )}
               </Pressable>
             </View>
+
+            <Text style={styles.versionText} testID="app-version">
+              Version {APP_VERSION}
+            </Text>
           </>
         ) : (
           <>
@@ -301,12 +471,15 @@ export default function SettingsScreen() {
               <Logo size={80} showTitle={false} />
               <Text style={styles.heroTitle}>Welcome to GSL</Text>
               <Text style={styles.heroSubtitle}>Choose your account and enter your password</Text>
+              <Text style={styles.versionText} testID="app-version-login">
+                Version {APP_VERSION}
+              </Text>
             </View>
 
             <View style={[styles.sectionCard, sharedStyles.card]}>
               <Text style={sharedStyles.sectionTitle}>Select user</Text>
               <View style={styles.userList}>
-                {HARDCODED_USERS.map((user) => (
+                {users.map((user) => (
                   <UserOptionRow
                     key={user.id}
                     user={user}
@@ -414,6 +587,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: theme.spacing.sm,
     marginTop: theme.spacing.sm,
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+  },
+  adminBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: theme.radius.pill,
+    backgroundColor: theme.colors.accentSoft,
+  },
+  adminBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: theme.colors.accent,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
   },
   localBadge: {
     paddingHorizontal: 8,
@@ -432,6 +620,48 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: theme.colors.textSecondary,
     lineHeight: 20,
+  },
+  userMgmtList: {
+    gap: theme.spacing.sm,
+  },
+  userMgmtRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: theme.colors.border,
+  },
+  userMgmtText: {
+    flex: 1,
+    gap: 2,
+  },
+  userMgmtName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: theme.colors.text,
+  },
+  userMgmtMeta: {
+    fontSize: 13,
+    color: theme.colors.textSecondary,
+  },
+  userMgmtLocked: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: theme.colors.textMuted,
+  },
+  deleteUserBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: theme.radius.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.danger,
+    backgroundColor: theme.colors.dangerSoft,
+  },
+  deleteUserText: {
+    color: theme.colors.danger,
+    fontSize: 13,
+    fontWeight: '600',
   },
   errorText: {
     color: theme.colors.danger,
@@ -456,5 +686,11 @@ const styles = StyleSheet.create({
   },
   btnDisabled: {
     opacity: 0.6,
+  },
+  versionText: {
+    textAlign: 'center',
+    fontSize: 13,
+    color: theme.colors.textMuted,
+    marginTop: theme.spacing.sm,
   },
 });
