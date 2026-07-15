@@ -464,7 +464,7 @@ export default function SettingsScreen() {
               </Pressable>
             </View>
 
-            <Text style={styles.versionText} testID="app-version">
+            <Text style={styles.versionText} testID="app-version-footer">
               Version {APP_VERSION}
             </Text>
           </>
