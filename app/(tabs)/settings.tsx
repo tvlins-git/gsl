@@ -247,6 +247,48 @@ export default function SettingsScreen() {
                   </View>
                 )}
               </View>
+              <Text style={styles.versionText} testID="app-version">
+                Version {APP_VERSION}
+              </Text>
+            </View>
+
+            <View style={[styles.sectionCard, sharedStyles.card]}>
+              <Text style={sharedStyles.sectionTitle}>Email</Text>
+              <Text style={styles.sectionHint}>
+                Used for calendar invites when a plan date is locked in.
+              </Text>
+              <Text style={styles.fieldLabel}>Email address</Text>
+              <TextInput
+                style={sharedStyles.input}
+                placeholder="you@example.com"
+                placeholderTextColor={theme.colors.textMuted}
+                value={contactEmail}
+                onChangeText={(value) => {
+                  setContactEmail(value);
+                  setEmailError('');
+                  setEmailSuccess('');
+                }}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="email"
+                textContentType="emailAddress"
+                testID="contact-email-input"
+              />
+              {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
+              {emailSuccess ? <Text style={styles.successText}>{emailSuccess}</Text> : null}
+              <Pressable
+                style={[sharedStyles.secondaryBtn, busy && styles.btnDisabled]}
+                onPress={handleSaveEmail}
+                disabled={busy}
+                testID="save-email-btn"
+              >
+                {busy ? (
+                  <ActivityIndicator color={theme.colors.text} />
+                ) : (
+                  <Text style={sharedStyles.secondaryBtnText}>Save email</Text>
+                )}
+              </Pressable>
             </View>
 
             {isAdmin ? (
@@ -336,45 +378,6 @@ export default function SettingsScreen() {
                 </Pressable>
               </View>
             ) : null}
-
-            <View style={[styles.sectionCard, sharedStyles.card]}>
-              <Text style={sharedStyles.sectionTitle}>Email</Text>
-              <Text style={styles.sectionHint}>
-                Used for calendar invites when a plan date is locked in.
-              </Text>
-              <Text style={styles.fieldLabel}>Email address</Text>
-              <TextInput
-                style={sharedStyles.input}
-                placeholder="you@example.com"
-                placeholderTextColor={theme.colors.textMuted}
-                value={contactEmail}
-                onChangeText={(value) => {
-                  setContactEmail(value);
-                  setEmailError('');
-                  setEmailSuccess('');
-                }}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoCorrect={false}
-                autoComplete="email"
-                textContentType="emailAddress"
-                testID="contact-email-input"
-              />
-              {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
-              {emailSuccess ? <Text style={styles.successText}>{emailSuccess}</Text> : null}
-              <Pressable
-                style={[sharedStyles.secondaryBtn, busy && styles.btnDisabled]}
-                onPress={handleSaveEmail}
-                disabled={busy}
-                testID="save-email-btn"
-              >
-                {busy ? (
-                  <ActivityIndicator color={theme.colors.text} />
-                ) : (
-                  <Text style={sharedStyles.secondaryBtnText}>Save email</Text>
-                )}
-              </Pressable>
-            </View>
 
             <View style={[styles.sectionCard, sharedStyles.card]}>
               <Text style={sharedStyles.sectionTitle}>Reset password</Text>
