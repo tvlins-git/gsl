@@ -1,6 +1,6 @@
-import { Picker } from '@react-native-picker/picker';
 import { SymbolView } from 'expo-symbols';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { MemberSelect } from '@/components/MemberSelect';
 import { sharedStyles, theme } from '@/constants/theme';
 import type { Member } from '@/lib/database.types';
 import type { MonthEntry } from '@/lib/hosts';
@@ -45,20 +45,14 @@ export function HostMonthRow({
       </View>
 
       <View style={styles.controls}>
-        <View style={styles.pickerCol}>
-          <Picker
-            selectedValue={assignedMemberId ?? ''}
-            onValueChange={(value) => onAssign(value || null)}
-            enabled={!disabled}
-            style={styles.picker}
-            testID={`host-picker-${month.year}-${month.month}`}
-          >
-            <Picker.Item label="Unassigned" value="" />
-            {members.map((m) => (
-              <Picker.Item key={m.id} label={m.display_name} value={m.id} />
-            ))}
-          </Picker>
-        </View>
+        <MemberSelect
+          members={members}
+          value={assignedMemberId}
+          onChange={onAssign}
+          disabled={disabled}
+          width={PICKER_WIDTH}
+          testID={`host-picker-${month.year}-${month.month}`}
+        />
 
         {/* Fixed action column so the clear (X) never shifts adjacent controls. */}
         <View style={[styles.actionsCol, !onDelete && styles.actionsColClearOnly]}>
@@ -153,18 +147,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flexShrink: 0,
-  },
-  pickerCol: {
-    width: PICKER_WIDTH,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: theme.colors.border,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.bg,
-    overflow: 'hidden',
-  },
-  picker: {
-    height: 40,
-    width: '100%',
   },
   actionsCol: {
     flexDirection: 'row',

@@ -103,7 +103,7 @@ export async function sendViaResend(input: {
         {
           filename: input.filename,
           content: icsBase64,
-          content_type: 'text/calendar; method=REQUEST',
+          content_type: 'text/calendar; method=REQUEST; charset=UTF-8',
         },
       ],
     }),

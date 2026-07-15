@@ -18,10 +18,9 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { useAuth } from '@/contexts/AuthContext';
 import { getGroupMembers } from '@/lib/auth';
 import {
-  buildIcsInvite,
-  deliverCalendarInvite,
   describeInviteResult,
   getCalendarInvitees,
+  sendCalendarInvites,
 } from '@/lib/calendar-invite';
 import { isLocalMode, localStore } from '@/lib/local-store';
 import { deletePoll, loadPollSummaries } from '@/lib/poll-list';
@@ -178,17 +177,6 @@ export default function PlanScreen() {
         locked = data;
 
         await supabase.functions
-          .invoke('send-calendar-invite', {
-            body: {
-              poll_id: selectedPoll.id,
-              slot_id: slot.id,
-              group_id: member.group_id,
-              exclude_user_ids: [member.user_id],
-            },
-          })
-          .catch(() => undefined);
-
-        await supabase.functions
           .invoke('send-push', {
             body: {
               type: 'poll',
@@ -202,30 +190,31 @@ export default function PlanScreen() {
           .catch(() => undefined);
       }
 
-      const ics = buildIcsInvite({
-        uid: `${locked.id}-${slot.id}@gsl`,
+      const delivery = await sendCalendarInvites({
+        pollId: locked.id,
+        slotId: slot.id,
         title: locked.title,
-        description: 'GSL group event',
         startsAt: slot.starts_at,
         endsAt: slot.ends_at,
         invitees,
         organizerEmail: member.contact_email ?? undefined,
         organizerName: member.display_name,
-      });
-
-      await deliverCalendarInvite({
-        title: locked.title,
-        startsAt: slot.starts_at,
-        endsAt: slot.ends_at,
-        invitees,
-        ics,
-        filename: `gsl-${locked.title.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.ics`,
+        invokeServer: isLocalMode()
+          ? undefined
+          : async (body) => {
+              const { data, error } = await supabase.functions.invoke('send-calendar-invite', {
+                body,
+              });
+              if (error) throw error;
+              return data as { emailed?: boolean } | null;
+            },
       });
 
       setInviteMessage(
         describeInviteResult({
           inviteeCount: invitees.length,
           skippedWithoutEmail,
+          delivery,
         })
       );
       await loadPollDetail(locked);
@@ -299,13 +288,13 @@ export default function PlanScreen() {
           <Text style={styles.back}>← Back to polls</Text>
         </Pressable>
         <View style={styles.detailHeader}>
-          <View style={styles.detailTitleBlock}>
-            <Text style={styles.pollTitle}>{selectedPoll.title}</Text>
+          <Text style={styles.pollTitle}>{selectedPoll.title}</Text>
+          <View style={styles.detailMetaRow}>
             <StatusBadge status={selectedPoll.status} />
+            <Pressable onPress={() => handleDeletePoll(selectedPoll.id)} testID="delete-poll-detail">
+              <Text style={styles.deleteText}>Delete</Text>
+            </Pressable>
           </View>
-          <Pressable onPress={() => handleDeletePoll(selectedPoll.id)} testID="delete-poll-detail">
-            <Text style={styles.deleteText}>Delete</Text>
-          </Pressable>
         </View>
         {chosenSlot ? (
           <View style={[styles.lockedBanner, sharedStyles.card]}>
@@ -380,14 +369,14 @@ export default function PlanScreen() {
         {polls.map((poll) => (
           <View key={poll.id} style={[styles.pollCard, sharedStyles.card]}>
             <Pressable style={styles.pollCardMain} onPress={() => loadPollDetail(poll)}>
-              <View style={styles.pollCardHeader}>
-                <Text style={styles.pollCardTitle}>{poll.title}</Text>
-                <StatusBadge status={poll.status} />
-              </View>
+              <Text style={styles.pollCardTitle}>{poll.title}</Text>
               <Text style={styles.pollCardSummary}>
                 {pollSummaries[poll.id] ?? 'Loading…'}
               </Text>
             </Pressable>
+            <View style={styles.pollCardStatus}>
+              <StatusBadge status={poll.status} />
+            </View>
             <Pressable
               style={styles.deleteBtn}
               onPress={() => handleDeletePoll(poll.id)}
@@ -458,15 +447,19 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   pollCardMain: { flex: 1, padding: theme.spacing.lg },
-  pollCardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: theme.spacing.sm,
+  pollCardTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: theme.colors.text,
     marginBottom: theme.spacing.sm,
   },
-  pollCardTitle: { fontSize: 17, fontWeight: '600', color: theme.colors.text, flex: 1 },
   pollCardSummary: { color: theme.colors.textSecondary, fontSize: 14, lineHeight: 20 },
+  pollCardStatus: {
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+    minWidth: 64,
+    paddingRight: theme.spacing.md,
+  },
   deleteBtn: {
     justifyContent: 'center',
     paddingHorizontal: theme.spacing.lg,
@@ -478,14 +471,15 @@ const styles = StyleSheet.create({
   backBtn: { padding: theme.spacing.lg, paddingBottom: theme.spacing.sm },
   back: { color: theme.colors.accent, fontSize: 15, fontWeight: '600' },
   detailHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
     paddingHorizontal: theme.spacing.lg,
     paddingBottom: theme.spacing.md,
-    gap: theme.spacing.md,
+    gap: theme.spacing.sm,
   },
-  detailTitleBlock: { flex: 1, gap: theme.spacing.sm },
+  detailMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   pollTitle: { fontSize: 22, fontWeight: '700', color: theme.colors.text },
   lockedBanner: {
     marginHorizontal: theme.spacing.lg,

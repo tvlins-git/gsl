@@ -92,10 +92,13 @@ describe('buildGoogleCalendarUrl', () => {
 });
 
 describe('describeInviteResult', () => {
-  it('summarizes invite outcomes', () => {
-    expect(describeInviteResult({ inviteeCount: 2, skippedWithoutEmail: 1 })).toContain(
-      'Calendar invite prepared for 2'
-    );
+  it('summarizes server email delivery', () => {
+    expect(
+      describeInviteResult({ inviteeCount: 2, skippedWithoutEmail: 1, delivery: 'server' })
+    ).toContain('emailed to 2');
+  });
+
+  it('summarizes missing emails', () => {
     expect(describeInviteResult({ inviteeCount: 0, skippedWithoutEmail: 2 })).toContain(
       'have no email'
     );
