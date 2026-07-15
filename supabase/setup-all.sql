@@ -15,6 +15,7 @@ CREATE TABLE members (
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   display_name TEXT NOT NULL,
   avatar_url TEXT,
+  contact_email TEXT,
   role TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('admin', 'member')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE(group_id, user_id)
@@ -56,6 +57,7 @@ CREATE TABLE polls (
   title TEXT NOT NULL,
   created_by UUID NOT NULL REFERENCES auth.users(id),
   status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'closed')),
+  chosen_slot_id UUID,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -65,6 +67,10 @@ CREATE TABLE poll_slots (
   starts_at TIMESTAMPTZ NOT NULL,
   ends_at TIMESTAMPTZ NOT NULL
 );
+
+ALTER TABLE polls
+  ADD CONSTRAINT polls_chosen_slot_id_fkey
+  FOREIGN KEY (chosen_slot_id) REFERENCES poll_slots(id) ON DELETE SET NULL;
 
 CREATE TABLE poll_responses (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

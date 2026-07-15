@@ -10,6 +10,7 @@ import {
   enableLocalMode,
   getLocalGroupMembers,
   isLocalMode,
+  localStore,
   setActiveLocalUser,
 } from './local-store';
 import { supabase } from './supabase';
@@ -147,12 +148,18 @@ async function getCurrentMemberFromDb(): Promise<Member | null> {
 }
 
 export async function getCurrentMember(): Promise<Member | null> {
-  if (isLocalMode()) return createLocalMember();
+  if (isLocalMode()) {
+    await localStore.hydrate();
+    return createLocalMember();
+  }
   return getCurrentMemberFromDb();
 }
 
 export async function getGroupMembers(groupId: string): Promise<Member[]> {
-  if (isLocalMode()) return getLocalGroupMembers();
+  if (isLocalMode()) {
+    await localStore.hydrate();
+    return getLocalGroupMembers();
+  }
   const { data, error } = await supabase
     .from('members')
     .select('*')
@@ -163,7 +170,10 @@ export async function getGroupMembers(groupId: string): Promise<Member[]> {
 }
 
 export async function updateMemberProfile(memberId: string, displayName: string, avatarUrl?: string) {
-  if (isLocalMode()) return createLocalMember();
+  if (isLocalMode()) {
+    await localStore.hydrate();
+    return createLocalMember();
+  }
   const { data, error } = await supabase
     .from('members')
     .update({ display_name: displayName, avatar_url: avatarUrl ?? null })
@@ -174,9 +184,25 @@ export async function updateMemberProfile(memberId: string, displayName: string,
   return data;
 }
 
+export async function updateMemberContactEmail(memberId: string, email: string | null) {
+  const trimmed = email?.trim() || null;
+  if (isLocalMode()) {
+    return localStore.updateMemberEmail(memberId, trimmed);
+  }
+  const { data, error } = await supabase
+    .from('members')
+    .update({ contact_email: trimmed })
+    .eq('id', memberId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
 export function activateLocalMode(user: HardcodedUser) {
   enableLocalMode();
   setActiveLocalUser(user);
+  void localStore.hydrate();
   return createLocalMember();
 }
 

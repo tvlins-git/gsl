@@ -16,9 +16,9 @@ export interface Database {
         { id?: string; name?: string; created_by?: string | null; created_at?: string }
       >;
       members: TableDef<
-        { id: string; group_id: string; user_id: string; display_name: string; avatar_url: string | null; role: 'admin' | 'member'; created_at: string },
-        { id?: string; group_id: string; user_id: string; display_name: string; avatar_url?: string | null; role?: 'admin' | 'member'; created_at?: string },
-        { id?: string; group_id?: string; user_id?: string; display_name?: string; avatar_url?: string | null; role?: 'admin' | 'member'; created_at?: string }
+        { id: string; group_id: string; user_id: string; display_name: string; avatar_url: string | null; contact_email: string | null; role: 'admin' | 'member'; created_at: string },
+        { id?: string; group_id: string; user_id: string; display_name: string; avatar_url?: string | null; contact_email?: string | null; role?: 'admin' | 'member'; created_at?: string },
+        { id?: string; group_id?: string; user_id?: string; display_name?: string; avatar_url?: string | null; contact_email?: string | null; role?: 'admin' | 'member'; created_at?: string }
       >;
       invite_codes: TableDef<
         { id: string; group_id: string; code: string; used_by: string | null; used_at: string | null; expires_at: string; created_at: string },
@@ -36,9 +36,9 @@ export interface Database {
         { id?: string; group_id?: string; year?: number; month?: number; assigned_member_id?: string | null; updated_by?: string | null; updated_at?: string }
       >;
       polls: TableDef<
-        { id: string; group_id: string; title: string; created_by: string; status: 'open' | 'closed'; created_at: string },
-        { id?: string; group_id: string; title: string; created_by: string; status?: 'open' | 'closed'; created_at?: string },
-        { id?: string; group_id?: string; title?: string; created_by?: string; status?: 'open' | 'closed'; created_at?: string }
+        { id: string; group_id: string; title: string; created_by: string; status: 'open' | 'closed'; chosen_slot_id: string | null; created_at: string },
+        { id?: string; group_id: string; title: string; created_by: string; status?: 'open' | 'closed'; chosen_slot_id?: string | null; created_at?: string },
+        { id?: string; group_id?: string; title?: string; created_by?: string; status?: 'open' | 'closed'; chosen_slot_id?: string | null; created_at?: string }
       >;
       poll_slots: TableDef<
         { id: string; poll_id: string; starts_at: string; ends_at: string },

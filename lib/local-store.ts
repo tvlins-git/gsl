@@ -30,6 +30,7 @@ const STORAGE_KEY = 'gsl_local_data_v1';
 
 let localModeActive = false;
 let activeLocalUser: HardcodedUser = DEFAULT_HARDCODED_USER;
+let memberEmailCache: Record<string, string> = {};
 
 export function setActiveLocalUser(user: HardcodedUser) {
   activeLocalUser = user;
@@ -47,6 +48,11 @@ export function isLocalMode() {
   return localModeActive;
 }
 
+function contactEmailFor(memberId: string): string | null {
+  const email = memberEmailCache[memberId]?.trim();
+  return email || null;
+}
+
 export function createLocalMember(): Member {
   const ids = LOCAL_USER_IDS[activeLocalUser.id];
   return {
@@ -55,6 +61,7 @@ export function createLocalMember(): Member {
     user_id: ids.userId,
     display_name: activeLocalUser.displayName,
     avatar_url: null,
+    contact_email: contactEmailFor(ids.memberId),
     role: 'admin',
     created_at: new Date().toISOString(),
   };
@@ -69,6 +76,7 @@ export function getLocalGroupMembers(): Member[] {
       user_id: ids.userId,
       display_name: user.displayName,
       avatar_url: null,
+      contact_email: contactEmailFor(ids.memberId),
       role: 'admin',
       created_at: new Date().toISOString(),
     };
@@ -84,6 +92,7 @@ interface LocalData {
   messages: Message[];
   photo_events: PhotoEvent[];
   photos: Photo[];
+  member_emails: Record<string, string>;
 }
 
 const emptyData = (): LocalData => ({
@@ -95,13 +104,16 @@ const emptyData = (): LocalData => ({
   messages: [],
   photo_events: [],
   photos: [],
+  member_emails: {},
 });
 
 async function readData(): Promise<LocalData> {
   const raw = await AsyncStorage.getItem(STORAGE_KEY);
   if (!raw) return emptyData();
   try {
-    return { ...emptyData(), ...JSON.parse(raw) };
+    const parsed = { ...emptyData(), ...JSON.parse(raw) } as LocalData;
+    memberEmailCache = parsed.member_emails ?? {};
+    return parsed;
   } catch {
     return emptyData();
   }
@@ -120,6 +132,11 @@ function uuid() {
 }
 
 export const localStore = {
+  /** Load persisted local data into memory (emails, etc.). */
+  async hydrate() {
+    await readData();
+  },
+
   async getHostAssignments(groupId: string) {
     const data = await readData();
     return data.host_assignments.filter((a) => a.group_id === groupId);
@@ -153,7 +170,14 @@ export const localStore = {
 
   async getPolls(groupId: string) {
     const data = await readData();
-    return data.polls.filter((p) => p.group_id === groupId).sort((a, b) => b.created_at.localeCompare(a.created_at));
+    return data.polls
+      .filter((p) => p.group_id === groupId)
+      .map((p) => ({
+        ...p,
+        chosen_slot_id: p.chosen_slot_id ?? null,
+        status: p.status ?? 'open',
+      }))
+      .sort((a, b) => b.created_at.localeCompare(a.created_at));
   },
 
   async getPollSlots(pollId: string) {
@@ -174,6 +198,7 @@ export const localStore = {
       title,
       created_by: userId,
       status: 'open',
+      chosen_slot_id: null,
       created_at: new Date().toISOString(),
     };
     data.polls.push(poll);
@@ -228,6 +253,31 @@ export const localStore = {
     data.poll_slots = data.poll_slots.filter((s) => s.poll_id !== pollId);
     data.poll_responses = data.poll_responses.filter((r) => !slotIds.includes(r.slot_id));
     await writeData(data);
+  },
+
+  async updateMemberEmail(memberId: string, email: string | null) {
+    const data = await readData();
+    const trimmed = email?.trim() ?? '';
+    if (trimmed) {
+      data.member_emails[memberId] = trimmed;
+    } else {
+      delete data.member_emails[memberId];
+    }
+    memberEmailCache = { ...data.member_emails };
+    await writeData(data);
+    return createLocalMember();
+  },
+
+  async lockPoll(pollId: string, slotId: string) {
+    const data = await readData();
+    const poll = data.polls.find((p) => p.id === pollId);
+    if (!poll) throw new Error('Poll not found');
+    const slot = data.poll_slots.find((s) => s.id === slotId && s.poll_id === pollId);
+    if (!slot) throw new Error('Slot not found');
+    poll.status = 'closed';
+    poll.chosen_slot_id = slotId;
+    await writeData(data);
+    return poll;
   },
 
   async getThreads(groupId: string) {

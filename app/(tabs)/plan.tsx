@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -14,6 +17,12 @@ import { Screen } from '@/components/ui/Screen';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { useAuth } from '@/contexts/AuthContext';
 import { getGroupMembers } from '@/lib/auth';
+import {
+  buildIcsInvite,
+  deliverCalendarInvite,
+  describeInviteResult,
+  getCalendarInvitees,
+} from '@/lib/calendar-invite';
 import { isLocalMode, localStore } from '@/lib/local-store';
 import { deletePoll, loadPollSummaries } from '@/lib/poll-list';
 import { computeSlotScores, formatSlotTime } from '@/lib/polls';
@@ -35,6 +44,8 @@ export default function PlanScreen() {
   const [newTitle, setNewTitle] = useState('');
   const [slotError, setSlotError] = useState('');
   const [newSlots, setNewSlots] = useState<{ startsAt: string; endsAt: string }[]>([]);
+  const [lockingSlotId, setLockingSlotId] = useState<string | null>(null);
+  const [inviteMessage, setInviteMessage] = useState('');
 
   const loadPolls = useCallback(async () => {
     if (!member) return;
@@ -138,6 +149,128 @@ export default function PlanScreen() {
     await loadPolls();
   };
 
+  const performLockAndInvite = async (slot: PollSlot) => {
+    if (!member || !selectedPoll) return;
+
+    setLockingSlotId(slot.id);
+    setInviteMessage('');
+    try {
+      const refreshedMembers = await getGroupMembers(member.group_id);
+      setMembers(refreshedMembers);
+
+      const { invitees, skippedWithoutEmail } = getCalendarInvitees(
+        refreshedMembers,
+        responses,
+        slot.id
+      );
+
+      let locked: Poll;
+      if (isLocalMode()) {
+        locked = await localStore.lockPoll(selectedPoll.id, slot.id);
+      } else {
+        const { data, error } = await supabase
+          .from('polls')
+          .update({ status: 'closed', chosen_slot_id: slot.id })
+          .eq('id', selectedPoll.id)
+          .select()
+          .single();
+        if (error || !data) throw error ?? new Error('Failed to lock poll');
+        locked = data;
+
+        await supabase.functions
+          .invoke('send-calendar-invite', {
+            body: {
+              poll_id: selectedPoll.id,
+              slot_id: slot.id,
+              group_id: member.group_id,
+              exclude_user_ids: [member.user_id],
+            },
+          })
+          .catch(() => undefined);
+
+        await supabase.functions
+          .invoke('send-push', {
+            body: {
+              type: 'poll',
+              group_id: member.group_id,
+              exclude_user_ids: [member.user_id],
+              title: 'GSL',
+              body: `Date locked: ${selectedPoll.title}`,
+              data: { pollId: selectedPoll.id },
+            },
+          })
+          .catch(() => undefined);
+      }
+
+      const ics = buildIcsInvite({
+        uid: `${locked.id}-${slot.id}@gsl`,
+        title: locked.title,
+        description: 'GSL group event',
+        startsAt: slot.starts_at,
+        endsAt: slot.ends_at,
+        invitees,
+        organizerEmail: member.contact_email ?? undefined,
+        organizerName: member.display_name,
+      });
+
+      await deliverCalendarInvite({
+        title: locked.title,
+        startsAt: slot.starts_at,
+        endsAt: slot.ends_at,
+        invitees,
+        ics,
+        filename: `gsl-${locked.title.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.ics`,
+      });
+
+      setInviteMessage(
+        describeInviteResult({
+          inviteeCount: invitees.length,
+          skippedWithoutEmail,
+        })
+      );
+      await loadPollDetail(locked);
+      await loadPolls();
+    } catch {
+      setInviteMessage('Could not lock this date. Try again.');
+    } finally {
+      setLockingSlotId(null);
+    }
+  };
+
+  const handleLockDate = (slot: PollSlot) => {
+    if (!selectedPoll || selectedPoll.status === 'closed') return;
+
+    const { invitees, skippedWithoutEmail } = getCalendarInvitees(members, responses, slot.id);
+    const when = formatSlotTime(slot.starts_at, slot.ends_at);
+    const detail =
+      invitees.length > 0
+        ? `Send a calendar invite to ${invitees.length} person(s) who said yes or maybe${
+            skippedWithoutEmail > 0 ? ` (${skippedWithoutEmail} skipped — no email)` : ''
+          }.`
+        : skippedWithoutEmail > 0
+          ? `${skippedWithoutEmail} said yes/maybe but none have an email in Settings yet. The date will still be locked.`
+          : 'No one said yes or maybe for this slot yet. The date will still be locked.';
+
+    const message = `${when}\n\n${detail}`;
+
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined' && window.confirm(`Lock this date?\n\n${message}`)) {
+        void performLockAndInvite(slot);
+      }
+      return;
+    }
+
+    Alert.alert('Lock this date?', message, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Lock & invite',
+        onPress: () => {
+          void performLockAndInvite(slot);
+        },
+      },
+    ]);
+  };
+
   const openCreateModal = () => {
     setNewTitle('');
     setSlotError('');
@@ -150,6 +283,10 @@ export default function PlanScreen() {
     responses,
     members.length
   );
+
+  const chosenSlot = selectedPoll?.chosen_slot_id
+    ? slots.find((s) => s.id === selectedPoll.chosen_slot_id)
+    : undefined;
 
   if (loading) {
     return <Screen loading />;
@@ -170,6 +307,15 @@ export default function PlanScreen() {
             <Text style={styles.deleteText}>Delete</Text>
           </Pressable>
         </View>
+        {chosenSlot ? (
+          <View style={[styles.lockedBanner, sharedStyles.card]}>
+            <Text style={styles.lockedTitle}>Locked date</Text>
+            <Text style={styles.lockedWhen}>
+              {formatSlotTime(chosenSlot.starts_at, chosenSlot.ends_at)}
+            </Text>
+          </View>
+        ) : null}
+        {inviteMessage ? <Text style={styles.inviteMessage}>{inviteMessage}</Text> : null}
         <View style={[styles.gridCard, sharedStyles.card]}>
           <PollGrid
             members={members}
@@ -185,6 +331,8 @@ export default function PlanScreen() {
           {slotScores.map((score) => {
             const slot = slots.find((s) => s.id === score.slotId);
             if (!slot) return null;
+            const isChosen = selectedPoll.chosen_slot_id === slot.id;
+            const isLocking = lockingSlotId === slot.id;
             return (
               <View
                 key={score.slotId}
@@ -196,7 +344,22 @@ export default function PlanScreen() {
                 <Text style={styles.resultMeta}>
                   {score.yesCount} yes · {score.maybeCount} maybe
                   {score.everyoneAvailable ? ' · Everyone free!' : ''}
+                  {isChosen ? ' · Locked' : ''}
                 </Text>
+                {selectedPoll.status === 'open' ? (
+                  <Pressable
+                    style={[styles.lockBtn, isLocking && styles.lockBtnDisabled]}
+                    onPress={() => handleLockDate(slot)}
+                    disabled={!!lockingSlotId}
+                    testID={`lock-slot-${slot.id}`}
+                  >
+                    {isLocking ? (
+                      <ActivityIndicator color={theme.colors.onPrimary} />
+                    ) : (
+                      <Text style={styles.lockBtnText}>Lock date & send invite</Text>
+                    )}
+                  </Pressable>
+                ) : null}
               </View>
             );
           })}
@@ -324,6 +487,29 @@ const styles = StyleSheet.create({
   },
   detailTitleBlock: { flex: 1, gap: theme.spacing.sm },
   pollTitle: { fontSize: 22, fontWeight: '700', color: theme.colors.text },
+  lockedBanner: {
+    marginHorizontal: theme.spacing.lg,
+    marginBottom: theme.spacing.md,
+    padding: theme.spacing.lg,
+    backgroundColor: theme.colors.successSoft,
+    borderColor: theme.colors.success,
+  },
+  lockedTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: theme.colors.success,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    marginBottom: 4,
+  },
+  lockedWhen: { fontSize: 16, fontWeight: '600', color: theme.colors.text },
+  inviteMessage: {
+    marginHorizontal: theme.spacing.lg,
+    marginBottom: theme.spacing.md,
+    color: theme.colors.textSecondary,
+    fontSize: 14,
+    lineHeight: 20,
+  },
   gridCard: { marginHorizontal: theme.spacing.lg, marginBottom: theme.spacing.md, overflow: 'hidden' },
   results: { marginHorizontal: theme.spacing.lg, padding: theme.spacing.lg },
   resultsTitle: { fontWeight: '700', fontSize: 15, color: theme.colors.text, marginBottom: theme.spacing.md },
@@ -331,6 +517,7 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing.sm,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: theme.colors.borderLight,
+    gap: theme.spacing.sm,
   },
   resultHighlightRow: {
     backgroundColor: theme.colors.successSoft,
@@ -342,6 +529,21 @@ const styles = StyleSheet.create({
   resultRowText: { fontSize: 15, fontWeight: '600', color: theme.colors.text },
   resultMeta: { fontSize: 13, color: theme.colors.textSecondary, marginTop: 2 },
   resultHighlight: { color: theme.colors.success },
+  lockBtn: {
+    alignSelf: 'flex-start',
+    backgroundColor: theme.colors.primary,
+    borderRadius: theme.radius.md,
+    paddingVertical: 10,
+    paddingHorizontal: theme.spacing.md,
+    minWidth: 180,
+    alignItems: 'center',
+  },
+  lockBtnDisabled: { opacity: 0.6 },
+  lockBtnText: {
+    color: theme.colors.onPrimary,
+    fontSize: 14,
+    fontWeight: '600',
+  },
   modalScroll: { flexGrow: 1, justifyContent: 'flex-end' },
   modalHandle: {
     alignSelf: 'center',

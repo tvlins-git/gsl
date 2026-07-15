@@ -19,12 +19,13 @@ import {
   HARDCODED_USERS,
   getHardcodedUser,
 } from '@/constants/hardcoded-user';
-import { getStoredUser } from '@/lib/auth';
+import { getStoredUser, updateMemberContactEmail } from '@/lib/auth';
+import { isValidContactEmail } from '@/lib/calendar-invite';
 import { resetUserPassword } from '@/lib/user-passwords';
 import { sharedStyles, theme } from '@/constants/theme';
 
 export default function SettingsScreen() {
-  const { member, loggedOut, signOut, signIn, loading, localMode } = useAuth();
+  const { member, loggedOut, signOut, signIn, loading, localMode, refreshMember } = useAuth();
   const [busy, setBusy] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState(DEFAULT_HARDCODED_USER.id);
   const [password, setPassword] = useState('');
@@ -34,11 +35,20 @@ export default function SettingsScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [resetError, setResetError] = useState('');
   const [resetSuccess, setResetSuccess] = useState('');
+  const [contactEmail, setContactEmail] = useState('');
+  const [emailError, setEmailError] = useState('');
+  const [emailSuccess, setEmailSuccess] = useState('');
 
   useEffect(() => {
     if (!loggedOut && member) return;
     getStoredUser().then((user) => setSelectedUserId(user.id));
   }, [loggedOut, member]);
+
+  useEffect(() => {
+    setContactEmail(member?.contact_email ?? '');
+    setEmailError('');
+    setEmailSuccess('');
+  }, [member?.id, member?.contact_email]);
 
   const selectedUser = getHardcodedUser(selectedUserId) ?? DEFAULT_HARDCODED_USER;
   const signedInUser = member
@@ -55,6 +65,9 @@ export default function SettingsScreen() {
       setConfirmPassword('');
       setResetError('');
       setResetSuccess('');
+      setContactEmail('');
+      setEmailError('');
+      setEmailSuccess('');
     } finally {
       setBusy(false);
     }
@@ -106,6 +119,30 @@ export default function SettingsScreen() {
     }
   };
 
+  const handleSaveEmail = async () => {
+    if (!member) return;
+
+    const trimmed = contactEmail.trim();
+    if (trimmed && !isValidContactEmail(trimmed)) {
+      setEmailError('Enter a valid email address.');
+      setEmailSuccess('');
+      return;
+    }
+
+    setBusy(true);
+    setEmailError('');
+    setEmailSuccess('');
+    try {
+      await updateMemberContactEmail(member.id, trimmed || null);
+      await refreshMember();
+      setEmailSuccess(trimmed ? 'Email saved for calendar invites.' : 'Email cleared.');
+    } catch {
+      setEmailError('Could not save email. Try again.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (loading) {
     return <Screen loading />;
   }
@@ -132,6 +169,45 @@ export default function SettingsScreen() {
                   </View>
                 )}
               </View>
+            </View>
+
+            <View style={[styles.sectionCard, sharedStyles.card]}>
+              <Text style={sharedStyles.sectionTitle}>Email</Text>
+              <Text style={styles.sectionHint}>
+                Used for calendar invites when a plan date is locked in.
+              </Text>
+              <Text style={styles.fieldLabel}>Email address</Text>
+              <TextInput
+                style={sharedStyles.input}
+                placeholder="you@example.com"
+                placeholderTextColor={theme.colors.textMuted}
+                value={contactEmail}
+                onChangeText={(value) => {
+                  setContactEmail(value);
+                  setEmailError('');
+                  setEmailSuccess('');
+                }}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="email"
+                textContentType="emailAddress"
+                testID="contact-email-input"
+              />
+              {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
+              {emailSuccess ? <Text style={styles.successText}>{emailSuccess}</Text> : null}
+              <Pressable
+                style={[sharedStyles.secondaryBtn, busy && styles.btnDisabled]}
+                onPress={handleSaveEmail}
+                disabled={busy}
+                testID="save-email-btn"
+              >
+                {busy ? (
+                  <ActivityIndicator color={theme.colors.text} />
+                ) : (
+                  <Text style={sharedStyles.secondaryBtnText}>Save email</Text>
+                )}
+              </Pressable>
             </View>
 
             <View style={[styles.sectionCard, sharedStyles.card]}>

@@ -10,6 +10,7 @@ export function buildMember(overrides: Partial<Member> = {}): Member {
     user_id: id(),
     display_name: 'Test User',
     avatar_url: null,
+    contact_email: null,
     role: 'member',
     created_at: new Date().toISOString(),
     ...overrides,
@@ -23,6 +24,7 @@ export function buildPoll(overrides: Partial<Poll> = {}): Poll {
     title: 'March dinner',
     created_by: 'user-1',
     status: 'open',
+    chosen_slot_id: null,
     created_at: new Date().toISOString(),
     ...overrides,
   };
