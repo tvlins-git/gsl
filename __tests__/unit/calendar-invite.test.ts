@@ -4,6 +4,7 @@ import {
   describeInviteResult,
   getCalendarInvitees,
   isValidContactEmail,
+  sendCalendarInvites,
   toIcsUtc,
 } from '@/lib/calendar-invite';
 import { buildMember } from '../factories';
@@ -102,5 +103,31 @@ describe('describeInviteResult', () => {
     expect(describeInviteResult({ inviteeCount: 0, skippedWithoutEmail: 2 })).toContain(
       'have no email'
     );
+  });
+});
+
+describe('sendCalendarInvites', () => {
+  it('does not use client delivery after the edge function sends email', async () => {
+    const invokeServer = jest.fn().mockResolvedValue({ emailed: true });
+
+    await expect(
+      sendCalendarInvites({
+        pollId: 'poll-1',
+        slotId: 'slot-1',
+        title: 'Dinner',
+        startsAt: '2026-09-19T15:00:00.000Z',
+        endsAt: '2026-09-19T17:00:00.000Z',
+        invitees: [
+          {
+            memberId: 'm1',
+            displayName: 'Alice',
+            email: 'a@example.com',
+            response: 'yes',
+          },
+        ],
+        invokeServer,
+      })
+    ).resolves.toBe('server');
+    expect(invokeServer).toHaveBeenCalledWith({ poll_id: 'poll-1', slot_id: 'slot-1' });
   });
 });
