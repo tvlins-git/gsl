@@ -100,14 +100,16 @@ serve(async (req) => {
     return jsonResponse({ error: 'Could not load invitees' }, 500);
   }
 
-  const rows = (responses ?? []).map((r: {
-    response: string;
-    members: { display_name: string; contact_email: string | null } | null;
-  }) => ({
-    response: r.response,
-    display_name: r.members?.display_name ?? 'Member',
-    contact_email: r.members?.contact_email ?? null,
-  }));
+  const rows = (responses ?? []).map((response) => {
+    const relatedMember = Array.isArray(response.members)
+      ? response.members[0]
+      : response.members;
+    return {
+      response: response.response,
+      display_name: relatedMember?.display_name ?? 'Member',
+      contact_email: relatedMember?.contact_email ?? null,
+    };
+  });
 
   const invitees = filterYesMaybeWithEmail(rows);
   const ics = buildIcsInvite({
