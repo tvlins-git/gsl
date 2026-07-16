@@ -4,6 +4,7 @@ import {
   describeInviteResult,
   getCalendarInvitees,
   isValidContactEmail,
+  shouldDeliverInviteLocally,
   toIcsUtc,
 } from '@/lib/calendar-invite';
 import { buildMember } from '../factories';
@@ -99,5 +100,15 @@ describe('describeInviteResult', () => {
     expect(describeInviteResult({ inviteeCount: 0, skippedWithoutEmail: 2 })).toContain(
       'have no email'
     );
+  });
+});
+
+describe('shouldDeliverInviteLocally', () => {
+  it('skips local delivery when the edge function already sent email', () => {
+    expect(shouldDeliverInviteLocally(true)).toBe(false);
+  });
+
+  it('falls back to local delivery when the edge function did not send email', () => {
+    expect(shouldDeliverInviteLocally(false)).toBe(true);
   });
 });

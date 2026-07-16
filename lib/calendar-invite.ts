@@ -196,6 +196,10 @@ function downloadIcsWeb(filename: string, ics: string) {
   URL.revokeObjectURL(url);
 }
 
+export function shouldDeliverInviteLocally(serverEmailedInvite: boolean): boolean {
+  return !serverEmailedInvite;
+}
+
 /** Deliver the invite via mail client + ICS download/share (no email provider required). */
 export async function deliverCalendarInvite(input: {
   title: string;

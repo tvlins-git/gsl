@@ -22,6 +22,7 @@ import {
   deliverCalendarInvite,
   describeInviteResult,
   getCalendarInvitees,
+  shouldDeliverInviteLocally,
 } from '@/lib/calendar-invite';
 import { isLocalMode, localStore } from '@/lib/local-store';
 import { deletePoll, loadPollSummaries } from '@/lib/poll-list';
@@ -165,6 +166,7 @@ export default function PlanScreen() {
       );
 
       let locked: Poll;
+      let serverEmailedInvite = false;
       if (isLocalMode()) {
         locked = await localStore.lockPoll(selectedPoll.id, slot.id);
       } else {
@@ -177,8 +179,8 @@ export default function PlanScreen() {
         if (error || !data) throw error ?? new Error('Failed to lock poll');
         locked = data;
 
-        await supabase.functions
-          .invoke('send-calendar-invite', {
+        const inviteResult = await supabase.functions
+          .invoke<{ emailed?: boolean }>('send-calendar-invite', {
             body: {
               poll_id: selectedPoll.id,
               slot_id: slot.id,
@@ -186,7 +188,8 @@ export default function PlanScreen() {
               exclude_user_ids: [member.user_id],
             },
           })
-          .catch(() => undefined);
+          .catch(() => null);
+        serverEmailedInvite = inviteResult?.data?.emailed === true;
 
         await supabase.functions
           .invoke('send-push', {
@@ -213,14 +216,16 @@ export default function PlanScreen() {
         organizerName: member.display_name,
       });
 
-      await deliverCalendarInvite({
-        title: locked.title,
-        startsAt: slot.starts_at,
-        endsAt: slot.ends_at,
-        invitees,
-        ics,
-        filename: `gsl-${locked.title.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.ics`,
-      });
+      if (shouldDeliverInviteLocally(serverEmailedInvite)) {
+        await deliverCalendarInvite({
+          title: locked.title,
+          startsAt: slot.starts_at,
+          endsAt: slot.ends_at,
+          invitees,
+          ics,
+          filename: `gsl-${locked.title.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.ics`,
+        });
+      }
 
       setInviteMessage(
         describeInviteResult({
