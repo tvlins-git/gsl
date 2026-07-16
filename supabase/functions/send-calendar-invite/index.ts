@@ -125,14 +125,24 @@ serve(async (req) => {
 
   let emailed = false;
   if (resendKey && invitees.length > 0) {
+    const when = new Date(slot.starts_at).toLocaleString('en-GB', {
+      dateStyle: 'full',
+      timeStyle: 'short',
+    });
     const result = await sendViaResend({
       apiKey: resendKey,
       from,
       to: invitees.map((i) => i.email),
-      subject: `Calendar invite: ${poll.title}`,
-      text: `You're invited to ${poll.title}. Open the attached calendar invite to add it.`,
+      subject: `Invitation: ${poll.title}`,
+      text: [
+        `You're invited to ${poll.title}.`,
+        '',
+        `When: ${when}`,
+        '',
+        'Open the attached calendar invite (.ics) to add this event to your calendar.',
+      ].join('\n'),
       ics,
-      filename: 'gsl-invite.ics',
+      filename: 'invite.ics',
     });
     emailed = result.ok;
   }

@@ -1,4 +1,4 @@
-import { Linking, Platform, Share } from 'react-native';
+import { Linking, Platform } from 'react-native';
 import type { Member } from './database.types';
 import type { PollResponseValue } from './polls';
 import { formatSlotTime } from './polls';
@@ -142,6 +142,8 @@ export function buildGoogleCalendarUrl(input: {
   return `https://calendar.google.com/calendar/render?${params.toString()}`;
 }
 
+export type InviteDeliveryMethod = 'server' | 'share' | 'mailto' | 'none';
+
 export function buildInviteMailto(input: {
   title: string;
   startsAt: string;
@@ -157,12 +159,8 @@ export function buildInviteMailto(input: {
     '',
     `When: ${when}`,
     '',
-    'Add to Google Calendar:',
+    'Add to your calendar:',
     input.googleCalendarUrl,
-    '',
-    'A calendar invite (.ics) file is also available from the GSL app.',
-    '',
-    `Invitees: ${input.invitees.map((i) => `${i.displayName} <${i.email}>`).join(', ')}`,
   ].join('\n');
 
   return `mailto:${encodeURIComponent(to).replace(/%2C/g, ',')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
@@ -171,46 +169,73 @@ export function buildInviteMailto(input: {
 export function describeInviteResult(input: {
   inviteeCount: number;
   skippedWithoutEmail: number;
+  delivery?: InviteDeliveryMethod;
 }): string {
+  const skippedSuffix =
+    input.skippedWithoutEmail > 0
+      ? ` Skipped ${input.skippedWithoutEmail} without a registered email.`
+      : '';
+
   if (input.inviteeCount === 0 && input.skippedWithoutEmail === 0) {
     return 'Date locked. No one marked yes or maybe for this slot.';
   }
   if (input.inviteeCount === 0) {
     return `Date locked. ${input.skippedWithoutEmail} person(s) said yes/maybe but have no email in Settings.`;
   }
-  const base = `Date locked. Calendar invite prepared for ${input.inviteeCount} person(s).`;
-  if (input.skippedWithoutEmail > 0) {
-    return `${base} Skipped ${input.skippedWithoutEmail} without a registered email.`;
+
+  switch (input.delivery) {
+    case 'server':
+      return `Date locked. Calendar invites emailed to ${input.inviteeCount} person(s).${skippedSuffix}`;
+    case 'share':
+      return `Date locked. Send the calendar invite to ${input.inviteeCount} person(s) from the share sheet.${skippedSuffix}`;
+    case 'mailto':
+      return `Date locked. Your mail app opened — send the message to deliver the invite.${skippedSuffix}`;
+    default:
+      return `Date locked.${skippedSuffix}`;
   }
-  return base;
 }
 
-function downloadIcsWeb(filename: string, ics: string) {
-  if (typeof document === 'undefined') return;
-  const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = filename;
-  anchor.click();
-  URL.revokeObjectURL(url);
+function buildInviteShareText(input: { title: string; startsAt: string; endsAt: string }): string {
+  const when = formatSlotTime(input.startsAt, input.endsAt);
+  return `You're invited to ${input.title}.\n\nWhen: ${when}`;
 }
 
-export function shouldDeliverInviteLocally(serverEmailedInvite: boolean): boolean {
-  return !serverEmailedInvite;
+/** Share the ICS file via the system share sheet (attaches invite on supported platforms). */
+async function shareIcsInvite(input: {
+  ics: string;
+  filename: string;
+  title: string;
+  startsAt: string;
+  endsAt: string;
+}): Promise<boolean> {
+  if (Platform.OS !== 'web' || typeof navigator === 'undefined' || !navigator.share) {
+    return false;
+  }
+
+  try {
+    const file = new File([input.ics], input.filename, { type: 'text/calendar' });
+    if (navigator.canShare && !navigator.canShare({ files: [file] })) {
+      return false;
+    }
+
+    await navigator.share({
+      files: [file],
+      title: `Calendar invite: ${input.title}`,
+      text: buildInviteShareText(input),
+    });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
-/** Deliver the invite via mail client + ICS download/share (no email provider required). */
-export async function deliverCalendarInvite(input: {
+/** Open a pre-filled mail compose window (no ICS download). */
+async function openInviteMailto(input: {
   title: string;
   startsAt: string;
   endsAt: string;
   invitees: CalendarInvitee[];
-  ics: string;
-  filename?: string;
-}): Promise<'sent' | 'none'> {
-  if (input.invitees.length === 0) return 'none';
-
+}): Promise<boolean> {
   const googleCalendarUrl = buildGoogleCalendarUrl({
     title: input.title,
     startsAt: input.startsAt,
@@ -226,26 +251,88 @@ export async function deliverCalendarInvite(input: {
     googleCalendarUrl,
   });
 
+  try {
+    await Linking.openURL(mailto);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Client-side fallback when server email is unavailable. */
+export async function deliverCalendarInvite(input: {
+  title: string;
+  startsAt: string;
+  endsAt: string;
+  invitees: CalendarInvitee[];
+  ics: string;
+  filename?: string;
+}): Promise<InviteDeliveryMethod> {
+  if (input.invitees.length === 0) return 'none';
+
   const filename = input.filename ?? 'gsl-invite.ics';
 
-  if (Platform.OS === 'web') {
-    downloadIcsWeb(filename, input.ics);
-  } else {
+  const shared = await shareIcsInvite({
+    ics: input.ics,
+    filename,
+    title: input.title,
+    startsAt: input.startsAt,
+    endsAt: input.endsAt,
+  });
+  if (shared) return 'share';
+
+  const mailed = await openInviteMailto({
+    title: input.title,
+    startsAt: input.startsAt,
+    endsAt: input.endsAt,
+    invitees: input.invitees,
+  });
+  return mailed ? 'mailto' : 'none';
+}
+
+/** Lock flow helper: email via Supabase edge function when configured, else client fallback. */
+export async function sendCalendarInvites(input: {
+  pollId: string;
+  slotId: string;
+  title: string;
+  startsAt: string;
+  endsAt: string;
+  invitees: CalendarInvitee[];
+  organizerEmail?: string;
+  organizerName?: string;
+  invokeServer?: (body: { poll_id: string; slot_id: string }) => Promise<{ emailed?: boolean } | null>;
+}): Promise<InviteDeliveryMethod> {
+  if (input.invitees.length === 0) return 'none';
+
+  if (input.invokeServer) {
     try {
-      await Share.share({
-        title: filename,
-        message: input.ics,
+      const result = await input.invokeServer({
+        poll_id: input.pollId,
+        slot_id: input.slotId,
       });
+      if (result?.emailed) return 'server';
     } catch {
-      // User cancelled share sheet — still try mailto below.
+      // Fall through to client delivery.
     }
   }
 
-  try {
-    await Linking.openURL(mailto);
-  } catch {
-    // Mail client unavailable; ICS download/share still delivered above.
-  }
+  const ics = buildIcsInvite({
+    uid: `${input.pollId}-${input.slotId}@gsl`,
+    title: input.title,
+    description: 'GSL group event',
+    startsAt: input.startsAt,
+    endsAt: input.endsAt,
+    invitees: input.invitees,
+    organizerEmail: input.organizerEmail,
+    organizerName: input.organizerName,
+  });
 
-  return 'sent';
+  return deliverCalendarInvite({
+    title: input.title,
+    startsAt: input.startsAt,
+    endsAt: input.endsAt,
+    invitees: input.invitees,
+    ics,
+    filename: `gsl-${input.title.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.ics`,
+  });
 }

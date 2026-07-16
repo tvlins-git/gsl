@@ -4,7 +4,7 @@ import {
   describeInviteResult,
   getCalendarInvitees,
   isValidContactEmail,
-  shouldDeliverInviteLocally,
+  sendCalendarInvites,
   toIcsUtc,
 } from '@/lib/calendar-invite';
 import { buildMember } from '../factories';
@@ -93,22 +93,41 @@ describe('buildGoogleCalendarUrl', () => {
 });
 
 describe('describeInviteResult', () => {
-  it('summarizes invite outcomes', () => {
-    expect(describeInviteResult({ inviteeCount: 2, skippedWithoutEmail: 1 })).toContain(
-      'Calendar invite prepared for 2'
-    );
+  it('summarizes server email delivery', () => {
+    expect(
+      describeInviteResult({ inviteeCount: 2, skippedWithoutEmail: 1, delivery: 'server' })
+    ).toContain('emailed to 2');
+  });
+
+  it('summarizes missing emails', () => {
     expect(describeInviteResult({ inviteeCount: 0, skippedWithoutEmail: 2 })).toContain(
       'have no email'
     );
   });
 });
 
-describe('shouldDeliverInviteLocally', () => {
-  it('skips local delivery when the edge function already sent email', () => {
-    expect(shouldDeliverInviteLocally(true)).toBe(false);
-  });
+describe('sendCalendarInvites', () => {
+  it('does not use client delivery after the edge function sends email', async () => {
+    const invokeServer = jest.fn().mockResolvedValue({ emailed: true });
 
-  it('falls back to local delivery when the edge function did not send email', () => {
-    expect(shouldDeliverInviteLocally(false)).toBe(true);
+    await expect(
+      sendCalendarInvites({
+        pollId: 'poll-1',
+        slotId: 'slot-1',
+        title: 'Dinner',
+        startsAt: '2026-09-19T15:00:00.000Z',
+        endsAt: '2026-09-19T17:00:00.000Z',
+        invitees: [
+          {
+            memberId: 'm1',
+            displayName: 'Alice',
+            email: 'a@example.com',
+            response: 'yes',
+          },
+        ],
+        invokeServer,
+      })
+    ).resolves.toBe('server');
+    expect(invokeServer).toHaveBeenCalledWith({ poll_id: 'poll-1', slot_id: 'slot-1' });
   });
 });
