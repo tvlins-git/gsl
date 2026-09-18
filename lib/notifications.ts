@@ -3,18 +3,22 @@ import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { supabase } from './supabase';
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+// expo-notifications is unsupported on web; calling this during Expo Router's
+// Node static render can throw (e.g. localStorage is not defined).
+if (Platform.OS !== 'web') {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  });
+}
 
 export async function registerForPushNotifications(userId: string): Promise<string | null> {
-  if (!Device.isDevice) return null;
+  if (Platform.OS === 'web' || !Device.isDevice) return null;
 
   const { status: existing } = await Notifications.getPermissionsAsync();
   let finalStatus = existing;
