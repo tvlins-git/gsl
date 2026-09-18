@@ -15,7 +15,7 @@ import {
 } from '@/lib/auth';
 import type { Member } from '@/lib/database.types';
 import { isLocalMode } from '@/lib/local-store';
-import { registerForPushNotifications } from '@/lib/notifications';
+import { registerForPushNotifications } from '@/lib/push-notifications';
 import { supabase } from '@/lib/supabase';
 
 interface AuthContextValue {

@@ -1,7 +1,6 @@
 import { useFonts } from 'expo-font';
-import * as Notifications from 'expo-notifications';
 import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router/react-navigation';
-import { Stack, useRouter } from 'expo-router';
+import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
@@ -10,8 +9,8 @@ import 'react-native-reanimated';
 import { useColorScheme } from '@/components/useColorScheme';
 import { GslNavTitle } from '@/components/GslNavTitle';
 import { HeaderBackButton } from '@/components/HeaderBackButton';
+import { NotificationDeepLinkHandler } from '@/components/NotificationDeepLinkHandler';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
-import { getDeepLinkPath, parseNotificationData } from '@/lib/notifications';
 
 export { ErrorBoundary } from 'expo-router';
 
@@ -29,21 +28,6 @@ function LoadingGate({ children }: { children: React.ReactNode }) {
   }
 
   return <>{children}</>;
-}
-
-function NotificationDeepLinkHandler() {
-  const router = useRouter();
-
-  useEffect(() => {
-    const sub = Notifications.addNotificationResponseReceivedListener((response) => {
-      const data = response.notification.request.content.data as Record<string, unknown>;
-      const link = parseNotificationData(data);
-      if (link) router.push(getDeepLinkPath(link) as never);
-    });
-    return () => sub.remove();
-  }, [router]);
-
-  return null;
 }
 
 export default function RootLayout() {
