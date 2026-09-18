@@ -7,11 +7,16 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
+    "build": "expo export -p web",
+    "export:web": "expo export -p web",
     "test": "jest",
     "test:watch": "jest --watch",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "create-admin": "node scripts/create-admin.mjs"
+  },
+  "engines": {
+    "node": "20.x"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.1.2",

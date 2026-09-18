@@ -1,8 +1,9 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from './database.types';
+import { resolveSupabaseConfig } from './supabase-config';
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
+const { url: supabaseUrl, key: supabaseAnonKey, configured: supabaseConfigured } =
+  resolveSupabaseConfig();
 
 export const supabase: SupabaseClient<Database> = createClient<Database>(
   supabaseUrl,
@@ -17,5 +18,5 @@ export const supabase: SupabaseClient<Database> = createClient<Database>(
 );
 
 export function isSupabaseConfigured(): boolean {
-  return Boolean(supabaseUrl && supabaseAnonKey && !supabaseUrl.includes('your-project'));
+  return supabaseConfigured;
 }
