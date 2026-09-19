@@ -2,6 +2,7 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import ThreadScreen from '@/app/thread/[id]';
 import { supabase } from '@/lib/supabase';
+import { listThreadMessages, sendThreadMessage } from '@/lib/thread-messages';
 import { buildMessage } from '../factories';
 
 const existing = buildMessage({
@@ -73,29 +74,15 @@ jest.mock('@/lib/local-store', () => ({
   },
 }));
 
-function mockQuery(result: { data: unknown; error: unknown }) {
-  const query: Record<string, jest.Mock | ((onFulfilled: (value: unknown) => unknown) => Promise<unknown>)> = {};
-  const self = () => query;
-  query.select = jest.fn(self);
-  query.insert = jest.fn(() => {
-    result = { data: saved, error: null };
-    return query;
-  });
-  query.eq = jest.fn(self);
-  query.single = jest.fn(async () => result);
-  query.then = (onFulfilled: (value: unknown) => unknown) => Promise.resolve(result).then(onFulfilled);
-  return query;
-}
+jest.mock('@/lib/thread-messages', () => ({
+  listThreadMessages: jest.fn(),
+  sendThreadMessage: jest.fn(),
+}));
 
 describe('ThreadScreen send', () => {
   beforeEach(() => {
-    (supabase.from as jest.Mock).mockImplementation(() =>
-      mockQuery({ data: [existing], error: null })
-    );
-    (supabase.channel as jest.Mock).mockReturnValue({
-      on: jest.fn().mockReturnThis(),
-      subscribe: jest.fn(),
-    });
+    (listThreadMessages as jest.Mock).mockResolvedValue([existing]);
+    (sendThreadMessage as jest.Mock).mockResolvedValue(saved);
     (supabase.functions.invoke as jest.Mock).mockResolvedValue({ data: null, error: null });
   });
 
@@ -109,5 +96,6 @@ describe('ThreadScreen send', () => {
 
     expect(await screen.findByText('Just sent this')).toBeTruthy();
     expect(screen.getByText('Already in the thread')).toBeTruthy();
+    expect(sendThreadMessage).toHaveBeenCalledWith('thread-1', 'user-1', 'Just sent this');
   });
 });

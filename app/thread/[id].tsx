@@ -17,11 +17,10 @@ import { getGroupMembers } from '@/lib/auth';
 import type { Message, Member } from '@/lib/database.types';
 import {
   createOptimisticMessage,
-  listThreadMessages,
   mergeMessages,
-  sendThreadMessage,
   sortMessagesChronologically,
 } from '@/lib/messages';
+import { listThreadMessages, sendThreadMessage } from '@/lib/thread-messages';
 import { isLocalMode } from '@/lib/local-store';
 import { supabase } from '@/lib/supabase';
 import { sharedStyles, theme } from '@/constants/theme';
@@ -88,16 +87,20 @@ export default function ThreadScreen() {
 
     if (isLocalMode()) return;
 
-    await supabase.functions.invoke('send-push', {
-      body: {
-        type: 'chat',
-        group_id: member.group_id,
-        exclude_user_ids: [member.user_id],
-        title: 'GSL',
-        body: `${member.display_name}: ${text}`,
-        data: { threadId: id },
-      },
-    }).catch(() => undefined);
+    try {
+      await supabase.functions.invoke('send-push', {
+        body: {
+          type: 'chat',
+          group_id: member.group_id,
+          exclude_user_ids: [member.user_id],
+          title: 'GSL',
+          body: `${member.display_name}: ${text}`,
+          data: { threadId: id },
+        },
+      });
+    } catch {
+      // Push is best-effort; the message is already persisted and shown.
+    }
   };
 
   if (loading) {
