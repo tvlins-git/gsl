@@ -325,6 +325,10 @@ export const localStore = {
         event,
         photoCount: eventPhotos.length,
         coverPhoto,
+        latestPhotoAt: eventPhotos.reduce<string | null>((latest, photo) => {
+          if (!latest || photo.created_at > latest) return photo.created_at;
+          return latest;
+        }, null),
       };
     });
   },

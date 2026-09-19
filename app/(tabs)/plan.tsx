@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -13,7 +14,6 @@ import {
 } from 'react-native';
 import { PollGrid } from '@/components/PollGrid';
 import { PollSlotEditor } from '@/components/PollSlotEditor';
-import { UserAvatar } from '@/components/UserAvatar';
 import { Screen } from '@/components/ui/Screen';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { formatRelativeTime } from '@/lib/time';
@@ -25,7 +25,7 @@ import {
   sendCalendarInvites,
 } from '@/lib/calendar-invite';
 import { isLocalMode, localStore } from '@/lib/local-store';
-import { deletePoll, loadPollSummaries } from '@/lib/poll-list';
+import { deletePoll, loadPollSummaries, partitionPolls } from '@/lib/poll-list';
 import { computeSlotScores, formatSlotTime } from '@/lib/polls';
 import type { Member, Poll, PollSlot } from '@/lib/database.types';
 import { supabase } from '@/lib/supabase';
@@ -34,6 +34,8 @@ import { feedColumn, sharedStyles, theme } from '@/constants/theme';
 
 export default function PlanScreen() {
   const { member } = useAuth();
+  const { pollId } = useLocalSearchParams<{ pollId?: string }>();
+  const openedPollId = useRef<string | null>(null);
   const [polls, setPolls] = useState<Poll[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [selectedPoll, setSelectedPoll] = useState<Poll | null>(null);
@@ -91,6 +93,15 @@ export default function PlanScreen() {
   useEffect(() => {
     loadPolls();
   }, [loadPolls]);
+
+  useEffect(() => {
+    if (!pollId || openedPollId.current === pollId || polls.length === 0) return;
+    const match = polls.find((poll) => poll.id === pollId);
+    if (match) {
+      openedPollId.current = pollId;
+      void loadPollDetail(match);
+    }
+  }, [pollId, polls, loadPollDetail]);
 
   const handleVote = async (slotId: string, response: PollResponseValue) => {
     if (!member) return;
@@ -290,26 +301,14 @@ export default function PlanScreen() {
           <Text style={styles.back}>← Back to polls</Text>
         </Pressable>
         <View style={styles.detailHeader}>
-          <View style={styles.detailIdentity}>
-            <UserAvatar
-              name={
-                members.find((item) => item.user_id === selectedPoll.created_by)?.display_name
-                ?? member?.display_name
-                ?? 'Friend'
-              }
-              size={44}
-            />
-            <View style={styles.detailTitleBlock}>
-              <Text style={styles.pollTitle}>{selectedPoll.title}</Text>
-              <Text style={styles.detailByline}>
-                {members.find((item) => item.user_id === selectedPoll.created_by)?.display_name
-                  ?? 'Friend'}{' '}
-                · {formatRelativeTime(selectedPoll.created_at)}
-              </Text>
-            </View>
-          </View>
+          <Text style={styles.pollTitle}>{selectedPoll.title}</Text>
           <View style={styles.detailMetaRow}>
-            <StatusBadge status={selectedPoll.status} />
+            <StatusBadge status={selectedPoll.status === 'closed' ? 'locked' : selectedPoll.status} />
+            <Text style={styles.detailByline}>
+              {members.find((item) => item.user_id === selectedPoll.created_by)?.display_name
+                ?? 'Friend'}{' '}
+              · {formatRelativeTime(selectedPoll.created_at)}
+            </Text>
             <Pressable onPress={() => handleDeletePoll(selectedPoll.id)} testID="delete-poll-detail">
               <Text style={styles.deleteText}>Delete</Text>
             </Pressable>
@@ -376,50 +375,59 @@ export default function PlanScreen() {
     );
   }
 
+  const { open: openPolls, locked: lockedPolls } = partitionPolls(polls);
+
+  const renderPollRow = (poll: Poll) => (
+    <View key={poll.id} style={styles.pollRow}>
+      <Pressable
+        style={styles.pollRowMain}
+        onPress={() => loadPollDetail(poll)}
+        testID={`poll-row-${poll.id}`}
+      >
+        <View style={styles.pollRowTop}>
+          <Text style={styles.pollRowTitle} numberOfLines={1}>
+            {poll.title}
+          </Text>
+          <StatusBadge status={poll.status === 'closed' ? 'locked' : poll.status} />
+        </View>
+        <Text style={styles.pollRowMeta} numberOfLines={2}>
+          {pollSummaries[poll.id] ?? 'Loading…'} · {formatRelativeTime(poll.created_at)}
+        </Text>
+      </Pressable>
+      <Pressable
+        style={styles.deleteBtn}
+        onPress={() => handleDeletePoll(poll.id)}
+        testID={`delete-poll-${poll.id}`}
+      >
+        <Text style={styles.deleteText}>Delete</Text>
+      </Pressable>
+    </View>
+  );
+
   return (
     <Screen>
-      <Pressable style={styles.compose} onPress={openCreateModal} testID="create-poll-btn">
-        <UserAvatar name={member?.display_name ?? 'You'} size={36} />
-        <Text style={styles.composeText}>Plan the next hangout…</Text>
-        <View style={styles.composePlus}>
-          <Text style={styles.composePlusText}>+</Text>
-        </View>
-      </Pressable>
+      <View style={sharedStyles.toolBar}>
+        <Text style={sharedStyles.toolBarTitle}>Polls</Text>
+        <Pressable style={sharedStyles.toolBarAction} onPress={openCreateModal} testID="create-poll-btn">
+          <Text style={sharedStyles.toolBarActionText}>New poll</Text>
+        </Pressable>
+      </View>
       <ScrollView contentContainerStyle={styles.listContent}>
         {polls.length === 0 && (
-          <Text style={sharedStyles.empty}>No plans yet. Post a time and see who can make it.</Text>
+          <Text style={sharedStyles.empty}>No polls yet. Create one and vote on dates.</Text>
         )}
-        {polls.map((poll) => {
-          const author =
-            members.find((item) => item.user_id === poll.created_by)?.display_name
-            ?? member?.display_name
-            ?? 'Friend';
-          return (
-            <View key={poll.id} style={[styles.pollCard, sharedStyles.card]}>
-              <Pressable style={styles.pollCardMain} onPress={() => loadPollDetail(poll)}>
-                <View style={styles.pollCardHeader}>
-                  <UserAvatar name={author} size={40} />
-                  <View style={styles.pollCardIdentity}>
-                    <Text style={styles.pollCardAuthor}>{author}</Text>
-                    <Text style={styles.pollCardTime}>{formatRelativeTime(poll.created_at)}</Text>
-                  </View>
-                  <StatusBadge status={poll.status} />
-                </View>
-                <Text style={styles.pollCardTitle}>{poll.title}</Text>
-                <Text style={styles.pollCardSummary}>
-                  {pollSummaries[poll.id] ?? 'Loading…'}
-                </Text>
-              </Pressable>
-              <Pressable
-                style={styles.deleteBtn}
-                onPress={() => handleDeletePoll(poll.id)}
-                testID={`delete-poll-${poll.id}`}
-              >
-                <Text style={styles.deleteText}>Delete</Text>
-              </Pressable>
-            </View>
-          );
-        })}
+        {openPolls.length > 0 ? (
+          <View>
+            <Text style={styles.sectionLabel}>Open</Text>
+            <View style={styles.pollTable}>{openPolls.map(renderPollRow)}</View>
+          </View>
+        ) : null}
+        {lockedPolls.length > 0 ? (
+          <View>
+            <Text style={styles.sectionLabel}>Locked</Text>
+            <View style={styles.pollTable}>{lockedPolls.map(renderPollRow)}</View>
+          </View>
+        ) : null}
       </ScrollView>
 
       <Modal visible={showCreate} animationType="slide" transparent>
@@ -467,104 +475,79 @@ export default function PlanScreen() {
 const styles = StyleSheet.create({
   listContent: {
     ...feedColumn,
-    paddingHorizontal: theme.spacing.lg,
+    maxWidth: 720,
     paddingBottom: theme.spacing.xxl,
   },
-  compose: {
-    ...feedColumn,
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: theme.spacing.lg,
-    marginBottom: theme.spacing.md,
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
-    ...sharedStyles.card,
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.radius.pill,
-    gap: theme.spacing.md,
-  },
-  composeText: {
-    flex: 1,
-    color: theme.colors.textMuted,
-    fontSize: 15,
-  },
-  composePlus: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: theme.colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  composePlusText: {
-    color: theme.colors.onPrimary,
-    fontSize: 20,
+  sectionLabel: {
+    paddingHorizontal: theme.spacing.lg,
+    paddingTop: theme.spacing.md,
+    paddingBottom: theme.spacing.sm,
+    fontSize: 12,
     fontWeight: '700',
-    marginTop: -1,
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    color: theme.colors.textMuted,
   },
-  createBtnDisabled: { opacity: 0.45 },
-  pollCard: {
-    marginBottom: theme.spacing.lg,
-    overflow: 'hidden',
+  pollTable: {
+    backgroundColor: theme.colors.surface,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: theme.colors.border,
   },
-  pollCardMain: { padding: theme.spacing.lg, gap: theme.spacing.sm },
-  pollCardHeader: {
+  pollRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: theme.spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: theme.colors.borderLight,
   },
-  pollCardIdentity: {
+  pollRowMain: {
     flex: 1,
     minWidth: 0,
-    gap: 2,
+    paddingVertical: 12,
+    paddingLeft: theme.spacing.lg,
+    paddingRight: theme.spacing.sm,
+    gap: 4,
   },
-  pollCardAuthor: {
-    fontSize: 15,
+  pollRowTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+  },
+  pollRowTitle: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 16,
     fontWeight: '700',
     color: theme.colors.text,
   },
-  pollCardTime: {
+  pollRowMeta: {
     fontSize: 13,
-    color: theme.colors.textMuted,
+    color: theme.colors.textSecondary,
+    lineHeight: 18,
   },
-  pollCardTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: theme.colors.text,
-  },
-  pollCardSummary: { color: theme.colors.textSecondary, fontSize: 14, lineHeight: 20 },
+  createBtnDisabled: { opacity: 0.45 },
   deleteBtn: {
-    alignSelf: 'flex-end',
     paddingHorizontal: theme.spacing.lg,
-    paddingBottom: theme.spacing.md,
+    paddingVertical: theme.spacing.md,
   },
-  deleteText: { color: theme.colors.danger, fontWeight: '600', fontSize: 14 },
+  deleteText: { color: theme.colors.danger, fontWeight: '600', fontSize: 13 },
   detailContent: { paddingBottom: theme.spacing.xxl },
   backBtn: { padding: theme.spacing.lg, paddingBottom: theme.spacing.sm },
   back: { color: theme.colors.accent, fontSize: 15, fontWeight: '600' },
   detailHeader: {
     paddingHorizontal: theme.spacing.lg,
     paddingBottom: theme.spacing.md,
-    gap: theme.spacing.md,
-  },
-  detailIdentity: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.md,
-  },
-  detailTitleBlock: {
-    flex: 1,
-    minWidth: 0,
-    gap: 4,
+    gap: theme.spacing.sm,
   },
   detailByline: {
+    flex: 1,
     fontSize: 13,
     color: theme.colors.textMuted,
   },
   detailMetaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: theme.spacing.sm,
   },
   pollTitle: { fontSize: 22, fontWeight: '700', color: theme.colors.text },
   lockedBanner: {

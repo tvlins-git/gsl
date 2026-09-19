@@ -8,6 +8,7 @@ export type PhotoEventSummary = {
   event: PhotoEvent;
   photoCount: number;
   coverPhoto: PhotoEventCover | null;
+  latestPhotoAt: string | null;
 };
 
 export function getPhotoPublicUrl(
@@ -52,12 +53,13 @@ export async function loadPhotoEventSummaries(groupId: string): Promise<PhotoEve
   const eventIds = eventList.map((e) => e.id);
   const { data: photos } = await supabase
     .from('photos')
-    .select('id, event_id, storage_path, thumb_path, uploaded_by, ai_score')
+    .select('id, event_id, storage_path, thumb_path, uploaded_by, ai_score, created_at')
     .in('event_id', eventIds)
     .order('ai_score', { ascending: false, nullsFirst: false });
 
   const counts = new Map<string, number>();
   const covers = new Map<string, PhotoEventCover>();
+  const latest = new Map<string, string>();
   for (const photo of photos ?? []) {
     counts.set(photo.event_id, (counts.get(photo.event_id) ?? 0) + 1);
     if (!covers.has(photo.event_id)) {
@@ -68,12 +70,17 @@ export async function loadPhotoEventSummaries(groupId: string): Promise<PhotoEve
         uploaded_by: photo.uploaded_by,
       });
     }
+    const prev = latest.get(photo.event_id);
+    if (!prev || photo.created_at > prev) {
+      latest.set(photo.event_id, photo.created_at);
+    }
   }
 
   return eventList.map((event) => ({
     event,
     photoCount: counts.get(event.id) ?? 0,
     coverPhoto: covers.get(event.id) ?? null,
+    latestPhotoAt: latest.get(event.id) ?? null,
   }));
 }
 

@@ -1,0 +1,185 @@
+import type { HostAssignment, Member, Poll, Thread } from './database.types';
+import { formatPhotoCount, loadPhotoEventSummaries, type PhotoEventSummary } from './photo-events';
+import { isLocalMode, localStore } from './local-store';
+import { supabase } from './supabase';
+
+export type ActivityKind = 'album' | 'photos' | 'poll' | 'plan_lock' | 'thread' | 'host';
+
+export type ActivityItem = {
+  id: string;
+  kind: ActivityKind;
+  title: string;
+  subtitle: string;
+  timestamp: string;
+  path: string;
+  authorName: string;
+};
+
+export type ActivitySources = {
+  photoEvents: PhotoEventSummary[];
+  polls: Poll[];
+  threads: Thread[];
+  hostAssignments: HostAssignment[];
+};
+
+const MONTH_NAMES = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+];
+
+/** Ignore photo-drop items that landed with the album create itself. */
+const PHOTO_DROP_GAP_MS = 30_000;
+
+function nameForUser(members: Member[], userId?: string | null) {
+  return members.find((member) => member.user_id === userId)?.display_name ?? 'Friend';
+}
+
+function nameForMember(members: Member[], memberId?: string | null) {
+  return members.find((member) => member.id === memberId)?.display_name ?? 'Friend';
+}
+
+export function activityKindLabel(kind: ActivityKind): string {
+  switch (kind) {
+    case 'album':
+      return 'Album';
+    case 'photos':
+      return 'Photos';
+    case 'poll':
+    case 'plan_lock':
+      return 'Plan';
+    case 'thread':
+      return 'Chat';
+    case 'host':
+      return 'Hosts';
+  }
+}
+
+export function buildActivityItems(input: {
+  members: Member[];
+  photoEvents: PhotoEventSummary[];
+  polls: Poll[];
+  threads: Thread[];
+  hostAssignments?: HostAssignment[];
+  limit?: number;
+}): ActivityItem[] {
+  const {
+    members,
+    photoEvents,
+    polls,
+    threads,
+    hostAssignments = [],
+    limit = 40,
+  } = input;
+  const items: ActivityItem[] = [];
+
+  for (const summary of photoEvents) {
+    const author = nameForUser(members, summary.event.created_by);
+    items.push({
+      id: `album-${summary.event.id}`,
+      kind: 'album',
+      title: summary.event.title,
+      subtitle: `New album · ${formatPhotoCount(summary.photoCount)}`,
+      timestamp: summary.event.created_at,
+      path: `/photos?eventId=${summary.event.id}`,
+      authorName: author,
+    });
+
+    const latest = summary.latestPhotoAt;
+    if (latest && summary.photoCount > 0) {
+      const gap = new Date(latest).getTime() - new Date(summary.event.created_at).getTime();
+      if (Number.isFinite(gap) && gap >= PHOTO_DROP_GAP_MS) {
+        items.push({
+          id: `photos-${summary.event.id}`,
+          kind: 'photos',
+          title: summary.event.title,
+          subtitle: `${formatPhotoCount(summary.photoCount)} added`,
+          timestamp: latest,
+          path: `/photos?eventId=${summary.event.id}`,
+          authorName: author,
+        });
+      }
+    }
+  }
+
+  for (const poll of polls) {
+    const author = nameForUser(members, poll.created_by);
+    if (poll.status === 'closed') {
+      items.push({
+        id: `plan-lock-${poll.id}`,
+        kind: 'plan_lock',
+        title: poll.title,
+        subtitle: 'Date locked',
+        timestamp: poll.created_at,
+        path: `/plan?pollId=${poll.id}`,
+        authorName: author,
+      });
+    } else {
+      items.push({
+        id: `poll-${poll.id}`,
+        kind: 'poll',
+        title: poll.title,
+        subtitle: 'New poll',
+        timestamp: poll.created_at,
+        path: `/plan?pollId=${poll.id}`,
+        authorName: author,
+      });
+    }
+  }
+
+  for (const thread of threads) {
+    items.push({
+      id: `thread-${thread.id}`,
+      kind: 'thread',
+      title: thread.name,
+      subtitle: 'New chat',
+      timestamp: thread.created_at,
+      path: `/thread/${thread.id}`,
+      authorName: nameForUser(members, thread.created_by),
+    });
+  }
+
+  for (const host of hostAssignments) {
+    if (!host.assigned_member_id) continue;
+    const hostName = nameForMember(members, host.assigned_member_id);
+    const month = MONTH_NAMES[host.month - 1] ?? 'Month';
+    items.push({
+      id: `host-${host.id}`,
+      kind: 'host',
+      title: `${month} ${host.year}`,
+      subtitle: `${hostName} is hosting`,
+      timestamp: host.updated_at,
+      path: '/hosts',
+      authorName: nameForUser(members, host.updated_by),
+    });
+  }
+
+  return items
+    .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
+    .slice(0, limit);
+}
+
+export async function loadActivitySources(groupId: string): Promise<ActivitySources> {
+  if (isLocalMode()) {
+    const [photoEvents, polls, threads, hostAssignments] = await Promise.all([
+      localStore.getPhotoEventSummaries(groupId),
+      localStore.getPolls(groupId),
+      localStore.getThreads(groupId),
+      localStore.getHostAssignments(groupId),
+    ]);
+    return { photoEvents, polls, threads, hostAssignments };
+  }
+
+  const [photoEvents, pollsRes, threadsRes, hostsRes] = await Promise.all([
+    loadPhotoEventSummaries(groupId),
+    supabase.from('polls').select('*').eq('group_id', groupId).order('created_at', { ascending: false }),
+    supabase.from('threads').select('*').eq('group_id', groupId).order('created_at', { ascending: false }),
+    supabase.from('host_assignments').select('*').eq('group_id', groupId),
+  ]);
+
+  return {
+    photoEvents,
+    polls: pollsRes.data ?? [],
+    threads: threadsRes.data ?? [],
+    hostAssignments: hostsRes.data ?? [],
+  };
+}

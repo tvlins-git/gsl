@@ -1,12 +1,27 @@
 import { SymbolView } from 'expo-symbols';
-import { Tabs } from 'expo-router';
-import { Platform } from 'react-native';
+import { router, Tabs } from 'expo-router';
+import { Platform, Pressable, StyleSheet, Text } from 'react-native';
 import { GslNavTitle } from '@/components/GslNavTitle';
+import { HeaderBackButton } from '@/components/HeaderBackButton';
 import { APP_NAME } from '@/constants/brand';
 import Colors from '@/constants/Colors';
 import { theme } from '@/constants/theme';
 import { useColorScheme } from '@/components/useColorScheme';
 import { SettingsAuthRedirect } from '@/components/SettingsAuthRedirect';
+
+function HostsHeaderLink() {
+  return (
+    <Pressable
+      onPress={() => router.push('/hosts')}
+      testID="header-hosts-btn"
+      accessibilityRole="button"
+      accessibilityLabel="Hosts"
+      style={styles.headerLink}
+    >
+      <Text style={styles.headerLinkText}>Hosts</Text>
+    </Pressable>
+  );
+}
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
@@ -39,10 +54,27 @@ export default function TabLayout() {
         options={{
           title: 'Feed',
           headerTitle: () => <GslNavTitle title={APP_NAME} />,
+          headerRight: () => <HostsHeaderLink />,
           tabBarLabel: 'Feed',
           tabBarAccessibilityLabel: 'Feed',
           tabBarIcon: ({ color }) => (
             <SymbolView name={{ ios: 'house', android: 'home', web: 'home' }} tintColor={color} size={24} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="photos"
+        options={{
+          title: `${APP_NAME} · Photos`,
+          headerTitle: () => <GslNavTitle suffix="Photos" />,
+          tabBarLabel: 'Photos',
+          tabBarAccessibilityLabel: 'Photos',
+          tabBarIcon: ({ color }) => (
+            <SymbolView
+              name={{ ios: 'photo.on.rectangle', android: 'photo_library', web: 'photo_library' }}
+              tintColor={color}
+              size={24}
+            />
           ),
         }}
       />
@@ -54,17 +86,6 @@ export default function TabLayout() {
           tabBarLabel: 'Plan',
           tabBarIcon: ({ color }) => (
             <SymbolView name={{ ios: 'calendar', android: 'event', web: 'event' }} tintColor={color} size={24} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="hosts"
-        options={{
-          title: `${APP_NAME} · Hosts`,
-          headerTitle: () => <GslNavTitle suffix="Hosts" />,
-          tabBarLabel: 'Hosts',
-          tabBarIcon: ({ color }) => (
-            <SymbolView name={{ ios: 'person.2', android: 'groups', web: 'groups' }} tintColor={color} size={24} />
           ),
         }}
       />
@@ -90,8 +111,28 @@ export default function TabLayout() {
           ),
         }}
       />
-      <Tabs.Screen name="photos" options={{ href: null }} />
+      <Tabs.Screen
+        name="hosts"
+        options={{
+          href: null,
+          title: `${APP_NAME} · Hosts`,
+          headerTitle: () => <GslNavTitle suffix="Hosts" />,
+          headerLeft: () => <HeaderBackButton fallbackHref="/" />,
+        }}
+      />
     </Tabs>
     </>
   );
 }
+
+const styles = StyleSheet.create({
+  headerLink: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  headerLinkText: {
+    color: theme.colors.accent,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+});
