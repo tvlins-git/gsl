@@ -14,6 +14,44 @@ export function feedPhotoAspect(naturalWidth: number, naturalHeight: number): nu
  * portrait images. Pair with `resizeMode="contain"` so a cap letterboxes
  * instead of stretching or hard-cropping.
  */
+/** RN iOS/Android uses `source`; RN-web ImageLoader passes the browser event as `nativeEvent`. */
+export function readLoadedImageSize(nativeEvent: unknown): { width: number; height: number } | null {
+  if (!nativeEvent || typeof nativeEvent !== 'object') return null;
+  const event = nativeEvent as {
+    source?: { width?: number; height?: number };
+    target?: { naturalWidth?: number; naturalHeight?: number; width?: number; height?: number };
+    nativeEvent?: unknown;
+    naturalWidth?: number;
+    naturalHeight?: number;
+    width?: number;
+    height?: number;
+  };
+  const nested =
+    event.nativeEvent && typeof event.nativeEvent === 'object'
+      ? (event.nativeEvent as typeof event)
+      : null;
+  const candidates = [event.source, event.target, nested?.source, nested?.target, event, nested];
+  for (const candidate of candidates) {
+    if (!candidate || typeof candidate !== 'object') continue;
+    const width = Number(
+      'width' in candidate && candidate.width
+        ? candidate.width
+        : 'naturalWidth' in candidate
+          ? candidate.naturalWidth
+          : 0
+    );
+    const height = Number(
+      'height' in candidate && candidate.height
+        ? candidate.height
+        : 'naturalHeight' in candidate
+          ? candidate.naturalHeight
+          : 0
+    );
+    if (width > 0 && height > 0) return { width, height };
+  }
+  return null;
+}
+
 export function feedPhotoDisplayHeight(
   boxWidth: number,
   aspect: number,

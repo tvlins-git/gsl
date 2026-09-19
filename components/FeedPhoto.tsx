@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Image, StyleSheet, View, type ImageStyle, type StyleProp } from 'react-native';
 import { theme } from '@/constants/theme';
 import {
@@ -6,6 +6,7 @@ import {
   FEED_PHOTO_MAX_HEIGHT,
   feedPhotoAspect,
   feedPhotoDisplayHeight,
+  readLoadedImageSize,
 } from '@/lib/feed-photo';
 
 interface FeedPhotoProps {
@@ -23,6 +24,22 @@ export function FeedPhoto({
 }: FeedPhotoProps) {
   const [aspect, setAspect] = useState(FEED_PHOTO_FALLBACK_ASPECT);
   const [boxWidth, setBoxWidth] = useState(0);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    let cancelled = false;
+    const probe = document.createElement('img');
+    probe.onload = () => {
+      if (!cancelled && probe.naturalWidth > 0 && probe.naturalHeight > 0) {
+        setAspect(feedPhotoAspect(probe.naturalWidth, probe.naturalHeight));
+      }
+    };
+    probe.src = uri;
+    return () => {
+      cancelled = true;
+      probe.onload = null;
+    };
+  }, [uri]);
 
   const measured = boxWidth > 0;
   const height = measured ? feedPhotoDisplayHeight(boxWidth, aspect, maxHeight) : undefined;
@@ -44,15 +61,8 @@ export function FeedPhoto({
         ]}
         resizeMode="contain"
         onLoad={(event) => {
-          const nativeEvent = event.nativeEvent as {
-            source?: { width?: number; height?: number };
-            target?: { naturalWidth?: number; naturalHeight?: number };
-          };
-          const width = nativeEvent.source?.width ?? nativeEvent.target?.naturalWidth ?? 0;
-          const height = nativeEvent.source?.height ?? nativeEvent.target?.naturalHeight ?? 0;
-          if (width > 0 && height > 0) {
-            setAspect(feedPhotoAspect(width, height));
-          }
+          const size = readLoadedImageSize(event.nativeEvent) ?? readLoadedImageSize(event);
+          if (size) setAspect(feedPhotoAspect(size.width, size.height));
         }}
         testID={testID}
         accessibilityRole="image"
