@@ -1,4 +1,5 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { UserAvatar } from '@/components/UserAvatar';
 import { theme } from '@/constants/theme';
 import type { Member } from '@/lib/database.types';
 import {
@@ -57,6 +58,7 @@ export function PollGrid({
         {members.map((member) => (
           <View key={member.id} style={styles.dataRow}>
             <View style={styles.memberCell}>
+              <UserAvatar name={member.display_name} size={28} imageUri={member.avatar_url} />
               <Text style={styles.memberName} numberOfLines={1}>
                 {member.display_name}
               </Text>
@@ -107,12 +109,12 @@ export function PollGrid({
 const styles = StyleSheet.create({
   headerRow: {
     flexDirection: 'row',
-    borderBottomWidth: 2,
-    borderBottomColor: theme.colors.primary,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: theme.colors.border,
     backgroundColor: theme.colors.bg,
   },
   memberHeaderCell: {
-    width: 100,
+    width: 132,
   },
   slotHeaderCell: {
     width: 120,
@@ -132,13 +134,16 @@ const styles = StyleSheet.create({
     borderBottomColor: theme.colors.borderLight,
   },
   memberCell: {
-    width: 100,
+    width: 132,
     padding: theme.spacing.sm,
-    justifyContent: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
   },
   memberName: {
+    flex: 1,
     fontSize: 13,
-    fontWeight: '500',
+    fontWeight: '700',
     color: theme.colors.text,
   },
   responseCell: {

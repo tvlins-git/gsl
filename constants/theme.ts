@@ -2,30 +2,31 @@ import { Platform, StyleSheet } from 'react-native';
 
 export const theme = {
   colors: {
-    bg: '#f2f2f7',
+    bg: '#f6f1eb',
     surface: '#ffffff',
-    text: '#1c1c1e',
-    textSecondary: '#636366',
-    textMuted: '#8e8e93',
-    border: '#e5e5ea',
-    borderLight: '#f0f0f5',
-    primary: '#1c1c1e',
-    primaryPressed: '#3a3a3c',
+    text: '#1c1612',
+    textSecondary: '#6b5f56',
+    textMuted: '#9a8d84',
+    border: '#ebe3db',
+    borderLight: '#f3eee8',
+    primary: '#d4543c',
+    primaryPressed: '#b84430',
     onPrimary: '#ffffff',
-    accent: '#2563eb',
-    accentSoft: '#eef4ff',
-    danger: '#dc2626',
-    dangerSoft: '#fef2f2',
-    success: '#15803d',
-    successSoft: '#ecfdf3',
-    warningSoft: '#fff7ed',
-    infoSoft: '#eff6ff',
+    accent: '#d4543c',
+    accentSoft: '#fde8e2',
+    danger: '#c53030',
+    dangerSoft: '#fdecec',
+    success: '#2f7d4a',
+    successSoft: '#e8f6ed',
+    warningSoft: '#fff4e5',
+    infoSoft: '#eef4fb',
+    storyRing: '#f2a65a',
   },
   radius: {
-    sm: 8,
-    md: 12,
-    lg: 16,
-    xl: 20,
+    sm: 10,
+    md: 16,
+    lg: 22,
+    xl: 28,
     pill: 999,
   },
   spacing: {
@@ -40,14 +41,14 @@ export const theme = {
 
 export const shadow = Platform.select({
   ios: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
+    shadowColor: '#3d2a1e',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.08,
+    shadowRadius: 20,
   },
-  android: { elevation: 2 },
+  android: { elevation: 3 },
   default: {
-    boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+    boxShadow: '0 8px 28px rgba(61,42,30,0.08)',
   },
 });
 
@@ -63,13 +64,11 @@ export const sharedStyles = StyleSheet.create({
   card: {
     backgroundColor: theme.colors.surface,
     borderRadius: theme.radius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: theme.colors.border,
     ...shadow,
   },
   primaryBtn: {
     backgroundColor: theme.colors.primary,
-    borderRadius: theme.radius.md,
+    borderRadius: theme.radius.pill,
     paddingVertical: 14,
     paddingHorizontal: theme.spacing.lg,
     alignItems: 'center',
@@ -78,11 +77,11 @@ export const sharedStyles = StyleSheet.create({
   primaryBtnText: {
     color: theme.colors.onPrimary,
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   secondaryBtn: {
     backgroundColor: theme.colors.surface,
-    borderRadius: theme.radius.md,
+    borderRadius: theme.radius.pill,
     paddingVertical: 12,
     paddingHorizontal: theme.spacing.lg,
     alignItems: 'center',
@@ -105,11 +104,9 @@ export const sharedStyles = StyleSheet.create({
     color: theme.colors.text,
   },
   sectionTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: theme.colors.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
+    fontSize: 15,
+    fontWeight: '700',
+    color: theme.colors.text,
     marginBottom: theme.spacing.sm,
   },
   empty: {
@@ -121,7 +118,7 @@ export const sharedStyles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
+    backgroundColor: 'rgba(28,22,18,0.4)',
     justifyContent: 'flex-end',
   },
   modalSheet: {
@@ -133,7 +130,7 @@ export const sharedStyles = StyleSheet.create({
     maxHeight: '92%',
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '700',
     color: theme.colors.text,
   },

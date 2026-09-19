@@ -190,8 +190,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: theme.colors.textSecondary,
     marginTop: 4,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
   },
   pickerBtn: {
     borderWidth: 1,

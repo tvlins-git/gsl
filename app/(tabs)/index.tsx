@@ -1,5 +1,3 @@
-import { Redirect } from 'expo-router';
+import PhotosScreen from './photos';
 
-export default function Index() {
-  return <Redirect href="/(tabs)/hosts" />;
-}
+export default PhotosScreen;

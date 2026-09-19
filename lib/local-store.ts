@@ -317,10 +317,16 @@ export const localStore = {
     const events = data.photo_events
       .filter((e) => e.group_id === groupId)
       .sort((a, b) => b.created_at.localeCompare(a.created_at));
-    return events.map((event) => ({
-      event,
-      photoCount: data.photos.filter((p) => p.event_id === event.id).length,
-    }));
+    return events.map((event) => {
+      const eventPhotos = data.photos.filter((p) => p.event_id === event.id);
+      const coverPhoto =
+        eventPhotos.slice().sort((a, b) => (b.ai_score ?? -1) - (a.ai_score ?? -1))[0] ?? null;
+      return {
+        event,
+        photoCount: eventPhotos.length,
+        coverPhoto,
+      };
+    });
   },
 
   async createPhotoEvent(groupId: string, title: string, userId: string, eventDate?: string) {

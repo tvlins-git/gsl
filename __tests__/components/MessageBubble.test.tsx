@@ -16,7 +16,7 @@ describe('MessageBubble', () => {
     expect(screen.getByText('Alex')).toBeTruthy();
   });
 
-  it('renders own messages with sender name', () => {
+  it('renders own messages without repeating the sender name', () => {
     render(
       <MessageBubble
         body="My message"
@@ -25,7 +25,7 @@ describe('MessageBubble', () => {
         isOwn={true}
       />
     );
-    expect(screen.getByText('Hr. Lins')).toBeTruthy();
+    expect(screen.queryByText('Hr. Lins')).toBeNull();
     expect(screen.getByText('My message')).toBeTruthy();
   });
 });

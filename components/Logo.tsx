@@ -29,9 +29,8 @@ const styles = StyleSheet.create({
     gap: 0,
   },
   title: {
-    fontSize: 32,
-    fontWeight: '800',
-    letterSpacing: 4,
-    color: '#111',
+    fontSize: 30,
+    fontWeight: '700',
+    color: '#1c1612',
   },
 });

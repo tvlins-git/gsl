@@ -565,8 +565,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: theme.colors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
   },
   userList: {
     gap: theme.spacing.sm,
@@ -600,11 +598,9 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.accentSoft,
   },
   adminBadgeText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
     color: theme.colors.accent,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
   },
   localBadge: {
     paddingHorizontal: 8,
@@ -613,11 +609,9 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.warningSoft,
   },
   localBadgeText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
     color: '#b45309',
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
   },
   sectionHint: {
     fontSize: 14,

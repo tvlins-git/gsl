@@ -1,6 +1,7 @@
 import { SymbolView } from 'expo-symbols';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { MemberSelect } from '@/components/MemberSelect';
+import { UserAvatar } from '@/components/UserAvatar';
 import { sharedStyles, theme } from '@/constants/theme';
 import type { Member } from '@/lib/database.types';
 import type { MonthEntry } from '@/lib/hosts';
@@ -27,6 +28,7 @@ export function HostMonthRow({
   disabled = false,
 }: HostMonthRowProps) {
   const canClear = !!assignedMemberId;
+  const assigned = members.find((member) => member.id === assignedMemberId);
 
   return (
     <View
@@ -38,9 +40,17 @@ export function HostMonthRow({
       ]}
       testID={`host-row-${month.year}-${month.month}`}
     >
+      {assigned ? (
+        <UserAvatar name={assigned.display_name} size={52} imageUri={assigned.avatar_url} ring={month.isCurrent} />
+      ) : (
+        <View style={styles.emptyAvatar} />
+      )}
       <View style={styles.labelCol}>
         <Text style={styles.monthLabel}>{month.label}</Text>
-        {month.isCurrent && <Text style={styles.badgeCurrent}>Current month</Text>}
+        <Text style={styles.hostName} numberOfLines={1}>
+          {assigned?.display_name ?? 'No host yet'}
+        </Text>
+        {month.isCurrent && <Text style={styles.badgeCurrent}>This month</Text>}
         {month.isNext && !month.isCurrent && <Text style={styles.badgeNext}>Up next</Text>}
       </View>
 
@@ -105,43 +115,52 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginHorizontal: theme.spacing.lg,
-    marginBottom: theme.spacing.sm,
-    paddingVertical: theme.spacing.sm,
+    marginBottom: theme.spacing.md,
+    paddingVertical: theme.spacing.md,
     paddingHorizontal: theme.spacing.md,
     gap: theme.spacing.md,
   },
   currentCard: {
-    borderColor: theme.colors.accent,
     backgroundColor: theme.colors.accentSoft,
   },
   nextCard: {
-    borderColor: '#fcd34d',
     backgroundColor: theme.colors.warningSoft,
+  },
+  emptyAvatar: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.borderLight,
   },
   labelCol: {
     flex: 1,
     minWidth: 0,
+    gap: 2,
   },
   monthLabel: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
     color: theme.colors.text,
   },
+  hostName: {
+    fontSize: 13,
+    color: theme.colors.textSecondary,
+    fontWeight: '500',
+  },
   badgeCurrent: {
-    fontSize: 11,
+    fontSize: 12,
     color: theme.colors.accent,
     fontWeight: '700',
-    marginTop: 4,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
+    marginTop: 2,
   },
   badgeNext: {
-    fontSize: 11,
+    fontSize: 12,
     color: '#b45309',
     fontWeight: '700',
-    marginTop: 4,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
+    marginTop: 2,
   },
   controls: {
     flexDirection: 'row',

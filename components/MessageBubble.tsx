@@ -1,4 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native';
+import { UserAvatar } from '@/components/UserAvatar';
 import { theme } from '@/constants/theme';
 import { formatMessageTime } from '@/lib/messages';
 
@@ -15,8 +16,9 @@ export function MessageBubble({ body, senderName, createdAt, isOwn }: MessageBub
       style={[styles.row, isOwn ? styles.ownRow : styles.otherRow]}
       testID="message-bubble"
     >
+      {!isOwn ? <UserAvatar name={senderName} size={28} /> : null}
       <View style={[styles.bubble, isOwn ? styles.ownBubble : styles.otherBubble]}>
-        <Text style={[styles.senderName, isOwn && styles.ownSenderName]}>{senderName}</Text>
+        {!isOwn ? <Text style={styles.senderName}>{senderName}</Text> : null}
         <Text style={[styles.body, isOwn && styles.ownBody]}>{body}</Text>
         <Text style={[styles.time, isOwn && styles.ownTime]}>
           {formatMessageTime(createdAt)}
@@ -30,37 +32,35 @@ const styles = StyleSheet.create({
   row: {
     marginVertical: 4,
     paddingHorizontal: theme.spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: theme.spacing.sm,
   },
   ownRow: {
-    alignItems: 'flex-end',
+    justifyContent: 'flex-end',
   },
   otherRow: {
-    alignItems: 'flex-start',
+    justifyContent: 'flex-start',
   },
   bubble: {
-    maxWidth: '80%',
+    maxWidth: '76%',
     borderRadius: theme.radius.lg,
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
   ownBubble: {
     backgroundColor: theme.colors.primary,
-    borderBottomRightRadius: theme.radius.sm,
+    borderBottomRightRadius: 6,
   },
   otherBubble: {
     backgroundColor: theme.colors.surface,
-    borderBottomLeftRadius: theme.radius.sm,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: theme.colors.border,
+    borderBottomLeftRadius: 6,
   },
   senderName: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
     color: theme.colors.textSecondary,
     marginBottom: 4,
-  },
-  ownSenderName: {
-    color: 'rgba(255,255,255,0.7)',
   },
   body: {
     fontSize: 16,

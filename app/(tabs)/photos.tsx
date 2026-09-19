@@ -1,4 +1,5 @@
 import * as ImagePicker from 'expo-image-picker';
+import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -12,25 +13,31 @@ import {
 } from 'react-native';
 import { PhotoEventRow } from '@/components/PhotoEventRow';
 import { PhotoGrid } from '@/components/PhotoGrid';
+import { StoriesRow } from '@/components/StoriesRow';
+import { UserAvatar } from '@/components/UserAvatar';
 import { Screen } from '@/components/ui/Screen';
 import { useAuth } from '@/contexts/AuthContext';
-import type { Photo, PhotoEvent } from '@/lib/database.types';
+import { getGroupMembers } from '@/lib/auth';
+import type { Member, Photo, PhotoEvent } from '@/lib/database.types';
 import { compressImage } from '@/lib/image-compress';
 import { isLocalMode, localStore } from '@/lib/local-store';
 import {
   deletePhotoEvent,
-  formatEventDate,
   formatPhotoCount,
+  getPhotoPublicUrl,
   loadPhotoEventSummaries,
   type PhotoEventSummary,
 } from '@/lib/photo-events';
 import { deletePhoto } from '@/lib/photo-list';
+import { formatRelativeTime } from '@/lib/time';
 import { supabase } from '@/lib/supabase';
 import { sharedStyles, theme } from '@/constants/theme';
 
 export default function PhotosScreen() {
   const { member } = useAuth();
+  const { eventId } = useLocalSearchParams<{ eventId?: string }>();
   const [summaries, setSummaries] = useState<PhotoEventSummary[]>([]);
+  const [members, setMembers] = useState<Member[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<PhotoEvent | null>(null);
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,8 +48,12 @@ export default function PhotosScreen() {
   const loadSummaries = useCallback(async () => {
     if (!member) return;
     setLoading(true);
-    const data = await loadPhotoEventSummaries(member.group_id);
+    const [data, groupMembers] = await Promise.all([
+      loadPhotoEventSummaries(member.group_id),
+      getGroupMembers(member.group_id),
+    ]);
     setSummaries(data);
+    setMembers(groupMembers);
     setLoading(false);
   }, [member]);
 
@@ -61,7 +72,16 @@ export default function PhotosScreen() {
     if (selectedEvent) loadPhotos(selectedEvent.id);
   }, [selectedEvent, loadPhotos]);
 
+  useEffect(() => {
+    if (!eventId || selectedEvent) return;
+    const match = summaries.find((item) => item.event.id === eventId);
+    if (match) setSelectedEvent(match.event);
+  }, [eventId, selectedEvent, summaries]);
+
   const selectedSummary = summaries.find((s) => s.event.id === selectedEvent?.id);
+  const nameForUser = (userId?: string | null) =>
+    members.find((item) => item.user_id === userId)?.display_name
+    ?? (member && userId === member.user_id ? member.display_name : 'Friend');
 
   const topPhotoIds = useMemo(() => {
     const scored = photos.filter((p) => p.ai_score != null);
@@ -69,14 +89,7 @@ export default function PhotosScreen() {
     return new Set(scored.slice(0, topN).map((p) => p.id));
   }, [photos]);
 
-  const getImageUrl = (photo: Photo, thumb = false) => {
-    if (isLocalMode()) {
-      return thumb && photo.thumb_path ? photo.thumb_path : photo.storage_path;
-    }
-    const path = thumb && photo.thumb_path ? photo.thumb_path : photo.storage_path;
-    const { data } = supabase.storage.from('photos').getPublicUrl(path);
-    return data.publicUrl;
-  };
+  const getImageUrl = (photo: Photo, thumb = false) => getPhotoPublicUrl(photo, thumb);
 
   const handleCreateEvent = async () => {
     if (!member || !newTitle.trim()) return;
@@ -194,10 +207,11 @@ export default function PhotosScreen() {
           <Text style={styles.back}>← Back to events</Text>
         </Pressable>
         <View style={[styles.detailHeader, sharedStyles.card]}>
+          <UserAvatar name={nameForUser(selectedEvent.created_by)} size={48} />
           <View style={styles.detailTitleBlock}>
             <Text style={styles.detailTitle}>{selectedEvent.title}</Text>
             <Text style={styles.detailMeta}>
-              Added {formatEventDate(selectedEvent.created_at)}
+              {nameForUser(selectedEvent.created_by)} · {formatRelativeTime(selectedEvent.created_at)}
               {selectedSummary ? ` · ${formatPhotoCount(selectedSummary.photoCount)}` : ''}
             </Text>
           </View>
@@ -245,12 +259,17 @@ export default function PhotosScreen() {
 
   return (
     <Screen>
+      <StoriesRow members={members} />
       <Pressable
-        style={[styles.createBtn, sharedStyles.primaryBtn]}
+        style={styles.compose}
         onPress={() => setShowCreate(true)}
         testID="create-photo-event-btn"
       >
-        <Text style={sharedStyles.primaryBtnText}>+ New event</Text>
+        <UserAvatar name={member?.display_name ?? 'You'} size={36} />
+        <Text style={styles.composeText}>Share from the last hangout…</Text>
+        <View style={styles.composePlus}>
+          <Text style={styles.composePlusText}>+</Text>
+        </View>
       </Pressable>
 
       <FlatList
@@ -260,12 +279,15 @@ export default function PhotosScreen() {
         renderItem={({ item }) => (
           <PhotoEventRow
             summary={item}
+            authorName={nameForUser(item.event.created_by)}
             onPress={() => setSelectedEvent(item.event)}
             onDelete={() => handleDeleteEvent(item.event.id)}
           />
         )}
         ListEmptyComponent={
-          <Text style={sharedStyles.empty}>Create an event to start uploading photos.</Text>
+          <Text style={sharedStyles.empty}>
+            Nothing on the feed yet. Start an album and drop in a few photos.
+          </Text>
         }
       />
 
@@ -295,9 +317,37 @@ export default function PhotosScreen() {
 }
 
 const styles = StyleSheet.create({
-  createBtn: {
-    margin: theme.spacing.lg,
-    marginBottom: theme.spacing.sm,
+  compose: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: theme.spacing.lg,
+    marginTop: theme.spacing.sm,
+    marginBottom: theme.spacing.md,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    ...sharedStyles.card,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.pill,
+    gap: theme.spacing.md,
+  },
+  composeText: {
+    flex: 1,
+    color: theme.colors.textMuted,
+    fontSize: 15,
+  },
+  composePlus: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: theme.colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  composePlusText: {
+    color: theme.colors.onPrimary,
+    fontSize: 20,
+    fontWeight: '700',
+    marginTop: -1,
   },
   list: {
     paddingHorizontal: theme.spacing.lg,
@@ -314,8 +364,7 @@ const styles = StyleSheet.create({
   },
   detailHeader: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
+    alignItems: 'center',
     marginHorizontal: theme.spacing.lg,
     marginBottom: theme.spacing.md,
     padding: theme.spacing.lg,
