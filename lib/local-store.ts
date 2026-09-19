@@ -99,9 +99,15 @@ async function readData(): Promise<LocalData> {
   const raw = await AsyncStorage.getItem(STORAGE_KEY);
   if (!raw) return emptyData();
   try {
-    const parsed = { ...emptyData(), ...JSON.parse(raw) } as LocalData;
+    const parsed = JSON.parse(raw) as Partial<LocalData>;
     memberEmailCache = parsed.member_emails ?? {};
-    return parsed;
+    return {
+      ...emptyData(),
+      ...parsed,
+      feed_posts: parsed.feed_posts ?? [],
+      feed_post_tags: parsed.feed_post_tags ?? [],
+      member_emails: parsed.member_emails ?? {},
+    };
   } catch {
     return emptyData();
   }
@@ -392,14 +398,14 @@ export const localStore = {
 
   async getFeedPosts(groupId: string) {
     const data = await readData();
-    return data.feed_posts
+    const posts = data.feed_posts ?? [];
+    const tags = data.feed_post_tags ?? [];
+    return posts
       .filter((post) => post.group_id === groupId)
       .sort((a, b) => b.created_at.localeCompare(a.created_at))
       .map((post) => ({
         ...post,
-        taggedUserIds: data.feed_post_tags
-          .filter((tag) => tag.post_id === post.id)
-          .map((tag) => tag.user_id),
+        taggedUserIds: tags.filter((tag) => tag.post_id === post.id).map((tag) => tag.user_id),
         imageUri: post.image_path,
       }));
   },
@@ -413,6 +419,8 @@ export const localStore = {
     taggedUserIds: string[];
   }): Promise<FeedPost & { taggedUserIds: string[]; imageUri: string | null }> {
     const data = await readData();
+    data.feed_posts ??= [];
+    data.feed_post_tags ??= [];
     const post: FeedPost = {
       id: uuid(),
       group_id: input.groupId,
