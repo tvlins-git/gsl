@@ -1,25 +1,26 @@
 import * as ImagePicker from 'expo-image-picker';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
-  Modal,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
+  type NativeSyntheticEvent,
+  type TextInputSelectionChangeEventData,
 } from 'react-native';
 import { UserAvatar } from '@/components/UserAvatar';
-import { sharedStyles, theme } from '@/constants/theme';
+import { theme } from '@/constants/theme';
 import type { Member } from '@/lib/database.types';
 import {
+  applyFeedMention,
   canSubmitFeedPost,
   createFeedPost,
-  formatTagPickerLabel,
-  isValidFeedTagSelection,
-  type FeedTagSelection,
+  getActiveFeedMention,
+  listFeedMentionSuggestions,
+  parseFeedMentions,
 } from '@/lib/feed-posts';
 
 interface FeedComposerProps {
@@ -30,17 +31,22 @@ interface FeedComposerProps {
 
 export function FeedComposer({ members, author, onPosted }: FeedComposerProps) {
   const [body, setBody] = useState('');
+  const [cursor, setCursor] = useState(0);
+  const [selection, setSelection] = useState<{ start: number; end: number } | undefined>();
   const [imageUri, setImageUri] = useState<string | null>(null);
-  const [tagAll, setTagAll] = useState(true);
-  const [taggedUserIds, setTaggedUserIds] = useState<string[]>([]);
-  const [tagOpen, setTagOpen] = useState(false);
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState('');
 
-  const selection: FeedTagSelection = tagAll ? { tagAll: true } : { tagAll: false, userIds: taggedUserIds };
-  const canPost =
-    canSubmitFeedPost(body, imageUri) && isValidFeedTagSelection(selection) && !posting;
-  const tagLabel = formatTagPickerLabel(selection, members);
+  const canPost = canSubmitFeedPost(body, imageUri) && !posting;
+  const mentionCursor = cursor === 0 && body.length > 0 ? body.length : cursor;
+  const activeMention = useMemo(
+    () => getActiveFeedMention(body, mentionCursor),
+    [body, mentionCursor]
+  );
+  const suggestions = useMemo(
+    () => (activeMention ? listFeedMentionSuggestions(activeMention.query, members) : []),
+    [activeMention, members]
+  );
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -53,22 +59,31 @@ export function FeedComposer({ members, author, onPosted }: FeedComposerProps) {
     }
   };
 
-  const toggleMember = (userId: string) => {
-    setTagAll(false);
-    setTaggedUserIds((current) =>
-      current.includes(userId) ? current.filter((id) => id !== userId) : [...current, userId]
-    );
+  const handleSelectionChange = (event: NativeSyntheticEvent<TextInputSelectionChangeEventData>) => {
+    const next = event.nativeEvent.selection;
+    setCursor(next.end);
+    setSelection(undefined);
   };
 
-  const selectEveryone = () => {
-    setTagAll(true);
-    setTaggedUserIds([]);
+  const handleChangeText = (next: string) => {
+    setBody(next);
+    setSelection(undefined);
+    setError('');
+  };
+
+  const insertMention = (insert: string) => {
+    if (!activeMention) return;
+    const next = applyFeedMention(body, activeMention, insert);
+    setBody(next.body);
+    setCursor(next.cursor);
+    setSelection({ start: next.cursor, end: next.cursor });
   };
 
   const handlePost = async () => {
     if (!canPost) return;
     setPosting(true);
     setError('');
+    const tags = parseFeedMentions(body, members);
     try {
       await createFeedPost({
         groupId: author.group_id,
@@ -76,14 +91,13 @@ export function FeedComposer({ members, author, onPosted }: FeedComposerProps) {
         authorName: author.display_name,
         body,
         imageUri,
-        tagAll,
-        taggedUserIds,
+        tagAll: tags.tagAll,
+        taggedUserIds: tags.tagAll ? [] : tags.userIds,
         groupUserIds: members.map((member) => member.user_id),
       });
       setBody('');
+      setCursor(0);
       setImageUri(null);
-      setTagAll(true);
-      setTaggedUserIds([]);
       await onPosted();
     } catch {
       setError('Could not post. Try again.');
@@ -99,14 +113,41 @@ export function FeedComposer({ members, author, onPosted }: FeedComposerProps) {
           <UserAvatar name={author.display_name} size={36} imageUri={author.avatar_url} />
           <TextInput
             style={styles.input}
-            placeholder="Write an update…"
+            placeholder="Use @everyone or @name to notify"
             placeholderTextColor={theme.colors.textMuted}
             value={body}
-            onChangeText={setBody}
+            onChangeText={handleChangeText}
+            onSelectionChange={handleSelectionChange}
+            selection={selection}
             multiline
             testID="feed-composer-input"
           />
         </View>
+        {suggestions.length > 0 ? (
+          <View style={styles.suggestions} testID="feed-mention-suggestions">
+            {suggestions.map((suggestion) => (
+              <Pressable
+                key={suggestion.id}
+                style={styles.suggestion}
+                onPress={() => insertMention(suggestion.insert)}
+                testID={
+                  suggestion.id === 'everyone'
+                    ? 'feed-mention-everyone'
+                    : `feed-mention-member-${suggestion.id}`
+                }
+                accessibilityRole="button"
+                accessibilityLabel={`Mention ${suggestion.label}`}
+              >
+                <Text style={styles.suggestionText}>@{suggestion.insert}</Text>
+                {suggestion.id !== 'everyone' ? (
+                  <Text style={styles.suggestionMeta}>{suggestion.label}</Text>
+                ) : (
+                  <Text style={styles.suggestionMeta}>Notify the whole group</Text>
+                )}
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
         {imageUri ? (
           <View style={styles.previewWrap}>
             <Image source={{ uri: imageUri }} style={styles.preview} />
@@ -130,17 +171,6 @@ export function FeedComposer({ members, author, onPosted }: FeedComposerProps) {
             <Text style={styles.chipText}>Photo</Text>
           </Pressable>
           <Pressable
-            style={styles.chip}
-            onPress={() => setTagOpen(true)}
-            testID="feed-composer-tags"
-            accessibilityRole="button"
-            accessibilityLabel={`Tag ${tagLabel}`}
-          >
-            <Text style={styles.chipText} numberOfLines={1}>
-              {tagLabel}
-            </Text>
-          </Pressable>
-          <Pressable
             style={[styles.postBtn, !canPost && styles.postBtnDisabled]}
             onPress={handlePost}
             disabled={!canPost}
@@ -157,45 +187,6 @@ export function FeedComposer({ members, author, onPosted }: FeedComposerProps) {
         </View>
         {error ? <Text style={styles.error}>{error}</Text> : null}
       </View>
-
-      <Modal visible={tagOpen} transparent animationType="fade" onRequestClose={() => setTagOpen(false)}>
-        <Pressable style={sharedStyles.modalOverlay} onPress={() => setTagOpen(false)}>
-          <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-            <Text style={styles.sheetTitle}>Tag people</Text>
-            <Text style={styles.sheetHint}>Everyone, or pick specific members.</Text>
-            <ScrollView style={styles.options} keyboardShouldPersistTaps="handled">
-              <Pressable
-                style={[styles.option, tagAll && styles.optionSelected]}
-                onPress={selectEveryone}
-                testID="feed-tag-all"
-              >
-                <Text style={[styles.optionText, tagAll && styles.optionTextSelected]}>Everyone</Text>
-              </Pressable>
-              {members.map((member) => {
-                const selected = !tagAll && taggedUserIds.includes(member.user_id);
-                return (
-                  <Pressable
-                    key={member.id}
-                    style={[styles.option, selected && styles.optionSelected]}
-                    onPress={() => toggleMember(member.user_id)}
-                    testID={`feed-tag-member-${member.id}`}
-                  >
-                    <View style={styles.optionPerson}>
-                      <UserAvatar name={member.display_name} size={32} imageUri={member.avatar_url} />
-                      <Text style={[styles.optionText, selected && styles.optionTextSelected]}>
-                        {member.display_name}
-                      </Text>
-                    </View>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-            <Pressable style={styles.doneBtn} onPress={() => setTagOpen(false)} testID="feed-tag-done">
-              <Text style={styles.doneText}>Done</Text>
-            </Pressable>
-          </Pressable>
-        </Pressable>
-      </Modal>
     </View>
   );
 }
@@ -223,6 +214,27 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: theme.colors.text,
     paddingTop: 8,
+  },
+  suggestions: {
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.bg,
+    overflow: 'hidden',
+  },
+  suggestion: {
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: 10,
+    gap: 2,
+  },
+  suggestionText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: theme.colors.text,
+  },
+  suggestionMeta: {
+    fontSize: 12,
+    color: theme.colors.textSecondary,
   },
   previewWrap: {
     gap: 6,
@@ -253,7 +265,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.border,
     backgroundColor: theme.colors.bg,
-    maxWidth: 140,
   },
   chipText: {
     fontSize: 13,
@@ -280,63 +291,6 @@ const styles = StyleSheet.create({
   error: {
     color: theme.colors.danger,
     fontSize: 13,
-    fontWeight: '600',
-  },
-  sheet: {
-    marginHorizontal: theme.spacing.lg,
-    marginTop: 'auto',
-    marginBottom: theme.spacing.xxl,
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.radius.xl,
-    padding: theme.spacing.lg,
-    gap: theme.spacing.sm,
-    maxHeight: '70%',
-  },
-  sheetTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: theme.colors.text,
-  },
-  sheetHint: {
-    fontSize: 13,
-    color: theme.colors.textSecondary,
-    marginBottom: theme.spacing.xs,
-  },
-  options: {
-    maxHeight: 320,
-  },
-  option: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 14,
-    paddingHorizontal: theme.spacing.md,
-    borderRadius: theme.radius.md,
-  },
-  optionSelected: {
-    backgroundColor: theme.colors.accentSoft,
-  },
-  optionPerson: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.md,
-    flex: 1,
-  },
-  optionText: {
-    fontSize: 16,
-    color: theme.colors.text,
-  },
-  optionTextSelected: {
-    fontWeight: '600',
-    color: theme.colors.accent,
-  },
-  doneBtn: {
-    paddingVertical: theme.spacing.sm,
-    alignItems: 'center',
-  },
-  doneText: {
-    fontSize: 15,
-    color: theme.colors.textSecondary,
     fontWeight: '600',
   },
 });

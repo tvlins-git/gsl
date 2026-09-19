@@ -45,9 +45,11 @@ describe('FeedComposer', () => {
   it('keeps Post disabled until there is text or a photo', () => {
     render(<FeedComposer members={[author, alice]} author={author} onPosted={() => {}} />);
     expect(screen.getByTestId('feed-composer-post')).toBeDisabled();
+    expect(screen.queryByTestId('feed-composer-tags')).toBeNull();
+    expect(screen.queryByText('Everyone')).toBeNull();
   });
 
-  it('posts text tagged to everyone', async () => {
+  it('posts text without mentions as untagged', async () => {
     const onPosted = jest.fn();
     render(<FeedComposer members={[author, alice]} author={author} onPosted={onPosted} />);
     fireEvent.changeText(screen.getByTestId('feed-composer-input'), 'Hello GSL');
@@ -56,7 +58,8 @@ describe('FeedComposer', () => {
     expect(createFeedPost).toHaveBeenCalledWith(
       expect.objectContaining({
         body: 'Hello GSL',
-        tagAll: true,
+        tagAll: false,
+        taggedUserIds: [],
         authorId: 'user-1',
         imageUri: null,
       })
@@ -64,20 +67,67 @@ describe('FeedComposer', () => {
     await waitFor(() => expect(onPosted).toHaveBeenCalled());
   });
 
-  it('can attach a photo and tag one person', async () => {
+  it('posts @everyone as tag_all', async () => {
     render(<FeedComposer members={[author, alice]} author={author} onPosted={() => {}} />);
-    fireEvent.press(screen.getByTestId('feed-composer-photo'));
-    await waitFor(() => expect(screen.getByTestId('feed-composer-remove-photo')).toBeTruthy());
-    fireEvent.press(screen.getByTestId('feed-composer-tags'));
-    fireEvent.press(screen.getByTestId('feed-tag-member-m2'));
-    fireEvent.press(screen.getByTestId('feed-tag-done'));
+    fireEvent.changeText(screen.getByTestId('feed-composer-input'), 'hello @everyone');
+    fireEvent.press(screen.getByTestId('feed-composer-post'));
+    await waitFor(() => expect(createFeedPost).toHaveBeenCalled());
+    expect(createFeedPost).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: 'hello @everyone',
+        tagAll: true,
+        taggedUserIds: [],
+      })
+    );
+  });
+
+  it('posts @name mentions as tagged members', async () => {
+    render(<FeedComposer members={[author, alice]} author={author} onPosted={() => {}} />);
+    fireEvent.changeText(screen.getByTestId('feed-composer-input'), 'hi @Alice');
     fireEvent.press(screen.getByTestId('feed-composer-post'));
     await waitFor(() => expect(createFeedPost).toHaveBeenCalled());
     expect(createFeedPost).toHaveBeenCalledWith(
       expect.objectContaining({
         tagAll: false,
         taggedUserIds: ['user-2'],
+      })
+    );
+  });
+
+  it('can attach a photo without the old tag picker', async () => {
+    render(<FeedComposer members={[author, alice]} author={author} onPosted={() => {}} />);
+    fireEvent.press(screen.getByTestId('feed-composer-photo'));
+    await waitFor(() => expect(screen.getByTestId('feed-composer-remove-photo')).toBeTruthy());
+    fireEvent.press(screen.getByTestId('feed-composer-post'));
+    await waitFor(() => expect(createFeedPost).toHaveBeenCalled());
+    expect(createFeedPost).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tagAll: false,
+        taggedUserIds: [],
         imageUri: 'file://photo.jpg',
+      })
+    );
+  });
+
+  it('shows mention suggestions while typing @', () => {
+    render(<FeedComposer members={[author, alice]} author={author} onPosted={() => {}} />);
+    fireEvent.changeText(screen.getByTestId('feed-composer-input'), 'hi @');
+    expect(screen.getByTestId('feed-mention-suggestions')).toBeTruthy();
+    expect(screen.getByTestId('feed-mention-everyone')).toBeTruthy();
+    expect(screen.getByTestId('feed-mention-member-user-2')).toBeTruthy();
+  });
+
+  it('inserts a suggestion into the composer text', async () => {
+    render(<FeedComposer members={[author, alice]} author={author} onPosted={() => {}} />);
+    fireEvent.changeText(screen.getByTestId('feed-composer-input'), 'hi @');
+    fireEvent.press(screen.getByTestId('feed-mention-member-user-2'));
+    fireEvent.press(screen.getByTestId('feed-composer-post'));
+    await waitFor(() => expect(createFeedPost).toHaveBeenCalled());
+    expect(createFeedPost).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: 'hi @Alice ',
+        tagAll: false,
+        taggedUserIds: ['user-2'],
       })
     );
   });

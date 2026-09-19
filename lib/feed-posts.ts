@@ -36,12 +36,146 @@ function createId() {
   });
 }
 
+const MENTION_TOKEN_RE = /@([A-Za-z][A-Za-z0-9._-]*)/g;
+const ACTIVE_MENTION_RE = /(^|[\s])@([A-Za-z0-9._-]*)$/;
+const HONORIFICS = new Set(['hr', 'mr', 'mrs', 'ms', 'dr']);
+
+export type FeedMentionMember = Pick<Member, 'user_id' | 'display_name'> & {
+  contact_email?: string | null;
+};
+
+export type FeedMentionSuggestion = {
+  id: string;
+  label: string;
+  insert: string;
+};
+
+export type ActiveFeedMention = {
+  query: string;
+  start: number;
+  end: number;
+};
+
 export function canSubmitFeedPost(body: string, imageUri: string | null | undefined) {
   return Boolean(body.trim() || imageUri);
 }
 
 export function isValidFeedTagSelection(selection: FeedTagSelection) {
-  return selection.tagAll || selection.userIds.length > 0;
+  return selection.tagAll || Array.isArray(selection.userIds);
+}
+
+function normalizeMentionKey(value: string) {
+  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
+}
+
+function displayNameTokens(displayName: string) {
+  return displayName
+    .split(/[\s._-]+/)
+    .map((token) => token.replace(/[^A-Za-z0-9]/g, ''))
+    .filter(Boolean);
+}
+
+function memberMentionKeys(member: FeedMentionMember) {
+  const keys = new Set<string>();
+  const nameKey = normalizeMentionKey(member.display_name);
+  if (nameKey) keys.add(nameKey);
+  for (const token of displayNameTokens(member.display_name)) {
+    keys.add(token.toLowerCase());
+  }
+  const emailLocal = member.contact_email?.split('@')[0];
+  if (emailLocal) {
+    const emailKey = normalizeMentionKey(emailLocal);
+    if (emailKey) keys.add(emailKey);
+  }
+  return keys;
+}
+
+function mentionInsertToken(member: FeedMentionMember) {
+  const tokens = displayNameTokens(member.display_name);
+  const preferred =
+    [...tokens].reverse().find((token) => !HONORIFICS.has(token.toLowerCase())) ?? tokens[0];
+  return preferred || normalizeMentionKey(member.display_name);
+}
+
+export function extractMentionTokens(body: string): string[] {
+  const tokens: string[] = [];
+  const matcher = new RegExp(MENTION_TOKEN_RE.source, 'g');
+  let match: RegExpExecArray | null;
+  while ((match = matcher.exec(body)) !== null) {
+    const token = match[1].replace(/[._-]+$/g, '');
+    if (token) tokens.push(token);
+  }
+  return tokens;
+}
+
+export function parseFeedMentions(body: string, members: FeedMentionMember[]): FeedTagSelection {
+  const tokens = extractMentionTokens(body);
+  if (tokens.some((token) => token.toLowerCase() === 'everyone')) {
+    return { tagAll: true };
+  }
+
+  const userIds: string[] = [];
+  const seen = new Set<string>();
+  for (const token of tokens) {
+    const needle = normalizeMentionKey(token);
+    if (!needle) continue;
+    for (const member of members) {
+      if (seen.has(member.user_id)) continue;
+      if (memberMentionKeys(member).has(needle)) {
+        seen.add(member.user_id);
+        userIds.push(member.user_id);
+      }
+    }
+  }
+  return { tagAll: false, userIds };
+}
+
+export function getActiveFeedMention(body: string, cursor: number): ActiveFeedMention | null {
+  const safeCursor = Math.max(0, Math.min(cursor, body.length));
+  const before = body.slice(0, safeCursor);
+  const match = before.match(ACTIVE_MENTION_RE);
+  if (!match) return null;
+  const query = match[2];
+  return {
+    query,
+    start: before.length - query.length - 1,
+    end: safeCursor,
+  };
+}
+
+export function listFeedMentionSuggestions(
+  query: string,
+  members: FeedMentionMember[]
+): FeedMentionSuggestion[] {
+  const needle = query.trim().toLowerCase();
+  const suggestions: FeedMentionSuggestion[] = [];
+  if (!needle || 'everyone'.startsWith(needle)) {
+    suggestions.push({ id: 'everyone', label: 'everyone', insert: 'everyone' });
+  }
+  for (const member of members) {
+    const keys = memberMentionKeys(member);
+    const key = normalizeMentionKey(needle);
+    const matches =
+      !needle ||
+      (key !== '' && [...keys].some((memberKey) => memberKey.startsWith(key)));
+    if (!matches) continue;
+    suggestions.push({
+      id: member.user_id,
+      label: member.display_name,
+      insert: mentionInsertToken(member),
+    });
+  }
+  return suggestions;
+}
+
+export function applyFeedMention(
+  body: string,
+  mention: Pick<ActiveFeedMention, 'start' | 'end'>,
+  insert: string
+) {
+  const token = insert.replace(/^@+/, '');
+  const next = `${body.slice(0, mention.start)}@${token} ${body.slice(mention.end)}`;
+  return { body: next, cursor: mention.start + token.length + 2 };
 }
 
 export function formatFeedPostTitle(body: string, hasImage: boolean) {
@@ -64,17 +198,6 @@ export function formatFeedPostSubtitle(
   return `Tagged ${names[0]} and ${names.length - 1} others`;
 }
 
-export function formatTagPickerLabel(selection: FeedTagSelection, members: Member[]) {
-  if (selection.tagAll) return 'Everyone';
-  if (selection.userIds.length === 0) return 'Tag people';
-  if (selection.userIds.length === 1) {
-    return (
-      members.find((member) => member.user_id === selection.userIds[0])?.display_name ?? '1 person'
-    );
-  }
-  return `${selection.userIds.length} people`;
-}
-
 export function resolveFeedPushTargets(input: {
   tagAll: boolean;
   taggedUserIds: string[];
@@ -90,6 +213,10 @@ export function resolveFeedPushTargets(input: {
     (userId) => userId !== input.authorId && group.has(userId)
   );
   return { userIds, excludeUserIds };
+}
+
+export function shouldSendFeedPush(targets: { userIds: string[] | null }) {
+  return targets.userIds == null || targets.userIds.length > 0;
 }
 
 export function buildFeedPushBody(input: {
@@ -191,12 +318,6 @@ export async function createFeedPost(input: CreateFeedPostInput): Promise<FeedPo
   if (!canSubmitFeedPost(body, input.imageUri)) {
     throw new Error('Write an update or attach a photo.');
   }
-  const selection: FeedTagSelection = input.tagAll
-    ? { tagAll: true }
-    : { tagAll: false, userIds: input.taggedUserIds };
-  if (!isValidFeedTagSelection(selection)) {
-    throw new Error('Tag everyone or at least one person.');
-  }
 
   const taggedUserIds = input.tagAll
     ? []
@@ -245,21 +366,24 @@ export async function createFeedPost(input: CreateFeedPostInput): Promise<FeedPo
   }
 
   const summary = toSummary(data as FeedPost, taggedUserIds);
-  await supabase.functions
-    .invoke('send-push', {
-      body: buildFeedSendPushPayload({
-        groupId: input.groupId,
-        authorId: input.authorId,
-        authorName: input.authorName,
-        postId,
-        body,
-        hasImage: Boolean(imagePath),
-        tagAll: input.tagAll,
-        taggedUserIds,
-        groupUserIds: input.groupUserIds,
-      }),
-    })
-    .catch(() => undefined);
+  const pushPayload = buildFeedSendPushPayload({
+    groupId: input.groupId,
+    authorId: input.authorId,
+    authorName: input.authorName,
+    postId,
+    body,
+    hasImage: Boolean(imagePath),
+    tagAll: input.tagAll,
+    taggedUserIds,
+    groupUserIds: input.groupUserIds,
+  });
+  if (shouldSendFeedPush({ userIds: pushPayload.user_ids ?? null })) {
+    await supabase.functions
+      .invoke('send-push', {
+        body: pushPayload,
+      })
+      .catch(() => undefined);
+  }
 
   return summary;
 }
