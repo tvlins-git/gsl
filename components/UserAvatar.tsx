@@ -10,12 +10,12 @@ interface UserAvatarProps {
 }
 
 const PALETTE = [
-  { bg: '#fde8e2', fg: '#d4543c' },
-  { bg: '#fce8d5', fg: '#c46a2a' },
-  { bg: '#e7f2e4', fg: '#3f7a4e' },
-  { bg: '#e4eaf8', fg: '#4a5fa0' },
-  { bg: '#f5e4f0', fg: '#8a4a7a' },
-  { bg: '#e4f3f3', fg: '#3d7a7a' },
+  { bg: '#e8e8e8', fg: '#111111' },
+  { bg: '#d4d4d4', fg: '#111111' },
+  { bg: '#c4c4c4', fg: '#111111' },
+  { bg: '#111111', fg: '#ffffff' },
+  { bg: '#3a3a3a', fg: '#ffffff' },
+  { bg: '#6b6b6b', fg: '#ffffff' },
 ] as const;
 
 function colorForName(name: string) {

@@ -158,7 +158,7 @@ const styles = StyleSheet.create({
   },
   badgeNext: {
     fontSize: 12,
-    color: '#b45309',
+    color: theme.colors.textSecondary,
     fontWeight: '700',
     marginTop: 2,
   },
