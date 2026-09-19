@@ -5,12 +5,21 @@ import FeedScreen from '@/app/(tabs)/index';
 import { deleteFeedPost } from '@/lib/feed-posts';
 import { loadActivitySources } from '@/lib/activity-feed';
 
-jest.mock('expo-router', () => ({
-  router: { push: jest.fn() },
-  useFocusEffect: (effect: () => void) => {
-    effect();
-  },
-}));
+jest.mock('expo-router', () => {
+  const { useEffect } = require('react');
+  return {
+    router: { push: jest.fn() },
+    // Real useFocusEffect runs on focus, not during render. Calling the
+    // callback on every render re-invokes loadFeed → setState → render
+    // forever, which is what timed out this suite on CI after #17.
+    useFocusEffect: (effect: () => void) => {
+      useEffect(() => {
+        const cleanup = effect();
+        return typeof cleanup === 'function' ? cleanup : undefined;
+      }, [effect]);
+    },
+  };
+});
 
 jest.mock('@/components/FeedPhoto', () => {
   const React = require('react');
@@ -142,7 +151,7 @@ describe('FeedScreen post delete', () => {
 
   it('lets the author delete their published post and hides Delete on others', async () => {
     render(<FeedScreen />);
-    expect(await screen.findByText('My flower post', {}, { timeout: 8000 })).toBeTruthy();
+    expect(await screen.findByText('My flower post')).toBeTruthy();
     expect(screen.getByTestId('delete-feed-item-post-mine')).toBeTruthy();
     expect(screen.queryByTestId('delete-feed-item-post-theirs')).toBeNull();
 
@@ -154,7 +163,7 @@ describe('FeedScreen post delete', () => {
       currentUserId: 'user-1',
       imagePath: 'file://flower.jpg',
     });
-  }, 15000);
+  });
 
   it('also deletes from the post detail sheet', async () => {
     render(<FeedScreen />);
@@ -164,5 +173,5 @@ describe('FeedScreen post delete', () => {
     expect(StyleSheet.flatten(detailPhoto.props.style).height).not.toBe(280);
     fireEvent.press(await screen.findByTestId('feed-post-delete'));
     await waitFor(() => expect(deleteFeedPost).toHaveBeenCalled());
-  }, 15000);
+  });
 });
