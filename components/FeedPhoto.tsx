@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Image, StyleSheet, View, type ImageStyle, type StyleProp } from 'react-native';
 import { theme } from '@/constants/theme';
 import {
@@ -24,22 +24,6 @@ export function FeedPhoto({
 }: FeedPhotoProps) {
   const [aspect, setAspect] = useState(FEED_PHOTO_FALLBACK_ASPECT);
   const [boxWidth, setBoxWidth] = useState(0);
-
-  useEffect(() => {
-    if (typeof document === 'undefined') return;
-    let cancelled = false;
-    const probe = document.createElement('img');
-    probe.onload = () => {
-      if (!cancelled && probe.naturalWidth > 0 && probe.naturalHeight > 0) {
-        setAspect(feedPhotoAspect(probe.naturalWidth, probe.naturalHeight));
-      }
-    };
-    probe.src = uri;
-    return () => {
-      cancelled = true;
-      probe.onload = null;
-    };
-  }, [uri]);
 
   const measured = boxWidth > 0;
   const height = measured ? feedPhotoDisplayHeight(boxWidth, aspect, maxHeight) : undefined;
