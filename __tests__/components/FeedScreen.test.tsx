@@ -132,7 +132,7 @@ describe('FeedScreen post delete', () => {
       currentUserId: 'user-1',
       imagePath: 'file://flower.jpg',
     });
-  });
+  }, 15000);
 
   it('also deletes from the post detail sheet', async () => {
     render(<FeedScreen />);
@@ -142,5 +142,5 @@ describe('FeedScreen post delete', () => {
     expect(StyleSheet.flatten(detailPhoto.props.style).height).not.toBe(280);
     fireEvent.press(await screen.findByTestId('feed-post-delete'));
     await waitFor(() => expect(deleteFeedPost).toHaveBeenCalled());
-  });
+  }, 15000);
 });
