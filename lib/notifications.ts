@@ -1,20 +1,46 @@
 import * as Device from 'expo-device';
-import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
+import { isExpoGoRuntime } from './runtime';
 import { supabase } from './supabase';
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+type NotificationsModule = typeof import('expo-notifications');
+
+let nativeNotifications: NotificationsModule | null | undefined;
+let handlerConfigured = false;
+
+async function loadNativeNotifications(): Promise<NotificationsModule | null> {
+  if (isExpoGoRuntime()) return null;
+  if (nativeNotifications !== undefined) return nativeNotifications;
+
+  try {
+    nativeNotifications = await import('expo-notifications');
+  } catch {
+    nativeNotifications = null;
+    return null;
+  }
+
+  if (nativeNotifications && !handlerConfigured) {
+    nativeNotifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: true,
+        shouldShowBanner: true,
+        shouldShowList: true,
+      }),
+    });
+    handlerConfigured = true;
+  }
+
+  return nativeNotifications;
+}
 
 export async function registerForPushNotifications(userId: string): Promise<string | null> {
+  if (isExpoGoRuntime()) return null;
   if (!Device.isDevice) return null;
+
+  const Notifications = await loadNativeNotifications();
+  if (!Notifications) return null;
 
   const { status: existing } = await Notifications.getPermissionsAsync();
   let finalStatus = existing;
@@ -36,6 +62,20 @@ export async function registerForPushNotifications(userId: string): Promise<stri
   );
 
   return token;
+}
+
+export async function subscribeToNotificationResponses(
+  listener: (data: Record<string, unknown>) => void
+): Promise<() => void> {
+  if (isExpoGoRuntime()) return () => undefined;
+
+  const Notifications = await loadNativeNotifications();
+  if (!Notifications) return () => undefined;
+
+  const sub = Notifications.addNotificationResponseReceivedListener((response) => {
+    listener(response.notification.request.content.data as Record<string, unknown>);
+  });
+  return () => sub.remove();
 }
 
 export type NotificationDeepLink =

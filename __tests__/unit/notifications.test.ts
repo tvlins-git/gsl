@@ -1,4 +1,11 @@
-import { parseNotificationData, getDeepLinkPath } from '@/lib/notifications';
+import { parseNotificationData, getDeepLinkPath, registerForPushNotifications, subscribeToNotificationResponses } from '@/lib/notifications';
+import { isExpoGoRuntime } from '@/lib/runtime';
+
+jest.mock('@/lib/runtime', () => ({
+  isExpoGoRuntime: jest.fn(),
+}));
+
+const mockIsExpoGoRuntime = isExpoGoRuntime as jest.MockedFunction<typeof isExpoGoRuntime>;
 
 describe('parseNotificationData', () => {
   it('parses chat notifications', () => {
@@ -24,5 +31,21 @@ describe('getDeepLinkPath', () => {
 
   it('builds hosts deep link', () => {
     expect(getDeepLinkPath({ type: 'hosts' })).toBe('/hosts');
+  });
+});
+
+describe('Expo Go notification guards', () => {
+  beforeEach(() => {
+    mockIsExpoGoRuntime.mockReturnValue(true);
+  });
+
+  it('skips push registration in Expo Go', async () => {
+    await expect(registerForPushNotifications('user-1')).resolves.toBeNull();
+  });
+
+  it('skips notification response listeners in Expo Go', async () => {
+    const unsubscribe = await subscribeToNotificationResponses(jest.fn());
+    expect(typeof unsubscribe).toBe('function');
+    unsubscribe();
   });
 });

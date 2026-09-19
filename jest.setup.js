@@ -11,6 +11,7 @@ jest.mock('expo-font');
 jest.mock('expo-asset');
 jest.mock('expo-constants', () => ({
   expoConfig: { extra: {} },
+  appOwnership: null,
 }));
 
 jest.mock('@/lib/supabase', () => ({
