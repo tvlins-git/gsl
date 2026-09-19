@@ -10,6 +10,16 @@ import {
 import { supabase } from '@/lib/supabase';
 import { buildMessage } from '../factories';
 
+jest.mock('@react-native-async-storage/async-storage', () => ({
+  __esModule: true,
+  default: {
+    getItem: jest.fn(async () => null),
+    setItem: jest.fn(async () => undefined),
+    removeItem: jest.fn(async () => undefined),
+    clear: jest.fn(async () => undefined),
+  },
+}));
+
 function mockQuery(result: { data: unknown; error: unknown }) {
   const query: Record<string, jest.Mock | ((onFulfilled: (value: unknown) => unknown, onRejected?: (reason: unknown) => unknown) => Promise<unknown>)> = {};
   const self = () => query;
