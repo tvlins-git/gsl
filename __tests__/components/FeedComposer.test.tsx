@@ -2,6 +2,7 @@ import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { FeedComposer } from '@/components/FeedComposer';
 import { createFeedPost } from '@/lib/feed-posts';
+import { isCameraPickerAvailable } from '@/lib/pick-image';
 import { buildMember } from '../factories';
 
 jest.mock('@/lib/local-store', () => ({
@@ -17,11 +18,11 @@ jest.mock('@/lib/feed-posts', () => {
   };
 });
 
-jest.mock('expo-image-picker', () => ({
-  launchImageLibraryAsync: jest.fn().mockResolvedValue({
-    canceled: false,
-    assets: [{ uri: 'file://photo.jpg' }],
-  }),
+const mockPickImageUri = jest.fn();
+
+jest.mock('@/lib/pick-image', () => ({
+  isCameraPickerAvailable: jest.fn(() => true),
+  pickImageUri: (...args: unknown[]) => mockPickImageUri(...args),
 }));
 
 const author = buildMember({
@@ -40,6 +41,9 @@ const alice = buildMember({
 describe('FeedComposer', () => {
   beforeEach(() => {
     (createFeedPost as jest.Mock).mockClear();
+    (isCameraPickerAvailable as jest.Mock).mockReturnValue(true);
+    mockPickImageUri.mockReset();
+    mockPickImageUri.mockResolvedValue('file://photo.jpg');
   });
 
   it('keeps Post disabled until there is text or a photo', () => {
@@ -94,9 +98,30 @@ describe('FeedComposer', () => {
     );
   });
 
-  it('can attach a photo without the old tag picker', async () => {
+  it('exposes Camera and Gallery instead of a single Photo button', () => {
     render(<FeedComposer members={[author, alice]} author={author} onPosted={() => {}} />);
-    fireEvent.press(screen.getByTestId('feed-composer-photo'));
+    expect(screen.getByTestId('feed-composer-camera')).toBeTruthy();
+    expect(screen.getByTestId('feed-composer-gallery')).toBeTruthy();
+    expect(screen.getByText('Camera')).toBeTruthy();
+    expect(screen.getByText('Gallery')).toBeTruthy();
+    expect(screen.getByText('L')).toBeTruthy();
+    expect(screen.queryByTestId('feed-composer-photo')).toBeNull();
+    expect(screen.queryByText('Photo')).toBeNull();
+    expect(screen.queryByText('HL')).toBeNull();
+  });
+
+  it('hides Camera on web while keeping Gallery', () => {
+    (isCameraPickerAvailable as jest.Mock).mockReturnValue(false);
+    render(<FeedComposer members={[author, alice]} author={author} onPosted={() => {}} />);
+    expect(screen.queryByTestId('feed-composer-camera')).toBeNull();
+    expect(screen.getByTestId('feed-composer-gallery')).toBeTruthy();
+  });
+
+  it('attaches a camera photo through the camera entry point', async () => {
+    mockPickImageUri.mockResolvedValue('file://camera.jpg');
+    render(<FeedComposer members={[author, alice]} author={author} onPosted={() => {}} />);
+    fireEvent.press(screen.getByTestId('feed-composer-camera'));
+    await waitFor(() => expect(mockPickImageUri).toHaveBeenCalledWith('camera'));
     await waitFor(() => expect(screen.getByTestId('feed-composer-remove-photo')).toBeTruthy());
     fireEvent.press(screen.getByTestId('feed-composer-post'));
     await waitFor(() => expect(createFeedPost).toHaveBeenCalled());
@@ -104,7 +129,22 @@ describe('FeedComposer', () => {
       expect.objectContaining({
         tagAll: false,
         taggedUserIds: [],
-        imageUri: 'file://photo.jpg',
+        imageUri: 'file://camera.jpg',
+      })
+    );
+  });
+
+  it('attaches a gallery photo through the gallery entry point', async () => {
+    mockPickImageUri.mockResolvedValue('file://gallery.jpg');
+    render(<FeedComposer members={[author, alice]} author={author} onPosted={() => {}} />);
+    fireEvent.press(screen.getByTestId('feed-composer-gallery'));
+    await waitFor(() => expect(mockPickImageUri).toHaveBeenCalledWith('gallery'));
+    await waitFor(() => expect(screen.getByTestId('feed-composer-remove-photo')).toBeTruthy());
+    fireEvent.press(screen.getByTestId('feed-composer-post'));
+    await waitFor(() => expect(createFeedPost).toHaveBeenCalled());
+    expect(createFeedPost).toHaveBeenCalledWith(
+      expect.objectContaining({
+        imageUri: 'file://gallery.jpg',
       })
     );
   });

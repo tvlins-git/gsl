@@ -1,4 +1,3 @@
-import * as ImagePicker from 'expo-image-picker';
 import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -22,6 +21,7 @@ import {
   listFeedMentionSuggestions,
   parseFeedMentions,
 } from '@/lib/feed-posts';
+import { isCameraPickerAvailable, pickImageUri, type ImagePickSource } from '@/lib/pick-image';
 
 interface FeedComposerProps {
   members: Member[];
@@ -48,14 +48,11 @@ export function FeedComposer({ members, author, onPosted }: FeedComposerProps) {
     [activeMention, members]
   );
 
-  const pickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      quality: 1,
-    });
-    if (!result.canceled && result.assets[0]) {
-      setImageUri(result.assets[0].uri);
-      setError('');
+  const attachImage = async (source: ImagePickSource) => {
+    setError('');
+    const uri = await pickImageUri(source);
+    if (uri) {
+      setImageUri(uri);
     }
   };
 
@@ -161,14 +158,25 @@ export function FeedComposer({ members, author, onPosted }: FeedComposerProps) {
           </View>
         ) : null}
         <View style={styles.actions}>
+          {isCameraPickerAvailable() ? (
+            <Pressable
+              style={styles.chip}
+              onPress={() => attachImage('camera')}
+              testID="feed-composer-camera"
+              accessibilityRole="button"
+              accessibilityLabel="Take photo with camera"
+            >
+              <Text style={styles.chipText}>Camera</Text>
+            </Pressable>
+          ) : null}
           <Pressable
             style={styles.chip}
-            onPress={pickImage}
-            testID="feed-composer-photo"
+            onPress={() => attachImage('gallery')}
+            testID="feed-composer-gallery"
             accessibilityRole="button"
-            accessibilityLabel="Attach photo"
+            accessibilityLabel="Choose photo from gallery"
           >
-            <Text style={styles.chipText}>Photo</Text>
+            <Text style={styles.chipText}>Gallery</Text>
           </Pressable>
           <Pressable
             style={[styles.postBtn, !canPost && styles.postBtnDisabled]}
