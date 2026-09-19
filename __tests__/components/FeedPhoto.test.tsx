@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { FeedPhoto } from '@/components/FeedPhoto';
+import { theme } from '@/constants/theme';
 import { FEED_PHOTO_MAX_HEIGHT, feedPhotoDisplayHeight } from '@/lib/feed-photo';
 
 describe('FeedPhoto', () => {
@@ -11,6 +12,15 @@ describe('FeedPhoto', () => {
     expect(photo.props.resizeMode).toBe('contain');
     const photoStyle = StyleSheet.flatten(photo.props.style);
     expect(photoStyle.width).toBe('100%');
+  });
+
+  it('letterboxes against the screen background instead of a second grey', () => {
+    render(<FeedPhoto uri="file://flower.jpg" testID="feed-photo" />);
+    const photo = screen.getByTestId('feed-photo');
+    const photoStyle = StyleSheet.flatten(photo.props.style);
+    const frameStyle = StyleSheet.flatten(photo.parent?.props.style);
+    expect(photoStyle.backgroundColor).toBe(theme.colors.bg);
+    expect(frameStyle.backgroundColor).toBe(theme.colors.bg);
   });
 
   it('sizes height from the natural aspect ratio after layout and load', () => {

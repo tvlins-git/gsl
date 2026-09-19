@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import * as Device from 'expo-device';
 import * as ImagePicker from 'expo-image-picker';
 
 export type ImagePickSource = 'camera' | 'gallery';
@@ -8,8 +9,11 @@ const IMAGE_PICK_OPTIONS: ImagePicker.ImagePickerOptions = {
   quality: 1,
 };
 
-export function isCameraPickerAvailable(os: typeof Platform.OS = Platform.OS) {
-  return os !== 'web';
+export function isCameraPickerAvailable(
+  os: typeof Platform.OS = Platform.OS,
+  isDevice: boolean = Device.isDevice
+) {
+  return os !== 'web' && isDevice;
 }
 
 export async function pickImageUri(source: ImagePickSource): Promise<string | null> {

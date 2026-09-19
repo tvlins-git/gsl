@@ -5,6 +5,10 @@ const mockRequestMediaLibraryPermissionsAsync = jest.fn();
 const mockLaunchCameraAsync = jest.fn();
 const mockLaunchImageLibraryAsync = jest.fn();
 
+jest.mock('expo-device', () => ({
+  isDevice: true,
+}));
+
 jest.mock('expo-image-picker', () => ({
   requestCameraPermissionsAsync: (...args: unknown[]) => mockRequestCameraPermissionsAsync(...args),
   requestMediaLibraryPermissionsAsync: (...args: unknown[]) =>
@@ -14,10 +18,19 @@ jest.mock('expo-image-picker', () => ({
 }));
 
 describe('isCameraPickerAvailable', () => {
-  it('is available on native and hidden on web', () => {
-    expect(isCameraPickerAvailable('ios')).toBe(true);
-    expect(isCameraPickerAvailable('android')).toBe(true);
-    expect(isCameraPickerAvailable('web')).toBe(false);
+  it('is hidden on web even when Device.isDevice is true', () => {
+    expect(isCameraPickerAvailable('web', true)).toBe(false);
+    expect(isCameraPickerAvailable('web', false)).toBe(false);
+  });
+
+  it('is hidden on iOS and Android simulators', () => {
+    expect(isCameraPickerAvailable('ios', false)).toBe(false);
+    expect(isCameraPickerAvailable('android', false)).toBe(false);
+  });
+
+  it('is available on real iOS and Android devices', () => {
+    expect(isCameraPickerAvailable('ios', true)).toBe(true);
+    expect(isCameraPickerAvailable('android', true)).toBe(true);
   });
 });
 
