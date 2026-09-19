@@ -3,7 +3,30 @@ import {
   FEED_PHOTO_MAX_HEIGHT,
   feedPhotoAspect,
   feedPhotoDisplayHeight,
+  readLoadedImageSize,
 } from '@/lib/feed-photo';
+
+describe('readLoadedImageSize', () => {
+  it('reads React Native source width/height', () => {
+    expect(readLoadedImageSize({ source: { width: 1600, height: 900 } })).toEqual({
+      width: 1600,
+      height: 900,
+    });
+  });
+
+  it('reads the browser image target used by RN-web', () => {
+    expect(readLoadedImageSize({ target: { naturalWidth: 800, naturalHeight: 400 } })).toEqual({
+      width: 800,
+      height: 400,
+    });
+  });
+
+  it('unwraps a nested nativeEvent from ImageLoader', () => {
+    expect(
+      readLoadedImageSize({ nativeEvent: { target: { naturalWidth: 640, naturalHeight: 480 } } })
+    ).toEqual({ width: 640, height: 480 });
+  });
+});
 
 describe('feedPhotoAspect', () => {
   it('returns width / height for landscape, portrait, and square', () => {

@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Image,
   Pressable,
   StyleSheet,
   Text,
@@ -10,6 +9,7 @@ import {
   type NativeSyntheticEvent,
   type TextInputSelectionChangeEventData,
 } from 'react-native';
+import { FeedPhoto } from '@/components/FeedPhoto';
 import { UserAvatar } from '@/components/UserAvatar';
 import { theme } from '@/constants/theme';
 import type { Member } from '@/lib/database.types';
@@ -148,7 +148,7 @@ export function FeedComposer({ members, author, onPosted }: FeedComposerProps) {
         ) : null}
         {imageUri ? (
           <View style={styles.previewWrap}>
-            <Image source={{ uri: imageUri }} style={styles.preview} />
+            <FeedPhoto uri={imageUri} style={styles.preview} testID="feed-composer-preview-photo" />
             <Pressable
               onPress={() => setImageUri(null)}
               style={styles.removePreview}
@@ -249,10 +249,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   preview: {
-    width: '100%',
-    height: 140,
     borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.borderLight,
   },
   removePreview: {
     alignSelf: 'flex-start',

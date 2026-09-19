@@ -6,6 +6,7 @@ import {
   FEED_PHOTO_MAX_HEIGHT,
   feedPhotoAspect,
   feedPhotoDisplayHeight,
+  readLoadedImageSize,
 } from '@/lib/feed-photo';
 
 interface FeedPhotoProps {
@@ -44,10 +45,8 @@ export function FeedPhoto({
         ]}
         resizeMode="contain"
         onLoad={(event) => {
-          const source = event.nativeEvent.source;
-          if (source?.width > 0 && source?.height > 0) {
-            setAspect(feedPhotoAspect(source.width, source.height));
-          }
+          const size = readLoadedImageSize(event.nativeEvent) ?? readLoadedImageSize(event);
+          if (size) setAspect(feedPhotoAspect(size.width, size.height));
         }}
         testID={testID}
         accessibilityRole="image"
