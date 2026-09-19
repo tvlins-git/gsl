@@ -35,6 +35,18 @@ describe('FeedPhoto', () => {
     expect(photoStyle.height).toBeLessThan(FEED_PHOTO_MAX_HEIGHT);
   });
 
+  it('reads web onLoad naturalWidth/naturalHeight from the image target', () => {
+    render(<FeedPhoto uri="file://web.jpg" testID="feed-photo" />);
+    const photo = screen.getByTestId('feed-photo');
+    fireEvent(photo.parent!, 'layout', { nativeEvent: { layout: { width: 400, height: 0 } } });
+    fireEvent(photo, 'load', {
+      nativeEvent: { target: { naturalWidth: 800, naturalHeight: 400 } },
+    });
+    const photoStyle = StyleSheet.flatten(screen.getByTestId('feed-photo').props.style);
+    expect(photo.props.resizeMode).toBe('contain');
+    expect(photoStyle.height).toBeCloseTo(feedPhotoDisplayHeight(400, 2));
+  });
+
   it('caps tall images and still uses contain rather than a hard crop', () => {
     render(<FeedPhoto uri="file://tall.jpg" testID="feed-photo" />);
     const photo = screen.getByTestId('feed-photo');

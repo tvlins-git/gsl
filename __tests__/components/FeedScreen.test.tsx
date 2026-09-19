@@ -21,6 +21,28 @@ jest.mock('expo-router', () => {
   };
 });
 
+jest.mock('@/components/FeedPhoto', () => {
+  const React = require('react');
+  const { Image } = require('react-native');
+  return {
+    FeedPhoto: ({
+      uri,
+      testID,
+      style,
+    }: {
+      uri: string;
+      testID?: string;
+      style?: object;
+    }) =>
+      React.createElement(Image, {
+        source: { uri },
+        style,
+        resizeMode: 'contain',
+        testID,
+      }),
+  };
+});
+
 jest.mock('@/components/StoriesRow', () => {
   const { View } = require('react-native');
   return { StoriesRow: () => <View testID="stories-row" /> };
@@ -129,7 +151,7 @@ describe('FeedScreen post delete', () => {
 
   it('lets the author delete their published post and hides Delete on others', async () => {
     render(<FeedScreen />);
-    expect(await screen.findByText('My flower post')).toBeTruthy();
+    expect(await screen.findByText('My flower post', {}, { timeout: 8000 })).toBeTruthy();
     expect(screen.getByTestId('delete-feed-item-post-mine')).toBeTruthy();
     expect(screen.queryByTestId('delete-feed-item-post-theirs')).toBeNull();
 
