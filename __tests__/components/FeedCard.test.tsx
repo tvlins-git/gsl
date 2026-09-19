@@ -1,4 +1,5 @@
 import React from 'react';
+import { StyleSheet } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { FeedCard } from '@/components/FeedCard';
 
@@ -18,6 +19,22 @@ describe('FeedCard', () => {
     expect(screen.getByText('Ski trip')).toBeTruthy();
     expect(screen.getByText('4 photos')).toBeTruthy();
     expect(screen.getByTestId('photo-event-1')).toBeTruthy();
+  });
+
+  it('renders a compact cover instead of a tall hero', () => {
+    render(
+      <FeedCard
+        authorName="Hr. Lins"
+        title="Test"
+        timestamp={new Date().toISOString()}
+        caption="0 photos"
+        onPress={() => {}}
+        testID="photo-event-cover"
+      />
+    );
+    const coverStyle = StyleSheet.flatten(screen.getByTestId('photo-event-cover-cover').props.style);
+    expect(coverStyle.height).toBe(140);
+    expect(coverStyle.aspectRatio).toBeUndefined();
   });
 
   it('calls onPress and onDelete', () => {

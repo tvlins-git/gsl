@@ -1,6 +1,6 @@
 import { router, useFocusEffect, type Href } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, StyleSheet, Text } from 'react-native';
 import { ActivityItem } from '@/components/ActivityItem';
 import { StoriesRow } from '@/components/StoriesRow';
 import { Screen } from '@/components/ui/Screen';
@@ -67,34 +67,7 @@ export default function FeedScreen() {
         data={items}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
-        ListHeaderComponent={
-          <View>
-            <StoriesRow members={members} highlightIds={highlightIds} />
-            <View style={styles.shortcuts}>
-              <Pressable
-                style={styles.shortcut}
-                onPress={() => router.push('/photos')}
-                testID="feed-shortcut-photos"
-              >
-                <Text style={styles.shortcutText}>See albums</Text>
-              </Pressable>
-              <Pressable
-                style={styles.shortcut}
-                onPress={() => router.push('/plan')}
-                testID="feed-shortcut-plan"
-              >
-                <Text style={styles.shortcutText}>Open polls</Text>
-              </Pressable>
-              <Pressable
-                style={styles.shortcut}
-                onPress={() => router.push('/hosts')}
-                testID="feed-shortcut-hosts"
-              >
-                <Text style={styles.shortcutText}>Hosts</Text>
-              </Pressable>
-            </View>
-          </View>
-        }
+        ListHeaderComponent={<StoriesRow members={members} highlightIds={highlightIds} />}
         renderItem={({ item }) => (
           <ActivityItem item={item} onPress={() => router.push(item.path as Href)} />
         )}
@@ -113,25 +86,5 @@ const styles = StyleSheet.create({
   list: {
     ...feedColumn,
     paddingBottom: theme.spacing.xxl,
-  },
-  shortcuts: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.lg,
-    paddingBottom: theme.spacing.md,
-  },
-  shortcut: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: theme.radius.pill,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
-  },
-  shortcutText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: theme.colors.text,
   },
 });
