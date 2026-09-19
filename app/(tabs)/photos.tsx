@@ -1,19 +1,12 @@
 import * as ImagePicker from 'expo-image-picker';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  FlatList,
-  Modal,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { PhotoEventRow } from '@/components/PhotoEventRow';
 import { PhotoGrid } from '@/components/PhotoGrid';
+import { PhotoSourceActions } from '@/components/PhotoSourceActions';
 import { Screen } from '@/components/ui/Screen';
 import { useAuth } from '@/contexts/AuthContext';
+import { isCameraAvailable, launchCameraForPhoto } from '@/lib/camera';
 import type { Photo, PhotoEvent } from '@/lib/database.types';
 import { compressImage } from '@/lib/image-compress';
 import { isLocalMode, localStore } from '@/lib/local-store';
@@ -153,12 +146,8 @@ export default function PhotosScreen() {
   };
 
   const takePhoto = async () => {
-    const perm = await ImagePicker.requestCameraPermissionsAsync();
-    if (!perm.granted) return;
-    const result = await ImagePicker.launchCameraAsync({ quality: 1 });
-    if (!result.canceled && result.assets[0]) {
-      await uploadImage(result.assets[0].uri);
-    }
+    const uri = await launchCameraForPhoto();
+    if (uri) await uploadImage(uri);
   };
 
   const closeEvent = () => {
@@ -215,23 +204,12 @@ export default function PhotosScreen() {
           </View>
         )}
 
-        <View style={styles.actions}>
-          <Pressable
-            style={[styles.actionBtn, sharedStyles.primaryBtn, uploading && styles.actionDisabled]}
-            onPress={pickFromGallery}
-            disabled={uploading}
-          >
-            <Text style={sharedStyles.primaryBtnText}>Gallery</Text>
-          </Pressable>
-          <Pressable
-            style={[styles.actionBtn, sharedStyles.secondaryBtn, uploading && styles.actionDisabled]}
-            onPress={takePhoto}
-            disabled={uploading}
-          >
-            <Text style={sharedStyles.secondaryBtnText}>Camera</Text>
-          </Pressable>
-          {uploading && <ActivityIndicator color={theme.colors.primary} />}
-        </View>
+        <PhotoSourceActions
+          uploading={uploading}
+          cameraAvailable={isCameraAvailable()}
+          onGallery={pickFromGallery}
+          onCamera={takePhoto}
+        />
 
         <PhotoGrid
           photos={photos}
@@ -351,15 +329,6 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
     fontSize: 14,
   },
-  actions: {
-    flexDirection: 'row',
-    gap: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.lg,
-    paddingBottom: theme.spacing.md,
-    alignItems: 'center',
-  },
-  actionBtn: { flex: 1 },
-  actionDisabled: { opacity: 0.45 },
   modalHandle: {
     alignSelf: 'center',
     width: 36,
