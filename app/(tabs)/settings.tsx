@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -449,6 +450,23 @@ export default function SettingsScreen() {
             </View>
 
             <View style={[styles.sectionCard, sharedStyles.card]}>
+              <Text style={sharedStyles.sectionTitle}>Group</Text>
+              <Pressable
+                style={styles.navRow}
+                onPress={() => router.push('/hosts')}
+                testID="open-hosts-btn"
+                accessibilityRole="button"
+                accessibilityLabel="Hosts"
+              >
+                <View style={styles.navRowText}>
+                  <Text style={styles.navRowTitle}>Hosts</Text>
+                  <Text style={styles.navRowHint}>Monthly host rotation</Text>
+                </View>
+                <Text style={styles.navRowChevron}>›</Text>
+              </Pressable>
+            </View>
+
+            <View style={[styles.sectionCard, sharedStyles.card]}>
               <Text style={sharedStyles.sectionTitle}>Account</Text>
               <Pressable
                 style={[styles.logoutBtn, busy && styles.btnDisabled]}
@@ -668,6 +686,30 @@ const styles = StyleSheet.create({
   successText: {
     color: theme.colors.success,
     fontSize: 14,
+  },
+  navRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+  },
+  navRowText: {
+    flex: 1,
+    gap: 2,
+  },
+  navRowTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: theme.colors.text,
+  },
+  navRowHint: {
+    fontSize: 13,
+    color: theme.colors.textSecondary,
+  },
+  navRowChevron: {
+    fontSize: 22,
+    color: theme.colors.textMuted,
+    lineHeight: 24,
   },
   logoutBtn: {
     paddingVertical: 14,

@@ -115,6 +115,33 @@ export const sharedStyles = StyleSheet.create({
     color: theme.colors.text,
     marginBottom: theme.spacing.sm,
   },
+  toolBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: theme.spacing.lg,
+    paddingTop: theme.spacing.md,
+    paddingBottom: theme.spacing.sm,
+    gap: theme.spacing.md,
+  },
+  toolBarTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: theme.colors.text,
+  },
+  toolBarAction: {
+    backgroundColor: theme.colors.primary,
+    borderRadius: theme.radius.pill,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  toolBarActionText: {
+    color: theme.colors.onPrimary,
+    fontSize: 14,
+    fontWeight: '700',
+  },
   empty: {
     textAlign: 'center',
     color: theme.colors.textMuted,

@@ -3,6 +3,13 @@ import { isLocalMode, localStore } from './local-store';
 import { summarizePollAcceptance, type PollResponseInput } from './polls';
 import { supabase } from './supabase';
 
+export function partitionPolls<T extends { status: string }>(polls: T[]) {
+  return {
+    open: polls.filter((poll) => poll.status === 'open'),
+    locked: polls.filter((poll) => poll.status !== 'open'),
+  };
+}
+
 export async function loadPollSummaries(
   polls: Poll[],
   memberNamesById: Record<string, string>

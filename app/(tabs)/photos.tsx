@@ -13,7 +13,6 @@ import {
 } from 'react-native';
 import { PhotoEventRow } from '@/components/PhotoEventRow';
 import { PhotoGrid } from '@/components/PhotoGrid';
-import { StoriesRow } from '@/components/StoriesRow';
 import { UserAvatar } from '@/components/UserAvatar';
 import { Screen } from '@/components/ui/Screen';
 import { useAuth } from '@/contexts/AuthContext';
@@ -264,18 +263,14 @@ export default function PhotosScreen() {
         keyExtractor={(item) => item.event.id}
         contentContainerStyle={styles.list}
         ListHeaderComponent={
-          <View>
-            <StoriesRow members={members} />
+          <View style={sharedStyles.toolBar}>
+            <Text style={sharedStyles.toolBarTitle}>Albums</Text>
             <Pressable
-              style={styles.compose}
+              style={sharedStyles.toolBarAction}
               onPress={() => setShowCreate(true)}
               testID="create-photo-event-btn"
             >
-              <UserAvatar name={member?.display_name ?? 'You'} size={36} />
-              <Text style={styles.composeText}>Share from the last hangout…</Text>
-              <View style={styles.composePlus}>
-                <Text style={styles.composePlusText}>+</Text>
-              </View>
+              <Text style={sharedStyles.toolBarActionText}>New album</Text>
             </Pressable>
           </View>
         }
@@ -289,7 +284,7 @@ export default function PhotosScreen() {
         )}
         ListEmptyComponent={
           <Text style={sharedStyles.empty}>
-            Nothing on the feed yet. Start an album and drop in a few photos.
+            No albums yet. Start one and drop in a few photos.
           </Text>
         }
       />
@@ -320,37 +315,6 @@ export default function PhotosScreen() {
 }
 
 const styles = StyleSheet.create({
-  compose: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: theme.spacing.sm,
-    marginBottom: theme.spacing.md,
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
-    ...sharedStyles.card,
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.radius.pill,
-    gap: theme.spacing.md,
-  },
-  composeText: {
-    flex: 1,
-    color: theme.colors.textMuted,
-    fontSize: 15,
-  },
-  composePlus: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: theme.colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  composePlusText: {
-    color: theme.colors.onPrimary,
-    fontSize: 20,
-    fontWeight: '700',
-    marginTop: -1,
-  },
   list: {
     ...feedColumn,
     paddingHorizontal: theme.spacing.lg,
