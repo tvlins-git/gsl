@@ -30,7 +30,7 @@ import { computeSlotScores, formatSlotTime } from '@/lib/polls';
 import type { Member, Poll, PollSlot } from '@/lib/database.types';
 import { supabase } from '@/lib/supabase';
 import type { PollResponseValue } from '@/lib/polls';
-import { sharedStyles, theme } from '@/constants/theme';
+import { feedColumn, sharedStyles, theme } from '@/constants/theme';
 
 export default function PlanScreen() {
   const { member } = useAuth();
@@ -466,13 +466,14 @@ export default function PlanScreen() {
 
 const styles = StyleSheet.create({
   listContent: {
+    ...feedColumn,
     paddingHorizontal: theme.spacing.lg,
     paddingBottom: theme.spacing.xxl,
   },
   compose: {
+    ...feedColumn,
     flexDirection: 'row',
     alignItems: 'center',
-    marginHorizontal: theme.spacing.lg,
     marginTop: theme.spacing.lg,
     marginBottom: theme.spacing.md,
     paddingHorizontal: theme.spacing.md,

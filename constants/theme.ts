@@ -52,6 +52,12 @@ export const shadow = Platform.select({
   },
 });
 
+export const feedColumn = {
+  width: '100%' as const,
+  maxWidth: 560,
+  alignSelf: 'center' as const,
+};
+
 export const sharedStyles = StyleSheet.create({
   screen: {
     flex: 1,

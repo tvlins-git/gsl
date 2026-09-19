@@ -9,7 +9,7 @@ import { generateMonthList } from '@/lib/hosts';
 import { isLocalMode, localStore } from '@/lib/local-store';
 import type { HostAssignment, Member } from '@/lib/database.types';
 import { supabase } from '@/lib/supabase';
-import { sharedStyles, theme } from '@/constants/theme';
+import { feedColumn, sharedStyles, theme } from '@/constants/theme';
 
 export default function HostsScreen() {
   const { member } = useAuth();
@@ -137,6 +137,8 @@ export default function HostsScreen() {
 
 const styles = StyleSheet.create({
   list: {
+    ...feedColumn,
+    maxWidth: 680,
     paddingTop: theme.spacing.md,
     paddingBottom: theme.spacing.xxl,
   },

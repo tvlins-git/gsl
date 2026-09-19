@@ -17,6 +17,7 @@ export function StoriesRow({ members, highlightIds, onPressMember }: StoriesRowP
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
+      style={styles.scroller}
       contentContainerStyle={styles.row}
       testID="stories-row"
     >
@@ -56,10 +57,15 @@ export function StoriesRow({ members, highlightIds, onPressMember }: StoriesRowP
 }
 
 const styles = StyleSheet.create({
+  scroller: {
+    flexGrow: 0,
+    minHeight: 96,
+  },
   row: {
     paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.sm,
     gap: theme.spacing.md,
+    alignItems: 'center',
   },
   item: {
     width: 72,

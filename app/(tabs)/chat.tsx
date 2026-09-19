@@ -1,5 +1,5 @@
-import { router } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
 import {
   FlatList,
   Modal,
@@ -19,7 +19,7 @@ import { formatRelativeTime } from '@/lib/time';
 import { isLocalMode, localStore } from '@/lib/local-store';
 import { deleteThread } from '@/lib/thread-list';
 import { supabase } from '@/lib/supabase';
-import { sharedStyles, theme } from '@/constants/theme';
+import { feedColumn, sharedStyles, theme } from '@/constants/theme';
 
 export default function ChatScreen() {
   const { member } = useAuth();
@@ -34,7 +34,6 @@ export default function ChatScreen() {
 
   const loadThreads = useCallback(async () => {
     if (!member) return;
-    setLoading(true);
     const data = isLocalMode()
       ? await localStore.getThreads(member.group_id)
       : (await supabase.from('threads').select('*').eq('group_id', member.group_id).order('created_at', { ascending: false })).data ?? [];
@@ -53,9 +52,11 @@ export default function ChatScreen() {
     setLoading(false);
   }, [member]);
 
-  useEffect(() => {
-    loadThreads();
-  }, [loadThreads]);
+  useFocusEffect(
+    useCallback(() => {
+      void loadThreads();
+    }, [loadThreads])
+  );
 
   const handleCreateThread = async () => {
     if (!member || !newName.trim()) return;
@@ -180,9 +181,9 @@ export default function ChatScreen() {
 
 const styles = StyleSheet.create({
   compose: {
+    ...feedColumn,
     flexDirection: 'row',
     alignItems: 'center',
-    marginHorizontal: theme.spacing.lg,
     marginTop: theme.spacing.lg,
     marginBottom: theme.spacing.sm,
     paddingHorizontal: theme.spacing.md,
@@ -212,6 +213,7 @@ const styles = StyleSheet.create({
     marginTop: -1,
   },
   list: {
+    ...feedColumn,
     paddingBottom: theme.spacing.xxl,
   },
   threadRow: {

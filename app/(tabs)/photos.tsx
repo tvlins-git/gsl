@@ -31,7 +31,7 @@ import {
 import { deletePhoto } from '@/lib/photo-list';
 import { formatRelativeTime } from '@/lib/time';
 import { supabase } from '@/lib/supabase';
-import { sharedStyles, theme } from '@/constants/theme';
+import { feedColumn, sharedStyles, theme } from '@/constants/theme';
 
 export default function PhotosScreen() {
   const { member } = useAuth();
@@ -259,23 +259,26 @@ export default function PhotosScreen() {
 
   return (
     <Screen>
-      <StoriesRow members={members} />
-      <Pressable
-        style={styles.compose}
-        onPress={() => setShowCreate(true)}
-        testID="create-photo-event-btn"
-      >
-        <UserAvatar name={member?.display_name ?? 'You'} size={36} />
-        <Text style={styles.composeText}>Share from the last hangout…</Text>
-        <View style={styles.composePlus}>
-          <Text style={styles.composePlusText}>+</Text>
-        </View>
-      </Pressable>
-
       <FlatList
         data={summaries}
         keyExtractor={(item) => item.event.id}
         contentContainerStyle={styles.list}
+        ListHeaderComponent={
+          <View>
+            <StoriesRow members={members} />
+            <Pressable
+              style={styles.compose}
+              onPress={() => setShowCreate(true)}
+              testID="create-photo-event-btn"
+            >
+              <UserAvatar name={member?.display_name ?? 'You'} size={36} />
+              <Text style={styles.composeText}>Share from the last hangout…</Text>
+              <View style={styles.composePlus}>
+                <Text style={styles.composePlusText}>+</Text>
+              </View>
+            </Pressable>
+          </View>
+        }
         renderItem={({ item }) => (
           <PhotoEventRow
             summary={item}
@@ -320,7 +323,6 @@ const styles = StyleSheet.create({
   compose: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginHorizontal: theme.spacing.lg,
     marginTop: theme.spacing.sm,
     marginBottom: theme.spacing.md,
     paddingHorizontal: theme.spacing.md,
@@ -350,6 +352,7 @@ const styles = StyleSheet.create({
     marginTop: -1,
   },
   list: {
+    ...feedColumn,
     paddingHorizontal: theme.spacing.lg,
     paddingBottom: theme.spacing.xxl,
   },

@@ -109,12 +109,14 @@ const styles = StyleSheet.create({
   },
   image: {
     width: '100%',
-    aspectRatio: 1,
+    aspectRatio: 4 / 5,
+    maxHeight: 480,
     backgroundColor: theme.colors.borderLight,
   },
   placeholder: {
     width: '100%',
-    aspectRatio: 1.2,
+    aspectRatio: 4 / 5,
+    maxHeight: 360,
     backgroundColor: theme.colors.accentSoft,
     alignItems: 'center',
     justifyContent: 'center',

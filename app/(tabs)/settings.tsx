@@ -30,7 +30,7 @@ import { getStoredUser, updateMemberContactEmail } from '@/lib/auth';
 import { isValidContactEmail } from '@/lib/calendar-invite';
 import { clearPasswordOverride, resetUserPassword } from '@/lib/user-passwords';
 import { APP_VERSION } from '@/constants/brand';
-import { sharedStyles, theme } from '@/constants/theme';
+import { feedColumn, sharedStyles, theme } from '@/constants/theme';
 
 export default function SettingsScreen() {
   const { member, loggedOut, signOut, signIn, loading, localMode, refreshMember } = useAuth();
@@ -535,6 +535,7 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   content: {
+    ...feedColumn,
     padding: theme.spacing.lg,
     paddingBottom: theme.spacing.xxl,
     gap: theme.spacing.lg,
