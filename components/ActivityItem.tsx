@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { activityKindLabel, type ActivityItem as ActivityItemData } from '@/lib/activity-feed';
 import { formatRelativeTime } from '@/lib/time';
 import { theme } from '@/constants/theme';
@@ -23,13 +23,16 @@ export function ActivityItem({ item, onPress }: ActivityItemProps) {
         </Text>
       </View>
       <View style={styles.body}>
-        <Text style={styles.title} numberOfLines={1}>
+        <Text style={styles.title} numberOfLines={item.kind === 'post' ? 2 : 1}>
           {item.title}
         </Text>
         <Text style={styles.meta} numberOfLines={1}>
           {item.subtitle} · {item.authorName} · {formatRelativeTime(item.timestamp)}
         </Text>
       </View>
+      {item.imageUri ? (
+        <Image source={{ uri: item.imageUri }} style={styles.thumb} testID={`feed-item-${item.id}-thumb`} />
+      ) : null}
     </Pressable>
   );
 }
@@ -77,5 +80,11 @@ const styles = StyleSheet.create({
   meta: {
     fontSize: 13,
     color: theme.colors.textSecondary,
+  },
+  thumb: {
+    width: 44,
+    height: 44,
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.borderLight,
   },
 });

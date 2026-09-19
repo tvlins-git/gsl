@@ -1,7 +1,8 @@
 import { router, useFocusEffect, type Href } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { ActivityItem } from '@/components/ActivityItem';
+import { FeedComposer } from '@/components/FeedComposer';
 import { StoriesRow } from '@/components/StoriesRow';
 import { Screen } from '@/components/ui/Screen';
 import { useAuth } from '@/contexts/AuthContext';
@@ -13,6 +14,7 @@ import {
 } from '@/lib/activity-feed';
 import type { HostAssignment, Member } from '@/lib/database.types';
 import { generateMonthList } from '@/lib/hosts';
+import { formatRelativeTime } from '@/lib/time';
 import { feedColumn, sharedStyles, theme } from '@/constants/theme';
 
 export default function FeedScreen() {
@@ -20,6 +22,7 @@ export default function FeedScreen() {
   const [items, setItems] = useState<ActivityItemData[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [hostAssignments, setHostAssignments] = useState<HostAssignment[]>([]);
+  const [selectedPost, setSelectedPost] = useState<ActivityItemData | null>(null);
   const [loading, setLoading] = useState(true);
 
   const loadFeed = useCallback(async () => {
@@ -37,6 +40,7 @@ export default function FeedScreen() {
         polls: sources.polls,
         threads: sources.threads,
         hostAssignments: sources.hostAssignments,
+        feedPosts: sources.feedPosts,
       })
     );
     setLoading(false);
@@ -57,7 +61,7 @@ export default function FeedScreen() {
     return new Set(hostId ? [hostId] : []);
   }, [hostAssignments]);
 
-  if (loading) {
+  if (loading || !member) {
     return <Screen loading />;
   }
 
@@ -70,41 +74,51 @@ export default function FeedScreen() {
         ListHeaderComponent={
           <View>
             <StoriesRow members={members} highlightIds={highlightIds} />
-            <View style={styles.shortcuts}>
-              <Pressable
-                style={styles.shortcut}
-                onPress={() => router.push('/photos')}
-                testID="feed-shortcut-photos"
-              >
-                <Text style={styles.shortcutText}>See albums</Text>
-              </Pressable>
-              <Pressable
-                style={styles.shortcut}
-                onPress={() => router.push('/plan')}
-                testID="feed-shortcut-plan"
-              >
-                <Text style={styles.shortcutText}>Open polls</Text>
-              </Pressable>
-              <Pressable
-                style={styles.shortcut}
-                onPress={() => router.push('/hosts')}
-                testID="feed-shortcut-hosts"
-              >
-                <Text style={styles.shortcutText}>Hosts</Text>
-              </Pressable>
-            </View>
+            <FeedComposer members={members} author={member} onPosted={loadFeed} />
           </View>
         }
         renderItem={({ item }) => (
-          <ActivityItem item={item} onPress={() => router.push(item.path as Href)} />
+          <ActivityItem
+            item={item}
+            onPress={() => {
+              if (item.kind === 'post') {
+                setSelectedPost(item);
+                return;
+              }
+              router.push(item.path as Href);
+            }}
+          />
         )}
         ListEmptyComponent={
           <Text style={sharedStyles.empty}>
-            Nothing on the feed yet. New albums, photo drops, locked dates, and chats will show up
-            here.
+            Share an update, or wait for albums, polls, and chats to show up here.
           </Text>
         }
       />
+
+      <Modal
+        visible={selectedPost != null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSelectedPost(null)}
+      >
+        <Pressable style={sharedStyles.modalOverlay} onPress={() => setSelectedPost(null)}>
+          <Pressable style={sharedStyles.modalSheet} onPress={(e) => e.stopPropagation()}>
+            <Text style={sharedStyles.modalTitle}>{selectedPost?.authorName}</Text>
+            <Text style={styles.postMeta}>
+              {selectedPost?.subtitle}
+              {selectedPost ? ` · ${formatRelativeTime(selectedPost.timestamp)}` : ''}
+            </Text>
+            {selectedPost?.imageUri ? (
+              <Image source={{ uri: selectedPost.imageUri }} style={styles.postImage} />
+            ) : null}
+            {selectedPost?.title ? <Text style={styles.postBody}>{selectedPost.title}</Text> : null}
+            <Pressable onPress={() => setSelectedPost(null)} testID="feed-post-close">
+              <Text style={styles.closeText}>Close</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </Screen>
   );
 }
@@ -114,24 +128,26 @@ const styles = StyleSheet.create({
     ...feedColumn,
     paddingBottom: theme.spacing.xxl,
   },
-  shortcuts: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.lg,
-    paddingBottom: theme.spacing.md,
+  postMeta: {
+    fontSize: 14,
+    color: theme.colors.textSecondary,
   },
-  shortcut: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: theme.radius.pill,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
-  },
-  shortcutText: {
-    fontSize: 13,
-    fontWeight: '600',
+  postBody: {
+    fontSize: 16,
     color: theme.colors.text,
+    lineHeight: 22,
+  },
+  postImage: {
+    width: '100%',
+    height: 220,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.borderLight,
+  },
+  closeText: {
+    textAlign: 'center',
+    color: theme.colors.textSecondary,
+    fontWeight: '600',
+    fontSize: 15,
+    paddingVertical: theme.spacing.sm,
   },
 });

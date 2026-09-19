@@ -7,7 +7,7 @@ serve(async (req) => {
     return new Response('Method not allowed', { status: 405 });
   }
 
-  const { type, group_id, exclude_user_ids, title, body, data } = await req.json();
+  const { type, group_id, exclude_user_ids, user_ids, title, body, data } = await req.json();
 
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,
@@ -31,7 +31,8 @@ serve(async (req) => {
       userId: t.user_id,
       token: t.expo_push_token,
     })),
-    exclude_user_ids ?? []
+    exclude_user_ids ?? [],
+    Array.isArray(user_ids) ? user_ids : null
   );
 
   const payload = buildExpoPushPayload(recipients, {

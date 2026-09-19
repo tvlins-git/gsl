@@ -52,9 +52,17 @@ export function FeedCard({
 
       <Pressable onPress={onPress}>
         {imageUri ? (
-          <Image source={{ uri: imageUri }} style={styles.image} resizeMode="cover" />
+          <Image
+            source={{ uri: imageUri }}
+            style={styles.cover}
+            resizeMode="cover"
+            testID={testID ? `${testID}-cover` : 'feed-card-cover'}
+          />
         ) : (
-          <View style={styles.placeholder}>
+          <View
+            style={styles.coverPlaceholder}
+            testID={testID ? `${testID}-cover` : 'feed-card-cover'}
+          >
             <Text style={styles.placeholderMark}>{title.slice(0, 1).toUpperCase() || '·'}</Text>
           </View>
         )}
@@ -107,22 +115,20 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 13,
   },
-  image: {
+  cover: {
     width: '100%',
-    aspectRatio: 4 / 5,
-    maxHeight: 480,
+    height: 140,
     backgroundColor: theme.colors.borderLight,
   },
-  placeholder: {
+  coverPlaceholder: {
     width: '100%',
-    aspectRatio: 4 / 5,
-    maxHeight: 360,
+    height: 140,
     backgroundColor: theme.colors.accentSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
   placeholderMark: {
-    fontSize: 56,
+    fontSize: 28,
     fontWeight: '700',
     color: theme.colors.primary,
     opacity: 0.35,

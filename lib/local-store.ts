@@ -3,6 +3,8 @@ import { DEFAULT_HARDCODED_USER, type AppUser } from '@/constants/hardcoded-user
 import { getAppUsersSync } from './app-users';
 import { summarizePollAcceptance } from './polls';
 import type {
+  FeedPost,
+  FeedPostTag,
   HostAssignment,
   Member,
   Message,
@@ -74,6 +76,8 @@ interface LocalData {
   messages: Message[];
   photo_events: PhotoEvent[];
   photos: Photo[];
+  feed_posts: FeedPost[];
+  feed_post_tags: FeedPostTag[];
   member_emails: Record<string, string>;
 }
 
@@ -86,6 +90,8 @@ const emptyData = (): LocalData => ({
   messages: [],
   photo_events: [],
   photos: [],
+  feed_posts: [],
+  feed_post_tags: [],
   member_emails: {},
 });
 
@@ -93,9 +99,15 @@ async function readData(): Promise<LocalData> {
   const raw = await AsyncStorage.getItem(STORAGE_KEY);
   if (!raw) return emptyData();
   try {
-    const parsed = { ...emptyData(), ...JSON.parse(raw) } as LocalData;
+    const parsed = JSON.parse(raw) as Partial<LocalData>;
     memberEmailCache = parsed.member_emails ?? {};
-    return parsed;
+    return {
+      ...emptyData(),
+      ...parsed,
+      feed_posts: parsed.feed_posts ?? [],
+      feed_post_tags: parsed.feed_post_tags ?? [],
+      member_emails: parsed.member_emails ?? {},
+    };
   } catch {
     return emptyData();
   }
@@ -382,5 +394,53 @@ export const localStore = {
     data.photo_events = data.photo_events.filter((e) => e.id !== eventId);
     data.photos = data.photos.filter((p) => p.event_id !== eventId);
     await writeData(data);
+  },
+
+  async getFeedPosts(groupId: string) {
+    const data = await readData();
+    const posts = data.feed_posts ?? [];
+    const tags = data.feed_post_tags ?? [];
+    return posts
+      .filter((post) => post.group_id === groupId)
+      .sort((a, b) => b.created_at.localeCompare(a.created_at))
+      .map((post) => ({
+        ...post,
+        taggedUserIds: tags.filter((tag) => tag.post_id === post.id).map((tag) => tag.user_id),
+        imageUri: post.image_path,
+      }));
+  },
+
+  async createFeedPost(input: {
+    groupId: string;
+    authorId: string;
+    body: string;
+    imagePath: string | null;
+    tagAll: boolean;
+    taggedUserIds: string[];
+  }): Promise<FeedPost & { taggedUserIds: string[]; imageUri: string | null }> {
+    const data = await readData();
+    data.feed_posts ??= [];
+    data.feed_post_tags ??= [];
+    const post: FeedPost = {
+      id: uuid(),
+      group_id: input.groupId,
+      author_id: input.authorId,
+      body: input.body,
+      image_path: input.imagePath,
+      tag_all: input.tagAll,
+      created_at: new Date().toISOString(),
+    };
+    data.feed_posts.push(post);
+    if (!input.tagAll) {
+      for (const userId of input.taggedUserIds) {
+        data.feed_post_tags.push({ post_id: post.id, user_id: userId });
+      }
+    }
+    await writeData(data);
+    return {
+      ...post,
+      taggedUserIds: input.tagAll ? [] : input.taggedUserIds,
+      imageUri: post.image_path,
+    };
   },
 };
