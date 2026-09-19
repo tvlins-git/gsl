@@ -1,4 +1,3 @@
-import * as ImagePicker from 'expo-image-picker';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { PhotoEventRow } from '@/components/PhotoEventRow';
@@ -6,10 +5,11 @@ import { PhotoGrid } from '@/components/PhotoGrid';
 import { PhotoSourceActions } from '@/components/PhotoSourceActions';
 import { Screen } from '@/components/ui/Screen';
 import { useAuth } from '@/contexts/AuthContext';
-import { isCameraAvailable, launchCameraForPhoto } from '@/lib/camera';
+import { isCameraAvailable } from '@/lib/camera';
 import type { Photo, PhotoEvent } from '@/lib/database.types';
 import { compressImage } from '@/lib/image-compress';
 import { isLocalMode, localStore } from '@/lib/local-store';
+import { pickImageFromCamera, pickImageFromGallery } from '@/lib/pick-image';
 import {
   deletePhotoEvent,
   formatEventDate,
@@ -136,17 +136,12 @@ export default function PhotosScreen() {
   };
 
   const pickFromGallery = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      quality: 1,
-    });
-    if (!result.canceled && result.assets[0]) {
-      await uploadImage(result.assets[0].uri);
-    }
+    const uri = await pickImageFromGallery();
+    if (uri) await uploadImage(uri);
   };
 
   const takePhoto = async () => {
-    const uri = await launchCameraForPhoto();
+    const uri = await pickImageFromCamera();
     if (uri) await uploadImage(uri);
   };
 
