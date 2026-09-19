@@ -1,7 +1,7 @@
 import type { FeedPost, Member } from './database.types';
 import { isHonorific } from './display-name';
-import { compressImage } from './image-compress';
 import { isLocalMode, localStore } from './local-store';
+import { uploadJpegToPhotos } from './photo-upload';
 import { supabase } from './supabase';
 
 export type { FeedPost };
@@ -58,6 +58,13 @@ export type ActiveFeedMention = {
 
 export function canSubmitFeedPost(body: string, imageUri: string | null | undefined) {
   return Boolean(body.trim() || imageUri);
+}
+
+export function canDeleteFeedPost(
+  authorId: string | null | undefined,
+  currentUserId: string | null | undefined
+) {
+  return Boolean(authorId && currentUserId && authorId === currentUserId);
 }
 
 export function isValidFeedTagSelection(selection: FeedTagSelection) {
@@ -303,14 +310,31 @@ export async function loadFeedPosts(groupId: string): Promise<FeedPostSummary[]>
 }
 
 async function uploadFeedImage(groupId: string, postId: string, imageUri: string) {
-  const compressed = await compressImage(imageUri, { maxWidth: 1200, quality: 0.8 });
   const imagePath = `${groupId}/feed/${postId}.jpg`;
-  const blob = await (await fetch(compressed.uri)).blob();
-  const { error } = await supabase.storage
-    .from('photos')
-    .upload(imagePath, blob, { contentType: 'image/jpeg' });
+  return uploadJpegToPhotos(imagePath, imageUri, { maxWidth: 1200, quality: 0.8 });
+}
+
+export async function deleteFeedPost(input: {
+  postId: string;
+  authorId: string;
+  currentUserId: string;
+  imagePath?: string | null;
+}): Promise<void> {
+  if (!canDeleteFeedPost(input.authorId, input.currentUserId)) {
+    throw new Error('You can only delete your own posts.');
+  }
+
+  if (isLocalMode()) {
+    await localStore.deleteFeedPost(input.postId);
+    return;
+  }
+
+  if (input.imagePath) {
+    await supabase.storage.from('photos').remove([input.imagePath]).catch(() => undefined);
+  }
+
+  const { error } = await supabase.from('feed_posts').delete().eq('id', input.postId);
   if (error) throw error;
-  return imagePath;
 }
 
 export async function createFeedPost(input: CreateFeedPostInput): Promise<FeedPostSummary> {

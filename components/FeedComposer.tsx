@@ -22,6 +22,7 @@ import {
   parseFeedMentions,
 } from '@/lib/feed-posts';
 import { isCameraPickerAvailable, pickImageUri, type ImagePickSource } from '@/lib/pick-image';
+import { formatUserFacingError } from '@/lib/user-error';
 
 interface FeedComposerProps {
   members: Member[];
@@ -96,8 +97,8 @@ export function FeedComposer({ members, author, onPosted }: FeedComposerProps) {
       setCursor(0);
       setImageUri(null);
       await onPosted();
-    } catch {
-      setError('Could not post. Try again.');
+    } catch (err) {
+      setError(formatUserFacingError(err, 'Could not post. Try again.'));
     } finally {
       setPosting(false);
     }

@@ -50,7 +50,7 @@ cp .env.example .env
    supabase link --project-ref <your-ref>
    supabase db push
    ```
-4. Create a **photos** storage bucket (private) in the Supabase dashboard
+4. Apply migrations (`supabase db push`). Migration `007_photos_storage_bucket.sql` creates the public **photos** bucket and group-scoped write policies. Feed images are stored at `{group_id}/feed/{post_id}.jpg`. If photo posts fail with a permissions error, confirm that migration (or matching dashboard policies) is applied.
 5. Deploy Edge Functions:
    ```bash
    supabase functions deploy score-photo

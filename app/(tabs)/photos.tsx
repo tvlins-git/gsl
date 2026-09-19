@@ -19,6 +19,7 @@ import { getGroupMembers } from '@/lib/auth';
 import type { Member, Photo, PhotoEvent } from '@/lib/database.types';
 import { compressImage } from '@/lib/image-compress';
 import { isLocalMode, localStore } from '@/lib/local-store';
+import { uploadJpegToPhotos } from '@/lib/photo-upload';
 import {
   deletePhotoEvent,
   formatPhotoCount,
@@ -126,11 +127,8 @@ export default function PhotosScreen() {
     const storagePath = `${member.group_id}/${selectedEvent.id}/${photoId}.jpg`;
     const thumbPath = `${member.group_id}/${selectedEvent.id}/${photoId}_thumb.jpg`;
 
-    const fullBlob = await (await fetch(compressed.uri)).blob();
-    const thumbBlob = await (await fetch(thumb.uri)).blob();
-
-    await supabase.storage.from('photos').upload(storagePath, fullBlob, { contentType: 'image/jpeg' });
-    await supabase.storage.from('photos').upload(thumbPath, thumbBlob, { contentType: 'image/jpeg' });
+    await uploadJpegToPhotos(storagePath, uri, { maxWidth: 1200, quality: 0.8 });
+    await uploadJpegToPhotos(thumbPath, uri, { maxWidth: 300, quality: 0.7 });
 
     const { data: photo } = await supabase
       .from('photos')
