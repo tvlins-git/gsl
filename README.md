@@ -45,19 +45,14 @@ cp .env.example .env
    EXPO_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
    EXPO_PUBLIC_SUPABASE_ANON_KEY=eyJ...
    ```
-3. Run migrations:
-   ```bash
-   supabase link --project-ref <your-ref>
-   supabase db push
-   ```
-4. Apply migrations (`supabase db push`). Migration `007_photos_storage_bucket.sql` creates the public **photos** bucket and group-scoped write policies. Feed images are stored at `{group_id}/feed/{post_id}.jpg`. If photo posts fail with a permissions error, confirm that migration (or matching dashboard policies) is applied.
-5. Deploy Edge Functions:
+3. Run migrations (`supabase db push`). `007_photos_storage_bucket.sql` creates the public **photos** bucket (15MB, jpeg/png/webp/heic) and storage RLS keyed to `auth_group_id()` so members can write under `{group_id}/...`. Feed images live at `{group_id}/feed/{post_id}.jpg`.
+4. Deploy Edge Functions:
    ```bash
    supabase functions deploy score-photo
    supabase functions deploy send-push
    supabase secrets set GOOGLE_CLOUD_VISION_API_KEY=<your-key>
    ```
-6. **Single user:** The app auto-signs in as **Hr. Lins** (no login screen). On first launch it creates the Supabase account if needed.
+5. **Single user:** The app auto-signs in as **Hr. Lins** (no login screen). On first launch it creates the Supabase account if needed.
 
 ### 3. Run the app
 
