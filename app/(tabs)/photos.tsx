@@ -1,4 +1,3 @@
-import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -27,6 +26,7 @@ import {
   loadPhotoEventSummaries,
   type PhotoEventSummary,
 } from '@/lib/photo-events';
+import { isCameraPickerAvailable, pickImageUri } from '@/lib/pick-image';
 import { deletePhoto } from '@/lib/photo-list';
 import { formatRelativeTime } from '@/lib/time';
 import { supabase } from '@/lib/supabase';
@@ -155,22 +155,13 @@ export default function PhotosScreen() {
   };
 
   const pickFromGallery = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      quality: 1,
-    });
-    if (!result.canceled && result.assets[0]) {
-      await uploadImage(result.assets[0].uri);
-    }
+    const uri = await pickImageUri('gallery');
+    if (uri) await uploadImage(uri);
   };
 
   const takePhoto = async () => {
-    const perm = await ImagePicker.requestCameraPermissionsAsync();
-    if (!perm.granted) return;
-    const result = await ImagePicker.launchCameraAsync({ quality: 1 });
-    if (!result.canceled && result.assets[0]) {
-      await uploadImage(result.assets[0].uri);
-    }
+    const uri = await pickImageUri('camera');
+    if (uri) await uploadImage(uri);
   };
 
   const closeEvent = () => {
@@ -236,13 +227,15 @@ export default function PhotosScreen() {
           >
             <Text style={sharedStyles.primaryBtnText}>Gallery</Text>
           </Pressable>
-          <Pressable
-            style={[styles.actionBtn, sharedStyles.secondaryBtn, uploading && styles.actionDisabled]}
-            onPress={takePhoto}
-            disabled={uploading}
-          >
-            <Text style={sharedStyles.secondaryBtnText}>Camera</Text>
-          </Pressable>
+          {isCameraPickerAvailable() ? (
+            <Pressable
+              style={[styles.actionBtn, sharedStyles.secondaryBtn, uploading && styles.actionDisabled]}
+              onPress={takePhoto}
+              disabled={uploading}
+            >
+              <Text style={sharedStyles.secondaryBtnText}>Camera</Text>
+            </Pressable>
+          ) : null}
           {uploading && <ActivityIndicator color={theme.colors.primary} />}
         </View>
 

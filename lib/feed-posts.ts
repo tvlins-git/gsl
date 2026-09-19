@@ -1,4 +1,5 @@
 import type { FeedPost, Member } from './database.types';
+import { isHonorific } from './display-name';
 import { compressImage } from './image-compress';
 import { isLocalMode, localStore } from './local-store';
 import { supabase } from './supabase';
@@ -38,7 +39,6 @@ function createId() {
 
 const MENTION_TOKEN_RE = /@([A-Za-z][A-Za-z0-9._-]*)/g;
 const ACTIVE_MENTION_RE = /(^|[\s])@([A-Za-z0-9._-]*)$/;
-const HONORIFICS = new Set(['hr', 'mr', 'mrs', 'ms', 'dr']);
 
 export type FeedMentionMember = Pick<Member, 'user_id' | 'display_name'> & {
   contact_email?: string | null;
@@ -93,7 +93,7 @@ function memberMentionKeys(member: FeedMentionMember) {
 function mentionInsertToken(member: FeedMentionMember) {
   const tokens = displayNameTokens(member.display_name);
   const preferred =
-    [...tokens].reverse().find((token) => !HONORIFICS.has(token.toLowerCase())) ?? tokens[0];
+    [...tokens].reverse().find((token) => !isHonorific(token)) ?? tokens[0];
   return preferred || normalizeMentionKey(member.display_name);
 }
 

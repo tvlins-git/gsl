@@ -1,3 +1,5 @@
+import { nameParts } from './display-name';
+
 export function formatRelativeTime(iso: string, now = new Date()): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '';
@@ -20,12 +22,8 @@ export function formatRelativeTime(iso: string, now = new Date()): string {
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
-const HONORIFICS = new Set(['hr.', 'mr.', 'mrs.', 'ms.', 'dr.']);
-
 export function firstName(name: string) {
-  const parts = name.split(/\s+/).filter(Boolean);
-  if (parts.length >= 2 && HONORIFICS.has(parts[0].toLowerCase())) {
-    return parts[1];
-  }
-  return parts[0] ?? name;
+  const parts = nameParts(name);
+  if (parts.length > 0) return parts[0];
+  return name.split(/\s+/).filter(Boolean)[0] ?? name;
 }
