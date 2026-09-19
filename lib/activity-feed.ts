@@ -19,7 +19,10 @@ export type ActivityItem = {
   timestamp: string;
   path: string;
   authorName: string;
+  authorId?: string;
+  sourceId?: string;
   imageUri?: string | null;
+  imagePath?: string | null;
 };
 
 export type ActivitySources = {
@@ -175,7 +178,10 @@ export function buildActivityItems(input: {
       timestamp: post.created_at,
       path: '/',
       authorName: nameForUser(members, post.author_id),
+      authorId: post.author_id,
+      sourceId: post.id,
       imageUri: post.imageUri,
+      imagePath: post.image_path,
     });
   }
 

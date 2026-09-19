@@ -192,6 +192,9 @@ describe('buildActivityItems', () => {
       subtitle: 'Tagged everyone',
       path: '/',
       authorName: 'Hr. Lins',
+      authorId: 'user-1',
+      sourceId: 'post-1',
+      imagePath: null,
     });
   });
 });

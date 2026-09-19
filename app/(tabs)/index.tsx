@@ -1,6 +1,6 @@
 import { router, useFocusEffect, type Href } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { FlatList, Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, FlatList, Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { ActivityItem } from '@/components/ActivityItem';
 import { FeedComposer } from '@/components/FeedComposer';
 import { StoriesRow } from '@/components/StoriesRow';
@@ -13,8 +13,10 @@ import {
   type ActivityItem as ActivityItemData,
 } from '@/lib/activity-feed';
 import type { HostAssignment, Member } from '@/lib/database.types';
+import { canDeleteFeedPost, deleteFeedPost } from '@/lib/feed-posts';
 import { generateMonthList } from '@/lib/hosts';
 import { formatRelativeTime } from '@/lib/time';
+import { formatUserFacingError } from '@/lib/user-error';
 import { feedColumn, sharedStyles, theme } from '@/constants/theme';
 
 export default function FeedScreen() {
@@ -61,9 +63,28 @@ export default function FeedScreen() {
     return new Set(hostId ? [hostId] : []);
   }, [hostAssignments]);
 
+  const handleDeletePost = async (item: ActivityItemData) => {
+    if (!member || !item.sourceId || !item.authorId) return;
+    try {
+      await deleteFeedPost({
+        postId: item.sourceId,
+        authorId: item.authorId,
+        currentUserId: member.user_id,
+        imagePath: item.imagePath,
+      });
+      if (selectedPost?.id === item.id) setSelectedPost(null);
+      await loadFeed();
+    } catch (error) {
+      Alert.alert('Could not delete', formatUserFacingError(error, 'Could not delete this post.'));
+    }
+  };
+
   if (loading || !member) {
     return <Screen loading />;
   }
+
+  const canDeleteSelected =
+    selectedPost != null && canDeleteFeedPost(selectedPost.authorId, member.user_id);
 
   return (
     <Screen>
@@ -87,6 +108,13 @@ export default function FeedScreen() {
               }
               router.push(item.path as Href);
             }}
+            onDelete={
+              item.kind === 'post' && canDeleteFeedPost(item.authorId, member.user_id)
+                ? () => {
+                    void handleDeletePost(item);
+                  }
+                : undefined
+            }
           />
         )}
         ListEmptyComponent={
@@ -109,10 +137,27 @@ export default function FeedScreen() {
               {selectedPost?.subtitle}
               {selectedPost ? ` · ${formatRelativeTime(selectedPost.timestamp)}` : ''}
             </Text>
-            {selectedPost?.imageUri ? (
-              <Image source={{ uri: selectedPost.imageUri }} style={styles.postImage} />
-            ) : null}
             {selectedPost?.title ? <Text style={styles.postBody}>{selectedPost.title}</Text> : null}
+            {selectedPost?.imageUri ? (
+              <Image
+                source={{ uri: selectedPost.imageUri }}
+                style={styles.postImage}
+                resizeMode="cover"
+                testID="feed-post-detail-photo"
+              />
+            ) : null}
+            {canDeleteSelected && selectedPost ? (
+              <Pressable
+                onPress={() => {
+                  void handleDeletePost(selectedPost);
+                }}
+                testID="feed-post-delete"
+                accessibilityRole="button"
+                accessibilityLabel="Delete post"
+              >
+                <Text style={styles.deleteText}>Delete</Text>
+              </Pressable>
+            ) : null}
             <Pressable onPress={() => setSelectedPost(null)} testID="feed-post-close">
               <Text style={styles.closeText}>Close</Text>
             </Pressable>
@@ -139,9 +184,16 @@ const styles = StyleSheet.create({
   },
   postImage: {
     width: '100%',
-    height: 220,
+    height: 280,
     borderRadius: theme.radius.md,
     backgroundColor: theme.colors.borderLight,
+  },
+  deleteText: {
+    textAlign: 'center',
+    color: theme.colors.danger,
+    fontWeight: '600',
+    fontSize: 15,
+    paddingVertical: theme.spacing.sm,
   },
   closeText: {
     textAlign: 'center',
