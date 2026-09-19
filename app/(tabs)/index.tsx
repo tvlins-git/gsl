@@ -1,8 +1,9 @@
 import { router, useFocusEffect, type Href } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { Alert, FlatList, Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { ActivityItem } from '@/components/ActivityItem';
 import { FeedComposer } from '@/components/FeedComposer';
+import { FeedPhoto } from '@/components/FeedPhoto';
 import { StoriesRow } from '@/components/StoriesRow';
 import { Screen } from '@/components/ui/Screen';
 import { useAuth } from '@/contexts/AuthContext';
@@ -139,10 +140,9 @@ export default function FeedScreen() {
             </Text>
             {selectedPost?.title ? <Text style={styles.postBody}>{selectedPost.title}</Text> : null}
             {selectedPost?.imageUri ? (
-              <Image
-                source={{ uri: selectedPost.imageUri }}
+              <FeedPhoto
+                uri={selectedPost.imageUri}
                 style={styles.postImage}
-                resizeMode="cover"
                 testID="feed-post-detail-photo"
               />
             ) : null}
@@ -183,10 +183,7 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   postImage: {
-    width: '100%',
-    height: 280,
     borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.borderLight,
   },
   deleteText: {
     textAlign: 'center',

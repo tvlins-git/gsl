@@ -63,9 +63,11 @@ describe('ActivityItem', () => {
     expect(screen.getByText('Post')).toBeTruthy();
     expect(screen.getByText('Hello GSL')).toBeTruthy();
     const photo = screen.getByTestId('feed-item-post-1-photo');
+    expect(photo.props.resizeMode).toBe('contain');
     const photoStyle = StyleSheet.flatten(photo.props.style);
     expect(photoStyle.width).toBe('100%');
-    expect(photoStyle.height).toBeGreaterThanOrEqual(200);
+    expect(photoStyle.aspectRatio).toBeGreaterThan(0);
+    expect(photoStyle.height).toBeUndefined();
     expect(screen.queryByTestId('delete-feed-item-post-1')).toBeNull();
   });
 

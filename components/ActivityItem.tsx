@@ -1,6 +1,7 @@
 import { useRef } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
+import { FeedPhoto } from '@/components/FeedPhoto';
 import { activityKindLabel, type ActivityItem as ActivityItemData } from '@/lib/activity-feed';
 import { formatRelativeTime } from '@/lib/time';
 import { theme } from '@/constants/theme';
@@ -38,14 +39,7 @@ export function ActivityItem({ item, onPress, onDelete }: ActivityItemProps) {
           </Text>
         </View>
       </View>
-      {item.imageUri ? (
-        <Image
-          source={{ uri: item.imageUri }}
-          style={styles.photo}
-          resizeMode="cover"
-          testID={photoTestId}
-        />
-      ) : null}
+      {item.imageUri ? <FeedPhoto uri={item.imageUri} testID={photoTestId} /> : null}
     </Pressable>
   );
 
@@ -130,11 +124,6 @@ const styles = StyleSheet.create({
   meta: {
     fontSize: 13,
     color: theme.colors.textSecondary,
-  },
-  photo: {
-    width: '100%',
-    height: 240,
-    backgroundColor: theme.colors.borderLight,
   },
   deleteAction: {
     width: 88,

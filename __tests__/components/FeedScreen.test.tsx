@@ -1,4 +1,5 @@
 import React from 'react';
+import { StyleSheet } from 'react-native';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import FeedScreen from '@/app/(tabs)/index';
 import { deleteFeedPost } from '@/lib/feed-posts';
@@ -136,7 +137,9 @@ describe('FeedScreen post delete', () => {
   it('also deletes from the post detail sheet', async () => {
     render(<FeedScreen />);
     fireEvent.press(await screen.findByTestId('feed-item-post-mine'));
-    expect(await screen.findByTestId('feed-post-detail-photo')).toBeTruthy();
+    const detailPhoto = await screen.findByTestId('feed-post-detail-photo');
+    expect(detailPhoto.props.resizeMode).toBe('contain');
+    expect(StyleSheet.flatten(detailPhoto.props.style).height).not.toBe(280);
     fireEvent.press(await screen.findByTestId('feed-post-delete'));
     await waitFor(() => expect(deleteFeedPost).toHaveBeenCalled());
   });
