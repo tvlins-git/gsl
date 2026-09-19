@@ -2,25 +2,26 @@ import { Platform, StyleSheet } from 'react-native';
 
 export const theme = {
   colors: {
-    bg: '#f6f1eb',
+    // Logo-aligned monochrome: black mark on near-white.
+    bg: '#f5f5f5',
     surface: '#ffffff',
-    text: '#1c1612',
-    textSecondary: '#6b5f56',
-    textMuted: '#9a8d84',
-    border: '#ebe3db',
-    borderLight: '#f3eee8',
-    primary: '#d4543c',
-    primaryPressed: '#b84430',
+    text: '#111111',
+    textSecondary: '#525252',
+    textMuted: '#8a8a8a',
+    border: '#e5e5e5',
+    borderLight: '#f0f0f0',
+    primary: '#111111',
+    primaryPressed: '#000000',
     onPrimary: '#ffffff',
-    accent: '#d4543c',
-    accentSoft: '#fde8e2',
+    accent: '#111111',
+    accentSoft: '#ececec',
     danger: '#c53030',
-    dangerSoft: '#fdecec',
-    success: '#2f7d4a',
-    successSoft: '#e8f6ed',
-    warningSoft: '#fff4e5',
-    infoSoft: '#eef4fb',
-    storyRing: '#f2a65a',
+    dangerSoft: '#f5e8e8',
+    success: '#111111',
+    successSoft: '#ececec',
+    warningSoft: '#e8e8e8',
+    infoSoft: '#f0f0f0',
+    storyRing: '#111111',
   },
   radius: {
     sm: 10,
@@ -41,14 +42,14 @@ export const theme = {
 
 export const shadow = Platform.select({
   ios: {
-    shadowColor: '#3d2a1e',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.08,
     shadowRadius: 20,
   },
   android: { elevation: 3 },
   default: {
-    boxShadow: '0 8px 28px rgba(61,42,30,0.08)',
+    boxShadow: '0 8px 28px rgba(0,0,0,0.08)',
   },
 });
 
@@ -151,7 +152,7 @@ export const sharedStyles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(28,22,18,0.4)',
+    backgroundColor: 'rgba(0,0,0,0.4)',
     justifyContent: 'flex-end',
   },
   modalSheet: {

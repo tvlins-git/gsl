@@ -1,5 +1,6 @@
 import { Image, StyleSheet, Text, View } from 'react-native';
 import { APP_NAME } from '@/constants/brand';
+import { theme } from '@/constants/theme';
 
 interface LogoProps {
   size?: number;
@@ -31,6 +32,6 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 30,
     fontWeight: '700',
-    color: '#1c1612',
+    color: theme.colors.text,
   },
 });

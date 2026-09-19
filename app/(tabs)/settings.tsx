@@ -630,7 +630,7 @@ const styles = StyleSheet.create({
   localBadgeText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#b45309',
+    color: theme.colors.textSecondary,
   },
   sectionHint: {
     fontSize: 14,
