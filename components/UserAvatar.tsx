@@ -1,5 +1,6 @@
 import { Image, StyleSheet, Text, View } from 'react-native';
 import { theme } from '@/constants/theme';
+import { getInitials } from '@/lib/display-name';
 
 interface UserAvatarProps {
   name: string;
@@ -16,15 +17,6 @@ const PALETTE = [
   { bg: '#f5e4f0', fg: '#8a4a7a' },
   { bg: '#e4f3f3', fg: '#3d7a7a' },
 ] as const;
-
-function getInitials(name: string) {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((part) => part[0]?.toUpperCase() ?? '')
-    .join('')
-    .slice(0, 2);
-}
 
 function colorForName(name: string) {
   let hash = 0;

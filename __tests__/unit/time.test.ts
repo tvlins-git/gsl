@@ -18,8 +18,10 @@ describe('formatRelativeTime', () => {
 });
 
 describe('firstName', () => {
-  it('returns the first token', () => {
+  it('returns the first real name token after titles', () => {
     expect(firstName('Hr. Lins')).toBe('Lins');
+    expect(firstName('Hr Lins')).toBe('Lins');
+    expect(firstName('Fr. Schmidt')).toBe('Schmidt');
     expect(firstName('Alice')).toBe('Alice');
   });
 });
