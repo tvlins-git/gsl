@@ -59,10 +59,10 @@ export function FeedPhoto({
 const styles = StyleSheet.create({
   frame: {
     width: '100%',
-    backgroundColor: theme.colors.borderLight,
+    backgroundColor: theme.colors.bg,
   },
   image: {
     width: '100%',
-    backgroundColor: theme.colors.borderLight,
+    backgroundColor: theme.colors.bg,
   },
 });

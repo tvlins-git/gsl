@@ -98,7 +98,7 @@ describe('FeedComposer', () => {
     );
   });
 
-  it('exposes Camera and Gallery instead of a single Photo button', () => {
+  it('exposes Camera and Gallery on a real device instead of a single Photo button', () => {
     render(<FeedComposer members={[author, alice]} author={author} onPosted={() => {}} />);
     expect(screen.getByTestId('feed-composer-camera')).toBeTruthy();
     expect(screen.getByTestId('feed-composer-gallery')).toBeTruthy();
@@ -110,7 +110,7 @@ describe('FeedComposer', () => {
     expect(screen.queryByText('HL')).toBeNull();
   });
 
-  it('hides Camera on web while keeping Gallery', () => {
+  it('hides Camera on web and simulators while keeping Gallery', () => {
     (isCameraPickerAvailable as jest.Mock).mockReturnValue(false);
     render(<FeedComposer members={[author, alice]} author={author} onPosted={() => {}} />);
     expect(screen.queryByTestId('feed-composer-camera')).toBeNull();
