@@ -1,8 +1,17 @@
 import {
   buildIcsInvite,
   filterYesMaybeWithEmail,
+  parseBearerToken,
   toIcsUtc,
 } from './invite.ts';
+
+Deno.test('parseBearerToken accepts only a bearer credential', () => {
+  assertEquals(parseBearerToken('Bearer signed.jwt.token'), 'signed.jwt.token');
+  assertEquals(parseBearerToken('bearer signed.jwt.token'), 'signed.jwt.token');
+  assertEquals(parseBearerToken(null), null);
+  assertEquals(parseBearerToken('signed.jwt.token'), null);
+  assertEquals(parseBearerToken('Bearer '), null);
+});
 
 Deno.test('filterYesMaybeWithEmail keeps yes/maybe with email', () => {
   const invitees = filterYesMaybeWithEmail([
