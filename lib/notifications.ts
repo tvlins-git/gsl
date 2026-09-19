@@ -2,7 +2,8 @@ export type NotificationDeepLink =
   | { type: 'chat'; threadId: string }
   | { type: 'plan'; pollId: string }
   | { type: 'hosts' }
-  | { type: 'photos'; eventId?: string };
+  | { type: 'photos'; eventId?: string }
+  | { type: 'feed'; postId?: string };
 
 export function parseNotificationData(data: Record<string, unknown>): NotificationDeepLink | null {
   const type = data.type as string | undefined;
@@ -17,6 +18,8 @@ export function parseNotificationData(data: Record<string, unknown>): Notificati
       return { type: 'hosts' };
     case 'photos':
       return { type: 'photos', eventId: data.eventId ? String(data.eventId) : undefined };
+    case 'feed':
+      return { type: 'feed', postId: data.postId ? String(data.postId) : undefined };
     default:
       return null;
   }
@@ -32,5 +35,7 @@ export function getDeepLinkPath(link: NotificationDeepLink): string {
       return '/hosts';
     case 'photos':
       return link.eventId ? `/photos?eventId=${link.eventId}` : '/photos';
+    case 'feed':
+      return '/';
   }
 }

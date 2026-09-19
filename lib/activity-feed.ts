@@ -1,9 +1,15 @@
 import type { HostAssignment, Member, Poll, Thread } from './database.types';
+import {
+  formatFeedPostSubtitle,
+  formatFeedPostTitle,
+  loadFeedPosts,
+  type FeedPostSummary,
+} from './feed-posts';
 import { formatPhotoCount, loadPhotoEventSummaries, type PhotoEventSummary } from './photo-events';
 import { isLocalMode, localStore } from './local-store';
 import { supabase } from './supabase';
 
-export type ActivityKind = 'album' | 'photos' | 'poll' | 'plan_lock' | 'thread' | 'host';
+export type ActivityKind = 'album' | 'photos' | 'poll' | 'plan_lock' | 'thread' | 'host' | 'post';
 
 export type ActivityItem = {
   id: string;
@@ -13,6 +19,7 @@ export type ActivityItem = {
   timestamp: string;
   path: string;
   authorName: string;
+  imageUri?: string | null;
 };
 
 export type ActivitySources = {
@@ -20,6 +27,7 @@ export type ActivitySources = {
   polls: Poll[];
   threads: Thread[];
   hostAssignments: HostAssignment[];
+  feedPosts: FeedPostSummary[];
 };
 
 const MONTH_NAMES = [
@@ -51,6 +59,8 @@ export function activityKindLabel(kind: ActivityKind): string {
       return 'Chat';
     case 'host':
       return 'Hosts';
+    case 'post':
+      return 'Post';
   }
 }
 
@@ -60,6 +70,7 @@ export function buildActivityItems(input: {
   polls: Poll[];
   threads: Thread[];
   hostAssignments?: HostAssignment[];
+  feedPosts?: FeedPostSummary[];
   limit?: number;
 }): ActivityItem[] {
   const {
@@ -68,6 +79,7 @@ export function buildActivityItems(input: {
     polls,
     threads,
     hostAssignments = [],
+    feedPosts = [],
     limit = 40,
   } = input;
   const items: ActivityItem[] = [];
@@ -153,6 +165,20 @@ export function buildActivityItems(input: {
     });
   }
 
+  for (const post of feedPosts) {
+    const hasImage = Boolean(post.image_path || post.imageUri);
+    items.push({
+      id: `post-${post.id}`,
+      kind: 'post',
+      title: formatFeedPostTitle(post.body, hasImage),
+      subtitle: formatFeedPostSubtitle(post, members),
+      timestamp: post.created_at,
+      path: '/',
+      authorName: nameForUser(members, post.author_id),
+      imageUri: post.imageUri,
+    });
+  }
+
   return items
     .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
     .slice(0, limit);
@@ -160,20 +186,22 @@ export function buildActivityItems(input: {
 
 export async function loadActivitySources(groupId: string): Promise<ActivitySources> {
   if (isLocalMode()) {
-    const [photoEvents, polls, threads, hostAssignments] = await Promise.all([
+    const [photoEvents, polls, threads, hostAssignments, feedPosts] = await Promise.all([
       localStore.getPhotoEventSummaries(groupId),
       localStore.getPolls(groupId),
       localStore.getThreads(groupId),
       localStore.getHostAssignments(groupId),
+      localStore.getFeedPosts(groupId),
     ]);
-    return { photoEvents, polls, threads, hostAssignments };
+    return { photoEvents, polls, threads, hostAssignments, feedPosts };
   }
 
-  const [photoEvents, pollsRes, threadsRes, hostsRes] = await Promise.all([
+  const [photoEvents, pollsRes, threadsRes, hostsRes, feedPosts] = await Promise.all([
     loadPhotoEventSummaries(groupId),
     supabase.from('polls').select('*').eq('group_id', groupId).order('created_at', { ascending: false }),
     supabase.from('threads').select('*').eq('group_id', groupId).order('created_at', { ascending: false }),
     supabase.from('host_assignments').select('*').eq('group_id', groupId),
+    loadFeedPosts(groupId),
   ]);
 
   return {
@@ -181,5 +209,6 @@ export async function loadActivitySources(groupId: string): Promise<ActivitySour
     polls: pollsRes.data ?? [],
     threads: threadsRes.data ?? [],
     hostAssignments: hostsRes.data ?? [],
+    feedPosts,
   };
 }

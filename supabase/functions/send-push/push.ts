@@ -11,12 +11,15 @@ export interface PushMessage {
 
 export function filterRecipients(
   tokens: PushRecipient[],
-  excludeUserIds: string[] = []
+  excludeUserIds: string[] = [],
+  includeUserIds?: string[] | null
 ): PushRecipient[] {
   const exclude = new Set(excludeUserIds);
+  const include = includeUserIds ? new Set(includeUserIds) : null;
   const seen = new Set<string>();
   return tokens.filter((t) => {
     if (exclude.has(t.userId)) return false;
+    if (include && !include.has(t.userId)) return false;
     if (seen.has(t.token)) return false;
     seen.add(t.token);
     return true;

@@ -44,4 +44,23 @@ describe('ActivityItem', () => {
     expect(screen.getByText('Plan')).toBeTruthy();
     expect(screen.getByText(/Date locked/)).toBeTruthy();
   });
+
+  it('renders a post row with a thumbnail', () => {
+    render(
+      <ActivityItem
+        item={{
+          ...item,
+          id: 'post-1',
+          kind: 'post',
+          title: 'Hello GSL',
+          subtitle: 'Tagged everyone',
+          imageUri: 'file://photo.jpg',
+        }}
+        onPress={() => {}}
+      />
+    );
+    expect(screen.getByText('Post')).toBeTruthy();
+    expect(screen.getByText('Hello GSL')).toBeTruthy();
+    expect(screen.getByTestId('feed-item-post-1-thumb')).toBeTruthy();
+  });
 });

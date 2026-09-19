@@ -163,6 +163,37 @@ describe('buildActivityItems', () => {
     expect(items).toHaveLength(1);
     expect(items[0].id).toBe('poll-a');
   });
+
+  it('includes user feed posts with tag subtitles', () => {
+    const items = buildActivityItems({
+      members,
+      photoEvents: [],
+      polls: [],
+      threads: [],
+      feedPosts: [
+        {
+          id: 'post-1',
+          group_id: 'group-1',
+          author_id: 'user-1',
+          body: 'Hello GSL',
+          image_path: null,
+          tag_all: true,
+          taggedUserIds: [],
+          imageUri: null,
+          created_at: '2026-09-09T10:00:00.000Z',
+        },
+      ],
+    });
+
+    expect(items[0]).toMatchObject({
+      id: 'post-post-1',
+      kind: 'post',
+      title: 'Hello GSL',
+      subtitle: 'Tagged everyone',
+      path: '/',
+      authorName: 'Hr. Lins',
+    });
+  });
 });
 
 describe('activityKindLabel', () => {
@@ -173,5 +204,6 @@ describe('activityKindLabel', () => {
     expect(activityKindLabel('plan_lock')).toBe('Plan');
     expect(activityKindLabel('thread')).toBe('Chat');
     expect(activityKindLabel('host')).toBe('Hosts');
+    expect(activityKindLabel('post')).toBe('Post');
   });
 });

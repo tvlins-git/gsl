@@ -15,6 +15,12 @@ describe('parseNotificationData', () => {
     const link = parseNotificationData({ type: 'hosts' });
     expect(link).toEqual({ type: 'hosts' });
   });
+
+  it('parses feed notifications', () => {
+    const link = parseNotificationData({ type: 'feed', postId: 'p1' });
+    expect(link).toEqual({ type: 'feed', postId: 'p1' });
+    expect(getDeepLinkPath({ type: 'feed', postId: 'p1' })).toBe('/');
+  });
 });
 
 describe('getDeepLinkPath', () => {

@@ -75,6 +75,40 @@ export interface Database {
         { id?: string; thread_id: string; sender_id: string; body: string; created_at?: string },
         { id?: string; thread_id?: string; sender_id?: string; body?: string; created_at?: string }
       >;
+      feed_posts: TableDef<
+        {
+          id: string;
+          group_id: string;
+          author_id: string;
+          body: string;
+          image_path: string | null;
+          tag_all: boolean;
+          created_at: string;
+        },
+        {
+          id?: string;
+          group_id: string;
+          author_id: string;
+          body?: string;
+          image_path?: string | null;
+          tag_all?: boolean;
+          created_at?: string;
+        },
+        {
+          id?: string;
+          group_id?: string;
+          author_id?: string;
+          body?: string;
+          image_path?: string | null;
+          tag_all?: boolean;
+          created_at?: string;
+        }
+      >;
+      feed_post_tags: TableDef<
+        { post_id: string; user_id: string },
+        { post_id: string; user_id: string },
+        { post_id?: string; user_id?: string }
+      >;
     };
     Views: { [_ in never]: never };
     Functions: {
@@ -97,3 +131,5 @@ export type PhotoEvent = Database['public']['Tables']['photo_events']['Row'];
 export type Photo = Database['public']['Tables']['photos']['Row'];
 export type Thread = Database['public']['Tables']['threads']['Row'];
 export type Message = Database['public']['Tables']['messages']['Row'];
+export type FeedPost = Database['public']['Tables']['feed_posts']['Row'];
+export type FeedPostTag = Database['public']['Tables']['feed_post_tags']['Row'];
