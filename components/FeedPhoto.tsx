@@ -44,9 +44,14 @@ export function FeedPhoto({
         ]}
         resizeMode="contain"
         onLoad={(event) => {
-          const source = event.nativeEvent.source;
-          if (source?.width > 0 && source?.height > 0) {
-            setAspect(feedPhotoAspect(source.width, source.height));
+          const nativeEvent = event.nativeEvent as {
+            source?: { width?: number; height?: number };
+            target?: { naturalWidth?: number; naturalHeight?: number };
+          };
+          const width = nativeEvent.source?.width ?? nativeEvent.target?.naturalWidth ?? 0;
+          const height = nativeEvent.source?.height ?? nativeEvent.target?.naturalHeight ?? 0;
+          if (width > 0 && height > 0) {
+            setAspect(feedPhotoAspect(width, height));
           }
         }}
         testID={testID}
