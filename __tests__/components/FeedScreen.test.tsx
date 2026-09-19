@@ -151,7 +151,7 @@ describe('FeedScreen post delete', () => {
 
   it('lets the author delete their published post and hides Delete on others', async () => {
     render(<FeedScreen />);
-    expect(await screen.findByText('My flower post', {}, { timeout: 8000 })).toBeTruthy();
+    expect(await screen.findByText('My flower post')).toBeTruthy();
     expect(screen.getByTestId('delete-feed-item-post-mine')).toBeTruthy();
     expect(screen.queryByTestId('delete-feed-item-post-theirs')).toBeNull();
 
