@@ -1,9 +1,90 @@
 import type { Message } from './database.types';
+import { isLocalMode, localStore } from './local-store';
+import { supabase } from './supabase';
+
+const OPTIMISTIC_ID_PREFIX = 'optimistic-';
 
 export function sortMessagesChronologically(messages: Message[]): Message[] {
   return [...messages].sort(
     (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
   );
+}
+
+export function isOptimisticMessageId(id: string): boolean {
+  return id.startsWith(OPTIMISTIC_ID_PREFIX);
+}
+
+export function createOptimisticMessage(
+  threadId: string,
+  senderId: string,
+  body: string,
+  now = new Date()
+): Message {
+  return {
+    id: `${OPTIMISTIC_ID_PREFIX}${now.getTime()}-${Math.random().toString(36).slice(2, 8)}`,
+    thread_id: threadId,
+    sender_id: senderId,
+    body,
+    created_at: now.toISOString(),
+  };
+}
+
+/** Merge incoming messages, drop optimistic twins, and keep chronological order. */
+export function mergeMessages(existing: Message[], incoming: Message[]): Message[] {
+  const byId = new Map<string, Message>();
+
+  for (const msg of existing) {
+    byId.set(msg.id, msg);
+  }
+
+  for (const msg of incoming) {
+    if (!isOptimisticMessageId(msg.id)) {
+      for (const [id, prev] of byId) {
+        if (
+          isOptimisticMessageId(id) &&
+          prev.sender_id === msg.sender_id &&
+          prev.body === msg.body
+        ) {
+          byId.delete(id);
+        }
+      }
+    }
+    byId.set(msg.id, msg);
+  }
+
+  return sortMessagesChronologically([...byId.values()]);
+}
+
+export async function listThreadMessages(threadId: string): Promise<Message[]> {
+  if (isLocalMode()) {
+    return localStore.getMessages(threadId);
+  }
+
+  const { data, error } = await supabase.from('messages').select('*').eq('thread_id', threadId);
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function sendThreadMessage(
+  threadId: string,
+  senderId: string,
+  body: string
+): Promise<Message> {
+  if (isLocalMode()) {
+    return localStore.addMessage(threadId, senderId, body);
+  }
+
+  const { data, error } = await supabase
+    .from('messages')
+    .insert({ thread_id: threadId, sender_id: senderId, body })
+    .select('*')
+    .single();
+
+  if (error) throw error;
+  if (!data) {
+    throw new Error('Message insert returned no row');
+  }
+  return data;
 }
 
 export function formatMessageTime(iso: string): string {
