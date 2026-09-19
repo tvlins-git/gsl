@@ -22,7 +22,6 @@ function defaultStartTime() {
 function WebDateInput({ value, onChange }: { value: Date; onChange: (d: Date) => void }) {
   const dateStr = `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
   return (
-    // @ts-expect-error — web-only native input
     <input
       type="date"
       value={dateStr}
@@ -41,7 +40,6 @@ function WebDateInput({ value, onChange }: { value: Date; onChange: (d: Date) =>
 function WebTimeInput({ value, onChange }: { value: Date; onChange: (d: Date) => void }) {
   const timeStr = `${String(value.getHours()).padStart(2, '0')}:${String(value.getMinutes()).padStart(2, '0')}`;
   return (
-    // @ts-expect-error — web-only native input
     <input
       type="time"
       value={timeStr}
