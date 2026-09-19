@@ -13,8 +13,10 @@ import {
 } from 'react-native';
 import { PollGrid } from '@/components/PollGrid';
 import { PollSlotEditor } from '@/components/PollSlotEditor';
+import { UserAvatar } from '@/components/UserAvatar';
 import { Screen } from '@/components/ui/Screen';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { formatRelativeTime } from '@/lib/time';
 import { useAuth } from '@/contexts/AuthContext';
 import { getGroupMembers } from '@/lib/auth';
 import {
@@ -28,7 +30,7 @@ import { computeSlotScores, formatSlotTime } from '@/lib/polls';
 import type { Member, Poll, PollSlot } from '@/lib/database.types';
 import { supabase } from '@/lib/supabase';
 import type { PollResponseValue } from '@/lib/polls';
-import { sharedStyles, theme } from '@/constants/theme';
+import { feedColumn, sharedStyles, theme } from '@/constants/theme';
 
 export default function PlanScreen() {
   const { member } = useAuth();
@@ -288,7 +290,24 @@ export default function PlanScreen() {
           <Text style={styles.back}>← Back to polls</Text>
         </Pressable>
         <View style={styles.detailHeader}>
-          <Text style={styles.pollTitle}>{selectedPoll.title}</Text>
+          <View style={styles.detailIdentity}>
+            <UserAvatar
+              name={
+                members.find((item) => item.user_id === selectedPoll.created_by)?.display_name
+                ?? member?.display_name
+                ?? 'Friend'
+              }
+              size={44}
+            />
+            <View style={styles.detailTitleBlock}>
+              <Text style={styles.pollTitle}>{selectedPoll.title}</Text>
+              <Text style={styles.detailByline}>
+                {members.find((item) => item.user_id === selectedPoll.created_by)?.display_name
+                  ?? 'Friend'}{' '}
+                · {formatRelativeTime(selectedPoll.created_at)}
+              </Text>
+            </View>
+          </View>
           <View style={styles.detailMetaRow}>
             <StatusBadge status={selectedPoll.status} />
             <Pressable onPress={() => handleDeletePoll(selectedPoll.id)} testID="delete-poll-detail">
@@ -359,33 +378,48 @@ export default function PlanScreen() {
 
   return (
     <Screen>
-      <Pressable style={[styles.createBtn, sharedStyles.primaryBtn]} onPress={openCreateModal} testID="create-poll-btn">
-        <Text style={sharedStyles.primaryBtnText}>+ New poll</Text>
+      <Pressable style={styles.compose} onPress={openCreateModal} testID="create-poll-btn">
+        <UserAvatar name={member?.display_name ?? 'You'} size={36} />
+        <Text style={styles.composeText}>Plan the next hangout…</Text>
+        <View style={styles.composePlus}>
+          <Text style={styles.composePlusText}>+</Text>
+        </View>
       </Pressable>
       <ScrollView contentContainerStyle={styles.listContent}>
         {polls.length === 0 && (
-          <Text style={sharedStyles.empty}>No polls yet. Create one to find a time that works.</Text>
+          <Text style={sharedStyles.empty}>No plans yet. Post a time and see who can make it.</Text>
         )}
-        {polls.map((poll) => (
-          <View key={poll.id} style={[styles.pollCard, sharedStyles.card]}>
-            <Pressable style={styles.pollCardMain} onPress={() => loadPollDetail(poll)}>
-              <Text style={styles.pollCardTitle}>{poll.title}</Text>
-              <Text style={styles.pollCardSummary}>
-                {pollSummaries[poll.id] ?? 'Loading…'}
-              </Text>
-            </Pressable>
-            <View style={styles.pollCardStatus}>
-              <StatusBadge status={poll.status} />
+        {polls.map((poll) => {
+          const author =
+            members.find((item) => item.user_id === poll.created_by)?.display_name
+            ?? member?.display_name
+            ?? 'Friend';
+          return (
+            <View key={poll.id} style={[styles.pollCard, sharedStyles.card]}>
+              <Pressable style={styles.pollCardMain} onPress={() => loadPollDetail(poll)}>
+                <View style={styles.pollCardHeader}>
+                  <UserAvatar name={author} size={40} />
+                  <View style={styles.pollCardIdentity}>
+                    <Text style={styles.pollCardAuthor}>{author}</Text>
+                    <Text style={styles.pollCardTime}>{formatRelativeTime(poll.created_at)}</Text>
+                  </View>
+                  <StatusBadge status={poll.status} />
+                </View>
+                <Text style={styles.pollCardTitle}>{poll.title}</Text>
+                <Text style={styles.pollCardSummary}>
+                  {pollSummaries[poll.id] ?? 'Loading…'}
+                </Text>
+              </Pressable>
+              <Pressable
+                style={styles.deleteBtn}
+                onPress={() => handleDeletePoll(poll.id)}
+                testID={`delete-poll-${poll.id}`}
+              >
+                <Text style={styles.deleteText}>Delete</Text>
+              </Pressable>
             </View>
-            <Pressable
-              style={styles.deleteBtn}
-              onPress={() => handleDeletePoll(poll.id)}
-              testID={`delete-poll-${poll.id}`}
-            >
-              <Text style={styles.deleteText}>Delete</Text>
-            </Pressable>
-          </View>
-        ))}
+          );
+        })}
       </ScrollView>
 
       <Modal visible={showCreate} animationType="slide" transparent>
@@ -432,39 +466,77 @@ export default function PlanScreen() {
 
 const styles = StyleSheet.create({
   listContent: {
+    ...feedColumn,
     paddingHorizontal: theme.spacing.lg,
     paddingBottom: theme.spacing.xxl,
   },
-  createBtn: {
-    margin: theme.spacing.lg,
-    marginBottom: theme.spacing.sm,
+  compose: {
+    ...feedColumn,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: theme.spacing.lg,
+    marginBottom: theme.spacing.md,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    ...sharedStyles.card,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.pill,
+    gap: theme.spacing.md,
+  },
+  composeText: {
+    flex: 1,
+    color: theme.colors.textMuted,
+    fontSize: 15,
+  },
+  composePlus: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: theme.colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  composePlusText: {
+    color: theme.colors.onPrimary,
+    fontSize: 20,
+    fontWeight: '700',
+    marginTop: -1,
   },
   createBtnDisabled: { opacity: 0.45 },
   pollCard: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
-    marginBottom: theme.spacing.md,
+    marginBottom: theme.spacing.lg,
     overflow: 'hidden',
   },
-  pollCardMain: { flex: 1, padding: theme.spacing.lg },
-  pollCardTitle: {
-    fontSize: 17,
-    fontWeight: '600',
+  pollCardMain: { padding: theme.spacing.lg, gap: theme.spacing.sm },
+  pollCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.md,
+  },
+  pollCardIdentity: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
+  },
+  pollCardAuthor: {
+    fontSize: 15,
+    fontWeight: '700',
     color: theme.colors.text,
-    marginBottom: theme.spacing.sm,
+  },
+  pollCardTime: {
+    fontSize: 13,
+    color: theme.colors.textMuted,
+  },
+  pollCardTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: theme.colors.text,
   },
   pollCardSummary: { color: theme.colors.textSecondary, fontSize: 14, lineHeight: 20 },
-  pollCardStatus: {
-    justifyContent: 'center',
-    alignItems: 'flex-end',
-    minWidth: 64,
-    paddingRight: theme.spacing.md,
-  },
   deleteBtn: {
-    justifyContent: 'center',
+    alignSelf: 'flex-end',
     paddingHorizontal: theme.spacing.lg,
-    borderLeftWidth: StyleSheet.hairlineWidth,
-    borderLeftColor: theme.colors.border,
+    paddingBottom: theme.spacing.md,
   },
   deleteText: { color: theme.colors.danger, fontWeight: '600', fontSize: 14 },
   detailContent: { paddingBottom: theme.spacing.xxl },
@@ -473,7 +545,21 @@ const styles = StyleSheet.create({
   detailHeader: {
     paddingHorizontal: theme.spacing.lg,
     paddingBottom: theme.spacing.md,
-    gap: theme.spacing.sm,
+    gap: theme.spacing.md,
+  },
+  detailIdentity: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.md,
+  },
+  detailTitleBlock: {
+    flex: 1,
+    minWidth: 0,
+    gap: 4,
+  },
+  detailByline: {
+    fontSize: 13,
+    color: theme.colors.textMuted,
   },
   detailMetaRow: {
     flexDirection: 'row',
@@ -492,8 +578,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: theme.colors.success,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
     marginBottom: 4,
   },
   lockedWhen: { fontSize: 16, fontWeight: '600', color: theme.colors.text },

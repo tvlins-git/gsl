@@ -21,7 +21,7 @@ export function PhotoGrid({
     <FlatList
       data={photos}
       keyExtractor={(item) => item.id}
-      numColumns={3}
+      numColumns={2}
       testID="photo-grid"
       renderItem={({ item }) => (
         <View style={styles.cell}>
@@ -59,9 +59,9 @@ export function PhotoGrid({
 
 const styles = StyleSheet.create({
   cell: {
-    flex: 1 / 3,
+    flex: 1 / 2,
     aspectRatio: 1,
-    padding: 2,
+    padding: 3,
     position: 'relative',
   },
   imageWrap: {
@@ -70,7 +70,7 @@ const styles = StyleSheet.create({
   image: {
     width: '100%',
     height: '100%',
-    borderRadius: theme.radius.sm,
+    borderRadius: theme.radius.md,
     backgroundColor: theme.colors.borderLight,
   },
   topBadge: {

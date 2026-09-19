@@ -21,26 +21,26 @@ export default function TabLayout() {
         tabBarStyle: {
           backgroundColor: theme.colors.surface,
           borderTopColor: theme.colors.border,
-          borderTopWidth: 1,
-          paddingTop: 4,
+          borderTopWidth: 0.5,
+          paddingTop: 6,
           height: Platform.OS === 'ios' ? 88 : 64,
         },
+        tabBarShowLabel: true,
         tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
         headerStyle: {
           backgroundColor: theme.colors.surface,
-          borderBottomWidth: 1,
-          borderBottomColor: theme.colors.border,
         },
         headerShadowVisible: false,
-        headerTitleStyle: { fontWeight: '800', letterSpacing: 2 },
+        headerTitleStyle: { fontWeight: '700' },
       }}
     >
       <Tabs.Screen
-        name="hosts"
+        name="index"
         options={{
-          title: APP_NAME,
-          headerTitle: () => <GslNavTitle suffix="Hosts" />,
-          tabBarLabel: 'Hosts',
+          title: 'Feed',
+          headerTitle: () => <GslNavTitle title={APP_NAME} />,
+          tabBarLabel: 'Feed',
+          tabBarAccessibilityLabel: 'Feed',
           tabBarIcon: ({ color }) => (
             <SymbolView name={{ ios: 'house', android: 'home', web: 'home' }} tintColor={color} size={24} />
           ),
@@ -58,13 +58,13 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="photos"
+        name="hosts"
         options={{
-          title: `${APP_NAME} · Photos`,
-          headerTitle: () => <GslNavTitle suffix="Photos" />,
-          tabBarLabel: 'Photos',
+          title: `${APP_NAME} · Hosts`,
+          headerTitle: () => <GslNavTitle suffix="Hosts" />,
+          tabBarLabel: 'Hosts',
           tabBarIcon: ({ color }) => (
-            <SymbolView name={{ ios: 'photo', android: 'image', web: 'image' }} tintColor={color} size={24} />
+            <SymbolView name={{ ios: 'person.2', android: 'groups', web: 'groups' }} tintColor={color} size={24} />
           ),
         }}
       />
@@ -82,15 +82,15 @@ export default function TabLayout() {
       <Tabs.Screen
         name="settings"
         options={{
-          title: `${APP_NAME} · Settings`,
-          headerTitle: () => <GslNavTitle suffix="Settings" />,
-          tabBarLabel: 'Settings',
+          title: `${APP_NAME} · Profile`,
+          headerTitle: () => <GslNavTitle suffix="Profile" />,
+          tabBarLabel: 'Profile',
           tabBarIcon: ({ color }) => (
-            <SymbolView name={{ ios: 'gearshape', android: 'settings', web: 'settings' }} tintColor={color} size={24} />
+            <SymbolView name={{ ios: 'person.circle', android: 'account_circle', web: 'account_circle' }} tintColor={color} size={24} />
           ),
         }}
       />
-      <Tabs.Screen name="index" options={{ href: null }} />
+      <Tabs.Screen name="photos" options={{ href: null }} />
     </Tabs>
     </>
   );

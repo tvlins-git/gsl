@@ -41,9 +41,8 @@ const styles = StyleSheet.create({
   },
   compactTitle: {
     fontSize: 22,
-    fontWeight: '800',
-    letterSpacing: 3,
-    color: '#111',
+    fontWeight: '700',
+    color: '#1c1612',
   },
   subtitle: {
     fontSize: 14,

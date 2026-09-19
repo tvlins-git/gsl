@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SymbolView } from 'expo-symbols';
+import { UserAvatar } from '@/components/UserAvatar';
 import { sharedStyles, theme } from '@/constants/theme';
 import type { Member } from '@/lib/database.types';
 
@@ -50,6 +51,13 @@ export function MemberSelect({
         accessibilityState={{ disabled, expanded: open }}
         testID={testID}
       >
+        {selectedMember ? (
+          <UserAvatar
+            name={selectedMember.display_name}
+            size={22}
+            imageUri={selectedMember.avatar_url}
+          />
+        ) : null}
         <Text
           style={[styles.triggerText, isPlaceholder && styles.triggerPlaceholder]}
           numberOfLines={1}
@@ -93,9 +101,12 @@ export function MemberSelect({
                     onPress={() => select(member.id)}
                     testID={testID ? `${testID}-option-${member.id}` : undefined}
                   >
-                    <Text style={[styles.optionText, selected && styles.optionTextSelected]}>
-                      {member.display_name}
-                    </Text>
+                    <View style={styles.optionPerson}>
+                      <UserAvatar name={member.display_name} size={32} imageUri={member.avatar_url} />
+                      <Text style={[styles.optionText, selected && styles.optionTextSelected]}>
+                        {member.display_name}
+                      </Text>
+                    </View>
                     {selected ? (
                       <SymbolView
                         name={{ ios: 'checkmark', android: 'check', web: 'check' }}
@@ -125,10 +136,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: theme.spacing.sm,
     paddingHorizontal: 12,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: theme.colors.bg,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    borderRadius: theme.radius.md,
+    borderRadius: theme.radius.pill,
   },
   triggerPressed: {
     backgroundColor: theme.colors.bg,
@@ -176,6 +187,12 @@ const styles = StyleSheet.create({
   },
   optionSelected: {
     backgroundColor: theme.colors.accentSoft,
+  },
+  optionPerson: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.md,
+    flex: 1,
   },
   optionText: {
     fontSize: 16,
