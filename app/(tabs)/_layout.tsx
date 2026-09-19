@@ -25,6 +25,7 @@ export default function TabLayout() {
           paddingTop: 6,
           height: Platform.OS === 'ios' ? 88 : 64,
         },
+        tabBarShowLabel: true,
         tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
         headerStyle: {
           backgroundColor: theme.colors.surface,
@@ -36,9 +37,10 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: APP_NAME,
+          title: 'Feed',
           headerTitle: () => <GslNavTitle title={APP_NAME} />,
           tabBarLabel: 'Feed',
+          tabBarAccessibilityLabel: 'Feed',
           tabBarIcon: ({ color }) => (
             <SymbolView name={{ ios: 'house', android: 'home', web: 'home' }} tintColor={color} size={24} />
           ),

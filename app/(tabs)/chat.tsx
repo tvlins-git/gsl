@@ -89,7 +89,7 @@ export default function ChatScreen() {
     await loadThreads();
   };
 
-  if (loading) {
+  if (loading && threads.length === 0) {
     return <Screen loading />;
   }
 
