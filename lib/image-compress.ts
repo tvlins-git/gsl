@@ -1,6 +1,7 @@
 export interface CompressOptions {
   maxWidth?: number;
   quality?: number;
+  includeBase64?: boolean;
 }
 
 export interface CompressResult {
@@ -40,20 +41,21 @@ export async function compressImage(
   uri: string,
   options: CompressOptions = {}
 ): Promise<CompressResult> {
-  const { maxWidth = 1200, quality = 0.8 } = options;
+  const { maxWidth = 1200, quality = 0.8, includeBase64 = false } = options;
 
   try {
     const ImageManipulator = await import('expo-image-manipulator');
     const result = await ImageManipulator.manipulateAsync(
       uri,
       [{ resize: { width: maxWidth } }],
-      { compress: quality, format: ImageManipulator.SaveFormat.JPEG, base64: false }
+      { compress: quality, format: ImageManipulator.SaveFormat.JPEG, base64: includeBase64 }
     );
 
     return {
       uri: result.uri,
       width: result.width,
       height: result.height,
+      ...(includeBase64 && result.base64 ? { base64: result.base64 } : {}),
     };
   } catch {
     return { uri, width: maxWidth, height: Math.round(maxWidth * 0.75) };

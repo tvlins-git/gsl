@@ -171,4 +171,15 @@ describe('FeedComposer', () => {
       })
     );
   });
+
+  it('surfaces a useful error instead of only the generic string', async () => {
+    (createFeedPost as jest.Mock).mockRejectedValueOnce(
+      new Error("Creating blobs from 'ArrayBuffer' and 'ArrayBufferView' are not supported")
+    );
+    render(<FeedComposer members={[author, alice]} author={author} onPosted={() => {}} />);
+    fireEvent.changeText(screen.getByTestId('feed-composer-input'), 'Flower');
+    fireEvent.press(screen.getByTestId('feed-composer-post'));
+    expect(await screen.findByText('Could not read the photo on this device. Try another photo.')).toBeTruthy();
+    expect(screen.queryByText('Could not post. Try again.')).toBeNull();
+  });
 });

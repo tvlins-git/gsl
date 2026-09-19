@@ -108,5 +108,4 @@ CREATE POLICY messages_all ON messages FOR ALL
     SELECT 1 FROM threads t WHERE t.id = thread_id AND t.group_id = auth_group_id()
   ));
 
--- Storage bucket (run via dashboard or separate migration)
--- INSERT INTO storage.buckets (id, name, public) VALUES ('photos', 'photos', false);
+-- Photos storage bucket is created in 007_photos_storage_bucket.sql

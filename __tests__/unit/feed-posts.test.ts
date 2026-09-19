@@ -2,7 +2,10 @@ import {
   applyFeedMention,
   buildFeedPushBody,
   buildFeedSendPushPayload,
+  canDeleteFeedPost,
   canSubmitFeedPost,
+  createFeedPost,
+  deleteFeedPost,
   extractMentionTokens,
   formatFeedPostSubtitle,
   formatFeedPostTitle,
@@ -13,11 +16,22 @@ import {
   resolveFeedPushTargets,
   shouldSendFeedPush,
 } from '@/lib/feed-posts';
+import { isLocalMode, localStore } from '@/lib/local-store';
+import { uploadJpegToPhotos } from '@/lib/photo-upload';
+import { supabase } from '@/lib/supabase';
 import { buildMember } from '../factories';
 
 jest.mock('@/lib/local-store', () => ({
   isLocalMode: jest.fn(() => true),
-  localStore: {},
+  localStore: {
+    createFeedPost: jest.fn(),
+    deleteFeedPost: jest.fn(),
+    getFeedPosts: jest.fn(),
+  },
+}));
+
+jest.mock('@/lib/photo-upload', () => ({
+  uploadJpegToPhotos: jest.fn(async (path: string) => path),
 }));
 
 const members = [
@@ -37,6 +51,12 @@ describe('feed post helpers', () => {
     expect(canSubmitFeedPost('   ', null)).toBe(false);
     expect(canSubmitFeedPost('Hello', null)).toBe(true);
     expect(canSubmitFeedPost('', 'file://photo.jpg')).toBe(true);
+  });
+
+  it('only the author can delete a published post', () => {
+    expect(canDeleteFeedPost('user-1', 'user-1')).toBe(true);
+    expect(canDeleteFeedPost('user-1', 'user-2')).toBe(false);
+    expect(canDeleteFeedPost(undefined, 'user-1')).toBe(false);
   });
 
   it('allows untagged posts and named or everyone tags', () => {
@@ -201,5 +221,94 @@ describe('feed mention parsing', () => {
       body: 'hi @Lins ',
       cursor: 9,
     });
+  });
+});
+
+describe('createFeedPost and deleteFeedPost', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (isLocalMode as jest.Mock).mockReturnValue(true);
+  });
+
+  it('uploads photos through the shared JPEG helper in remote mode', async () => {
+    (isLocalMode as jest.Mock).mockReturnValue(false);
+    (uploadJpegToPhotos as jest.Mock).mockResolvedValue('group-1/feed/post-1.jpg');
+    const single = jest.fn().mockResolvedValue({
+      data: {
+        id: 'post-1',
+        group_id: 'group-1',
+        author_id: 'user-1',
+        body: 'Flower',
+        image_path: 'group-1/feed/post-1.jpg',
+        tag_all: false,
+        created_at: '2026-09-19T00:00:00.000Z',
+      },
+      error: null,
+    });
+    (supabase.from as jest.Mock).mockReturnValue({
+      insert: jest.fn().mockReturnValue({
+        select: jest.fn().mockReturnValue({ single }),
+      }),
+    });
+    (supabase.functions.invoke as jest.Mock).mockResolvedValue({ data: null, error: null });
+
+    await createFeedPost({
+      groupId: 'group-1',
+      authorId: 'user-1',
+      authorName: 'Hr. Lins',
+      body: 'Flower',
+      imageUri: 'ph://magenta-flower',
+      tagAll: false,
+      taggedUserIds: [],
+      groupUserIds: ['user-1'],
+    });
+
+    expect(uploadJpegToPhotos).toHaveBeenCalledWith(
+      expect.stringMatching(/^group-1\/feed\/.+\.jpg$/),
+      'ph://magenta-flower',
+      { maxWidth: 1200, quality: 0.8 }
+    );
+  });
+
+  it('deletes a local post for the author', async () => {
+    (localStore.deleteFeedPost as jest.Mock).mockResolvedValue(undefined);
+    await deleteFeedPost({
+      postId: 'post-1',
+      authorId: 'user-1',
+      currentUserId: 'user-1',
+      imagePath: 'file://photo.jpg',
+    });
+    expect(localStore.deleteFeedPost).toHaveBeenCalledWith('post-1');
+  });
+
+  it('rejects delete from someone who is not the author', async () => {
+    await expect(
+      deleteFeedPost({
+        postId: 'post-1',
+        authorId: 'user-1',
+        currentUserId: 'user-2',
+      })
+    ).rejects.toThrow('You can only delete your own posts.');
+    expect(localStore.deleteFeedPost).not.toHaveBeenCalled();
+  });
+
+  it('deletes the remote row and storage object for the author', async () => {
+    (isLocalMode as jest.Mock).mockReturnValue(false);
+    const remove = jest.fn().mockResolvedValue({ error: null });
+    const eq = jest.fn().mockResolvedValue({ error: null });
+    (supabase.storage.from as jest.Mock).mockReturnValue({ remove });
+    (supabase.from as jest.Mock).mockReturnValue({
+      delete: jest.fn(() => ({ eq })),
+    });
+
+    await deleteFeedPost({
+      postId: 'post-1',
+      authorId: 'user-1',
+      currentUserId: 'user-1',
+      imagePath: 'group-1/feed/post-1.jpg',
+    });
+
+    expect(remove).toHaveBeenCalledWith(['group-1/feed/post-1.jpg']);
+    expect(eq).toHaveBeenCalledWith('id', 'post-1');
   });
 });

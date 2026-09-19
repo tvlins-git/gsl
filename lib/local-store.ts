@@ -396,6 +396,13 @@ export const localStore = {
     await writeData(data);
   },
 
+  async deleteFeedPost(postId: string) {
+    const data = await readData();
+    data.feed_posts = (data.feed_posts ?? []).filter((post) => post.id !== postId);
+    data.feed_post_tags = (data.feed_post_tags ?? []).filter((tag) => tag.post_id !== postId);
+    await writeData(data);
+  },
+
   async getFeedPosts(groupId: string) {
     const data = await readData();
     const posts = data.feed_posts ?? [];

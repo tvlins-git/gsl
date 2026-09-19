@@ -1,3 +1,4 @@
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useFonts } from 'expo-font';
 import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router/react-navigation';
 import { Stack } from 'expo-router';
@@ -56,25 +57,30 @@ function RootLayoutNav() {
   const colorScheme = useColorScheme();
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <LoadingGate>
-        <NotificationDeepLinkHandler />
-        <Stack>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen
-            name="thread/[id]"
-            options={{
-              headerTitle: () => <GslNavTitle suffix="Chat" />,
-              headerLeft: () => <HeaderBackButton />,
-            }}
-          />
-        </Stack>
-      </LoadingGate>
-    </ThemeProvider>
+    <GestureHandlerRootView style={styles.root}>
+      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+        <LoadingGate>
+          <NotificationDeepLinkHandler />
+          <Stack>
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen
+              name="thread/[id]"
+              options={{
+                headerTitle: () => <GslNavTitle suffix="Chat" />,
+                headerLeft: () => <HeaderBackButton />,
+              }}
+            />
+          </Stack>
+        </LoadingGate>
+      </ThemeProvider>
+    </GestureHandlerRootView>
   );
 }
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
   loading: {
     flex: 1,
     justifyContent: 'center',

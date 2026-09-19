@@ -1,4 +1,5 @@
 import React from 'react';
+import { StyleSheet } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { ActivityItem } from '@/components/ActivityItem';
 import type { ActivityItem as ActivityItemData } from '@/lib/activity-feed';
@@ -45,7 +46,7 @@ describe('ActivityItem', () => {
     expect(screen.getByText(/Date locked/)).toBeTruthy();
   });
 
-  it('renders a post row with a thumbnail', () => {
+  it('renders a post photo on its own full-width row below the title', () => {
     render(
       <ActivityItem
         item={{
@@ -61,6 +62,25 @@ describe('ActivityItem', () => {
     );
     expect(screen.getByText('Post')).toBeTruthy();
     expect(screen.getByText('Hello GSL')).toBeTruthy();
-    expect(screen.getByTestId('feed-item-post-1-thumb')).toBeTruthy();
+    const photo = screen.getByTestId('feed-item-post-1-photo');
+    expect(photo.props.resizeMode).toBe('contain');
+    const photoStyle = StyleSheet.flatten(photo.props.style);
+    expect(photoStyle.width).toBe('100%');
+    expect(photoStyle.aspectRatio).toBeGreaterThan(0);
+    expect(photoStyle.height).toBeUndefined();
+    expect(screen.queryByTestId('delete-feed-item-post-1')).toBeNull();
+  });
+
+  it('reveals Delete for swipe-to-delete when onDelete is provided', () => {
+    const onDelete = jest.fn();
+    render(
+      <ActivityItem
+        item={{ ...item, id: 'post-1', kind: 'post', title: 'Hello GSL' }}
+        onPress={() => {}}
+        onDelete={onDelete}
+      />
+    );
+    fireEvent.press(screen.getByTestId('delete-feed-item-post-1'));
+    expect(onDelete).toHaveBeenCalled();
   });
 });
