@@ -95,7 +95,7 @@ describe('buildActivityItems', () => {
       kind: 'album',
       title: 'Ski trip',
       subtitle: 'New album · 0 photos',
-      path: '/photos?eventId=event-1',
+      path: '/photos?eventId=event-1&from=feed',
       authorName: 'Hr. Lins',
       thumbUris: [],
     });
@@ -158,7 +158,7 @@ describe('buildActivityItems', () => {
     expect(items[0]).toMatchObject({
       kind: 'photos',
       subtitle: '4 photos added',
-      path: '/photos?eventId=event-1',
+      path: '/photos?eventId=event-1&from=feed',
       thumbUris: [],
     });
   });
