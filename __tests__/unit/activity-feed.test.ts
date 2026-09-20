@@ -11,8 +11,16 @@ jest.mock('@/lib/local-store', () => ({
 function buildSummary(overrides: Partial<PhotoEventSummary['event']> & {
   photoCount?: number;
   latestPhotoAt?: string | null;
+  coverPhoto?: PhotoEventSummary['coverPhoto'];
+  previewPhotos?: PhotoEventSummary['previewPhotos'];
 } = {}): PhotoEventSummary {
-  const { photoCount = 0, latestPhotoAt = null, ...event } = overrides;
+  const {
+    photoCount = 0,
+    latestPhotoAt = null,
+    coverPhoto = null,
+    previewPhotos,
+    ...event
+  } = overrides;
   return {
     event: {
       id: event.id ?? 'event-1',
@@ -23,7 +31,8 @@ function buildSummary(overrides: Partial<PhotoEventSummary['event']> & {
       created_at: event.created_at ?? '2026-09-01T10:00:00.000Z',
     },
     photoCount,
-    coverPhoto: null,
+    coverPhoto,
+    previewPhotos: previewPhotos ?? (coverPhoto ? [coverPhoto] : []),
     latestPhotoAt,
   };
 }
@@ -88,6 +97,46 @@ describe('buildActivityItems', () => {
       subtitle: 'New album · 0 photos',
       path: '/photos?eventId=event-1',
       authorName: 'Hr. Lins',
+      thumbUris: [],
+    });
+  });
+
+  it('attaches real album thumb URIs from preview photos', () => {
+    const items = buildActivityItems({
+      members,
+      photoEvents: [
+        buildSummary({
+          photoCount: 2,
+          coverPhoto: {
+            id: 'p1',
+            storage_path: 'file://full-1.jpg',
+            thumb_path: 'file://thumb-1.jpg',
+            uploaded_by: 'user-1',
+          },
+          previewPhotos: [
+            {
+              id: 'p1',
+              storage_path: 'file://full-1.jpg',
+              thumb_path: 'file://thumb-1.jpg',
+              uploaded_by: 'user-1',
+            },
+            {
+              id: 'p2',
+              storage_path: 'file://full-2.jpg',
+              thumb_path: 'file://thumb-2.jpg',
+              uploaded_by: 'user-1',
+            },
+          ],
+        }),
+      ],
+      polls: [],
+      threads: [],
+    });
+
+    expect(items[0]).toMatchObject({
+      kind: 'album',
+      thumbUris: ['file://thumb-1.jpg', 'file://thumb-2.jpg'],
+      photoCount: 2,
     });
   });
 
@@ -110,6 +159,7 @@ describe('buildActivityItems', () => {
       kind: 'photos',
       subtitle: '4 photos added',
       path: '/photos?eventId=event-1',
+      thumbUris: [],
     });
   });
 

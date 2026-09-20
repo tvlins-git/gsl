@@ -1,13 +1,15 @@
 import type { Photo, PhotoEvent } from './database.types';
+import { ALBUM_FEED_THUMB_MAX, selectAlbumPreviewPhotos, type AlbumPreviewPhoto } from './album-previews';
 import { isLocalMode, localStore } from './local-store';
 import { supabase } from './supabase';
 
-export type PhotoEventCover = Pick<Photo, 'id' | 'storage_path' | 'thumb_path' | 'uploaded_by'>;
+export type PhotoEventCover = AlbumPreviewPhoto;
 
 export type PhotoEventSummary = {
   event: PhotoEvent;
   photoCount: number;
   coverPhoto: PhotoEventCover | null;
+  previewPhotos: PhotoEventCover[];
   latestPhotoAt: string | null;
 };
 
@@ -15,12 +17,27 @@ export function getPhotoPublicUrl(
   photo: Pick<Photo, 'storage_path' | 'thumb_path'>,
   thumb = false
 ) {
-  if (isLocalMode()) {
-    return thumb && photo.thumb_path ? photo.thumb_path : photo.storage_path;
-  }
   const path = thumb && photo.thumb_path ? photo.thumb_path : photo.storage_path;
+  if (!path) return '';
+  if (isLocalMode()) {
+    return path;
+  }
   const { data } = supabase.storage.from('photos').getPublicUrl(path);
   return data.publicUrl;
+}
+
+export function albumThumbUris(
+  summary: Pick<PhotoEventSummary, 'previewPhotos' | 'coverPhoto'>
+): string[] {
+  const photos = summary.previewPhotos?.length
+    ? summary.previewPhotos
+    : summary.coverPhoto
+      ? [summary.coverPhoto]
+      : [];
+  return photos
+    .slice(0, ALBUM_FEED_THUMB_MAX)
+    .map((photo) => getPhotoPublicUrl(photo, true))
+    .filter((uri) => uri.length > 0);
 }
 
 export function formatEventDate(createdAt: string) {
@@ -57,31 +74,27 @@ export async function loadPhotoEventSummaries(groupId: string): Promise<PhotoEve
     .in('event_id', eventIds)
     .order('ai_score', { ascending: false, nullsFirst: false });
 
-  const counts = new Map<string, number>();
-  const covers = new Map<string, PhotoEventCover>();
-  const latest = new Map<string, string>();
+  const photosByEvent = new Map<string, NonNullable<typeof photos>>();
   for (const photo of photos ?? []) {
-    counts.set(photo.event_id, (counts.get(photo.event_id) ?? 0) + 1);
-    if (!covers.has(photo.event_id)) {
-      covers.set(photo.event_id, {
-        id: photo.id,
-        storage_path: photo.storage_path,
-        thumb_path: photo.thumb_path,
-        uploaded_by: photo.uploaded_by,
-      });
-    }
-    const prev = latest.get(photo.event_id);
-    if (!prev || photo.created_at > prev) {
-      latest.set(photo.event_id, photo.created_at);
-    }
+    const list = photosByEvent.get(photo.event_id) ?? [];
+    list.push(photo);
+    photosByEvent.set(photo.event_id, list);
   }
 
-  return eventList.map((event) => ({
-    event,
-    photoCount: counts.get(event.id) ?? 0,
-    coverPhoto: covers.get(event.id) ?? null,
-    latestPhotoAt: latest.get(event.id) ?? null,
-  }));
+  return eventList.map((event) => {
+    const eventPhotos = photosByEvent.get(event.id) ?? [];
+    const previewPhotos = selectAlbumPreviewPhotos(eventPhotos);
+    return {
+      event,
+      photoCount: eventPhotos.length,
+      previewPhotos,
+      coverPhoto: previewPhotos[0] ?? null,
+      latestPhotoAt: eventPhotos.reduce<string | null>((latest, photo) => {
+        if (!latest || photo.created_at > latest) return photo.created_at;
+        return latest;
+      }, null),
+    };
+  });
 }
 
 export async function deletePhotoEvent(eventId: string) {

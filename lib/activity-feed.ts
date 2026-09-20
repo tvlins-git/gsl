@@ -5,7 +5,7 @@ import {
   loadFeedPosts,
   type FeedPostSummary,
 } from './feed-posts';
-import { formatPhotoCount, loadPhotoEventSummaries, type PhotoEventSummary } from './photo-events';
+import { formatPhotoCount, loadPhotoEventSummaries, albumThumbUris, type PhotoEventSummary } from './photo-events';
 import { isLocalMode, localStore } from './local-store';
 import { supabase } from './supabase';
 
@@ -23,6 +23,8 @@ export type ActivityItem = {
   sourceId?: string;
   imageUri?: string | null;
   imagePath?: string | null;
+  thumbUris?: string[];
+  photoCount?: number;
 };
 
 export type ActivitySources = {
@@ -89,6 +91,7 @@ export function buildActivityItems(input: {
 
   for (const summary of photoEvents) {
     const author = nameForUser(members, summary.event.created_by);
+    const thumbUris = albumThumbUris(summary);
     items.push({
       id: `album-${summary.event.id}`,
       kind: 'album',
@@ -97,6 +100,9 @@ export function buildActivityItems(input: {
       timestamp: summary.event.created_at,
       path: `/photos?eventId=${summary.event.id}`,
       authorName: author,
+      sourceId: summary.event.id,
+      thumbUris,
+      photoCount: summary.photoCount,
     });
 
     const latest = summary.latestPhotoAt;
@@ -111,6 +117,9 @@ export function buildActivityItems(input: {
           timestamp: latest,
           path: `/photos?eventId=${summary.event.id}`,
           authorName: author,
+          sourceId: summary.event.id,
+          thumbUris,
+          photoCount: summary.photoCount,
         });
       }
     }

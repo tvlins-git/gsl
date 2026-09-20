@@ -175,3 +175,59 @@ describe('FeedScreen post delete', () => {
     await waitFor(() => expect(deleteFeedPost).toHaveBeenCalled());
   });
 });
+
+describe('FeedScreen album thumbs', () => {
+  beforeEach(() => {
+    (loadActivitySources as jest.Mock).mockResolvedValue({
+      photoEvents: [
+        {
+          event: {
+            id: 'event-1',
+            group_id: 'group-1',
+            title: 'MyTest',
+            event_date: null,
+            created_by: 'user-1',
+            created_at: '2026-09-20T10:00:00.000Z',
+          },
+          photoCount: 2,
+          coverPhoto: {
+            id: 'p1',
+            storage_path: 'file://full-1.jpg',
+            thumb_path: 'file://thumb-1.jpg',
+            uploaded_by: 'user-1',
+          },
+          previewPhotos: [
+            {
+              id: 'p1',
+              storage_path: 'file://full-1.jpg',
+              thumb_path: 'file://thumb-1.jpg',
+              uploaded_by: 'user-1',
+            },
+            {
+              id: 'p2',
+              storage_path: 'file://full-2.jpg',
+              thumb_path: 'file://thumb-2.jpg',
+              uploaded_by: 'user-1',
+            },
+          ],
+          latestPhotoAt: '2026-09-20T10:00:01.000Z',
+        },
+      ],
+      polls: [],
+      threads: [],
+      hostAssignments: [],
+      feedPosts: [],
+    });
+  });
+
+  it('shows compact album thumbnails from real photo URIs', async () => {
+    render(<FeedScreen />);
+    expect(await screen.findByText('MyTest')).toBeTruthy();
+    expect(screen.getByTestId('feed-item-album-event-1-thumbs-0').props.source).toEqual({
+      uri: 'file://thumb-1.jpg',
+    });
+    expect(screen.getByTestId('feed-item-album-event-1-thumbs-1').props.source).toEqual({
+      uri: 'file://thumb-2.jpg',
+    });
+  });
+});
