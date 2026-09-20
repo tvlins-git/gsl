@@ -95,10 +95,15 @@ jest.mock('@/lib/photo-events', () => {
   };
 });
 
+const mockGetPhotos = jest.fn(async () => mockPhotos);
+const mockAddPhoto = jest.fn(async () => undefined);
+const mockPickImageUris = jest.fn(async () => [] as string[]);
+
 jest.mock('@/lib/local-store', () => ({
   isLocalMode: jest.fn(() => true),
   localStore: {
-    getPhotos: jest.fn(async () => mockPhotos),
+    getPhotos: (...args: unknown[]) => mockGetPhotos(...args),
+    addPhoto: (...args: unknown[]) => mockAddPhoto(...args),
     getPhotoEventSummaries: jest.fn(async () => []),
   },
 }));
@@ -110,6 +115,16 @@ jest.mock('@/lib/photo-list', () => ({
 jest.mock('@/lib/pick-image', () => ({
   isCameraPickerAvailable: () => false,
   pickImageUri: jest.fn(),
+  pickImageUris: (...args: unknown[]) => mockPickImageUris(...args),
+}));
+
+jest.mock('@/lib/image-compress', () => ({
+  compressImage: jest.fn(async (uri: string) => ({
+    uri,
+    width: 800,
+    height: 600,
+    base64: 'AQID',
+  })),
 }));
 
 describe('PhotosScreen album viewer', () => {
@@ -118,6 +133,12 @@ describe('PhotosScreen album viewer', () => {
     (router.canGoBack as jest.Mock).mockReturnValue(false);
     (router.back as jest.Mock).mockClear();
     (router.replace as jest.Mock).mockClear();
+    mockGetPhotos.mockReset();
+    mockGetPhotos.mockResolvedValue(mockPhotos);
+    mockAddPhoto.mockReset();
+    mockAddPhoto.mockResolvedValue(undefined);
+    mockPickImageUris.mockReset();
+    mockPickImageUris.mockResolvedValue([]);
   });
 
   it('opens a full-screen swipe viewer when a grid photo is tapped', async () => {
@@ -142,6 +163,37 @@ describe('PhotosScreen album viewer', () => {
     expect(router.back).not.toHaveBeenCalled();
     expect(router.replace).not.toHaveBeenCalled();
   });
+
+  it('uploads every gallery URI selected in one picker session', async () => {
+    mockPickImageUris.mockResolvedValue(['file://a.jpg', 'file://b.jpg', 'file://c.jpg']);
+    render(<PhotosScreen />);
+    fireEvent.press(await screen.findByTestId('photo-event-event-1'));
+    fireEvent.press(await screen.findByTestId('album-gallery-btn'));
+
+    await waitFor(() => expect(mockPickImageUris).toHaveBeenCalledWith('gallery', { multiple: true }));
+    await waitFor(() => expect(mockAddPhoto).toHaveBeenCalledTimes(3));
+    expect(mockAddPhoto).toHaveBeenNthCalledWith(
+      1,
+      'event-1',
+      'user-1',
+      'data:image/jpeg;base64,AQID',
+      'data:image/jpeg;base64,AQID'
+    );
+    expect(mockAddPhoto).toHaveBeenNthCalledWith(
+      2,
+      'event-1',
+      'user-1',
+      'data:image/jpeg;base64,AQID',
+      'data:image/jpeg;base64,AQID'
+    );
+    expect(mockAddPhoto).toHaveBeenNthCalledWith(
+      3,
+      'event-1',
+      'user-1',
+      'data:image/jpeg;base64,AQID',
+      'data:image/jpeg;base64,AQID'
+    );
+  });
 });
 
 describe('PhotosScreen album back from Feed', () => {
@@ -150,6 +202,8 @@ describe('PhotosScreen album back from Feed', () => {
     (router.canGoBack as jest.Mock).mockReturnValue(false);
     (router.back as jest.Mock).mockClear();
     (router.replace as jest.Mock).mockClear();
+    mockGetPhotos.mockReset();
+    mockGetPhotos.mockResolvedValue(mockPhotos);
   });
 
   it('pops back to Feed when history exists', async () => {

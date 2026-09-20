@@ -28,8 +28,8 @@ import {
   loadPhotoEventSummaries,
   type PhotoEventSummary,
 } from '@/lib/photo-events';
-import { isCameraPickerAvailable, pickImageUri } from '@/lib/pick-image';
 import { albumBackAction, albumBackButtonText, albumBackLabel, firstSearchParam } from '@/lib/album-back';
+import { isCameraPickerAvailable, pickImageUris } from '@/lib/pick-image';
 import { deletePhoto } from '@/lib/photo-list';
 import { formatRelativeTime } from '@/lib/time';
 import { supabase } from '@/lib/supabase';
@@ -120,9 +120,8 @@ export default function PhotosScreen() {
     setNewTitle('');
   };
 
-  const uploadImage = async (uri: string) => {
+  const persistAlbumPhoto = async (uri: string) => {
     if (!member || !selectedEvent) return;
-    setUploading(true);
 
     if (isLocalMode()) {
       const compressed = await compressImage(uri, { maxWidth: 1200, quality: 0.8, includeBase64: true });
@@ -132,9 +131,6 @@ export default function PhotosScreen() {
         : compressed.uri;
       const thumbUri = thumb.base64 ? `data:image/jpeg;base64,${thumb.base64}` : thumb.uri;
       await localStore.addPhoto(selectedEvent.id, member.user_id, fullUri, thumbUri);
-      await loadPhotos(selectedEvent.id);
-      await loadSummaries();
-      setUploading(false);
       return;
     }
 
@@ -161,21 +157,35 @@ export default function PhotosScreen() {
 
     if (photo) {
       await supabase.functions.invoke('score-photo', { body: { photo_id: photo.id } }).catch(() => undefined);
+    }
+  };
+
+  const uploadImages = async (uris: string[]) => {
+    if (!member || !selectedEvent || uris.length === 0) return;
+    setUploading(true);
+    try {
+      for (const uri of uris) {
+        try {
+          await persistAlbumPhoto(uri);
+        } catch {
+          // Keep the rest of the batch; a single bad asset should not drop the others.
+        }
+      }
       await loadPhotos(selectedEvent.id);
       await loadSummaries();
+    } finally {
+      setUploading(false);
     }
-
-    setUploading(false);
   };
 
   const pickFromGallery = async () => {
-    const uri = await pickImageUri('gallery');
-    if (uri) await uploadImage(uri);
+    const uris = await pickImageUris('gallery', { multiple: true });
+    await uploadImages(uris);
   };
 
   const takePhoto = async () => {
-    const uri = await pickImageUri('camera');
-    if (uri) await uploadImage(uri);
+    const uris = await pickImageUris('camera');
+    await uploadImages(uris);
   };
 
   const closeEvent = () => {
@@ -259,6 +269,7 @@ export default function PhotosScreen() {
             style={[styles.actionBtn, sharedStyles.primaryBtn, uploading && styles.actionDisabled]}
             onPress={pickFromGallery}
             disabled={uploading}
+            testID="album-gallery-btn"
           >
             <Text style={sharedStyles.primaryBtnText}>Gallery</Text>
           </Pressable>

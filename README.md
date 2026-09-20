@@ -73,6 +73,19 @@ Verify:
 3. On your own post, swipe left and tap **Delete**.
 4. Open an album → full-screen **PhotoViewer**, swipe between photos.
 
+### Album Gallery multi-select
+
+Album **Gallery** uses the system picker with multi-select (up to 20 photos). Feed **Gallery** stays single-select (one photo per post).
+
+**iOS test plan (Simulator + device):**
+
+1. Photos tab → open an album → tap **Gallery**.
+2. Tap several photos. Numbered badges appear (iOS 15+).
+3. Tap **Add** (top right) to confirm. Checkmarks alone do not add them.
+4. All selected photos should appear in the album grid.
+
+**Simulator Add/Done trap:** On some iOS Simulator runtimes, PHPicker shows checkmarks but no **Add** button. That is an Apple simulator bug, not the app forcing single-select. Cancel with **X** and retry, or pick on a physical device. Do not set album `allowsMultipleSelection` back to `false` to work around it — Feed already stays single-select via `pickImageUri`.
+
 ### 4. GitHub setup
 
 ```bash
