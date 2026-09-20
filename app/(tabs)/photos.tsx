@@ -1,5 +1,5 @@
-import { useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -28,6 +28,7 @@ import {
   loadPhotoEventSummaries,
   type PhotoEventSummary,
 } from '@/lib/photo-events';
+import { albumBackAction, albumBackButtonText, albumBackLabel, firstSearchParam } from '@/lib/album-back';
 import { isCameraPickerAvailable, pickImageUris } from '@/lib/pick-image';
 import { deletePhoto } from '@/lib/photo-list';
 import { formatRelativeTime } from '@/lib/time';
@@ -36,10 +37,14 @@ import { feedColumn, sharedStyles, theme } from '@/constants/theme';
 
 export default function PhotosScreen() {
   const { member } = useAuth();
-  const { eventId } = useLocalSearchParams<{ eventId?: string }>();
+  const params = useLocalSearchParams<{ eventId?: string | string[]; from?: string | string[] }>();
+  const eventId = firstSearchParam(params.eventId);
+  const from = firstSearchParam(params.from);
+  const openedEventId = useRef<string | null>(null);
   const [summaries, setSummaries] = useState<PhotoEventSummary[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<PhotoEvent | null>(null);
+  const [openedFromLink, setOpenedFromLink] = useState(false);
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -75,10 +80,14 @@ export default function PhotosScreen() {
   }, [selectedEvent, loadPhotos]);
 
   useEffect(() => {
-    if (!eventId || selectedEvent) return;
+    if (!eventId || openedEventId.current === eventId) return;
     const match = summaries.find((item) => item.event.id === eventId);
-    if (match) setSelectedEvent(match.event);
-  }, [eventId, selectedEvent, summaries]);
+    if (match) {
+      openedEventId.current = eventId;
+      setOpenedFromLink(true);
+      setSelectedEvent(match.event);
+    }
+  }, [eventId, summaries]);
 
   const selectedSummary = summaries.find((s) => s.event.id === selectedEvent?.id);
   const nameForUser = (userId?: string | null) =>
@@ -103,6 +112,7 @@ export default function PhotosScreen() {
           .select()
           .single()).data;
     if (data) {
+      setOpenedFromLink(false);
       setSelectedEvent(data);
       await loadSummaries();
     }
@@ -180,9 +190,21 @@ export default function PhotosScreen() {
 
   const closeEvent = () => {
     setSelectedEvent(null);
+    setOpenedFromLink(false);
     setPhotos([]);
     setViewerIndex(null);
     loadSummaries();
+  };
+
+  const handleAlbumBack = () => {
+    const dest = albumBackAction({
+      openedFromLink,
+      from,
+      canGoBack: router.canGoBack(),
+    });
+    closeEvent();
+    if (dest.type === 'back') router.back();
+    else if (dest.type === 'replace') router.replace(dest.href);
   };
 
   const handleDeletePhoto = async (photo: Photo) => {
@@ -195,6 +217,7 @@ export default function PhotosScreen() {
   const handleDeleteEvent = async (eventId: string) => {
     await deletePhotoEvent(eventId);
     if (selectedEvent?.id === eventId) {
+      setOpenedFromLink(false);
       setSelectedEvent(null);
       setPhotos([]);
     }
@@ -206,10 +229,17 @@ export default function PhotosScreen() {
   }
 
   if (selectedEvent) {
+    const backFrom = openedFromLink ? from : undefined;
     return (
       <Screen>
-        <Pressable onPress={closeEvent} style={styles.backBtn}>
-          <Text style={styles.back}>← Back to events</Text>
+        <Pressable
+          onPress={handleAlbumBack}
+          style={styles.backBtn}
+          testID="album-back-btn"
+          accessibilityRole="button"
+          accessibilityLabel={albumBackLabel(backFrom)}
+        >
+          <Text style={styles.back}>{albumBackButtonText(backFrom)}</Text>
         </Pressable>
         <View style={[styles.detailHeader, sharedStyles.card]}>
           <UserAvatar name={nameForUser(selectedEvent.created_by)} size={48} />
@@ -299,7 +329,10 @@ export default function PhotosScreen() {
           <PhotoEventRow
             summary={item}
             authorName={nameForUser(item.event.created_by)}
-            onPress={() => setSelectedEvent(item.event)}
+            onPress={() => {
+              setOpenedFromLink(false);
+              setSelectedEvent(item.event);
+            }}
             onDelete={() => handleDeleteEvent(item.event.id)}
           />
         )}

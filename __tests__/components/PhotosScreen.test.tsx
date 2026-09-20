@@ -1,5 +1,6 @@
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { router, useLocalSearchParams } from 'expo-router';
 import PhotosScreen from '@/app/(tabs)/photos';
 
 const mockEvent = {
@@ -48,7 +49,12 @@ const mockMember = {
 };
 
 jest.mock('expo-router', () => ({
-  useLocalSearchParams: () => ({}),
+  useLocalSearchParams: jest.fn(() => ({})),
+  router: {
+    canGoBack: jest.fn(() => false),
+    back: jest.fn(),
+    replace: jest.fn(),
+  },
 }));
 
 jest.mock('@/contexts/AuthContext', () => ({
@@ -121,8 +127,14 @@ jest.mock('@/lib/image-compress', () => ({
   })),
 }));
 
+jest.setTimeout(15000);
+
 describe('PhotosScreen album viewer', () => {
   beforeEach(() => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({});
+    (router.canGoBack as jest.Mock).mockReturnValue(false);
+    (router.back as jest.Mock).mockClear();
+    (router.replace as jest.Mock).mockClear();
     mockGetPhotos.mockReset();
     mockGetPhotos.mockResolvedValue(mockPhotos);
     mockAddPhoto.mockReset();
@@ -142,6 +154,16 @@ describe('PhotosScreen album viewer', () => {
     });
     fireEvent.press(screen.getByTestId('photo-viewer-close'));
     await waitFor(() => expect(screen.queryByTestId('photo-viewer')).toBeNull());
+  });
+
+  it('returns to the albums list when Back is pressed from Photos', async () => {
+    render(<PhotosScreen />);
+    fireEvent.press(await screen.findByTestId('photo-event-event-1'));
+    expect(await screen.findByText('← Back to albums')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('album-back-btn'));
+    expect(await screen.findByText('Albums')).toBeTruthy();
+    expect(router.back).not.toHaveBeenCalled();
+    expect(router.replace).not.toHaveBeenCalled();
   });
 
   it('uploads every gallery URI selected in one picker session', async () => {
@@ -173,5 +195,43 @@ describe('PhotosScreen album viewer', () => {
       'data:image/jpeg;base64,AQID',
       'data:image/jpeg;base64,AQID'
     );
+  });
+});
+
+describe('PhotosScreen album back from Feed', () => {
+  beforeEach(() => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({ eventId: 'event-1', from: 'feed' });
+    (router.canGoBack as jest.Mock).mockReturnValue(false);
+    (router.back as jest.Mock).mockClear();
+    (router.replace as jest.Mock).mockClear();
+    mockGetPhotos.mockReset();
+    mockGetPhotos.mockResolvedValue(mockPhotos);
+  });
+
+  it('pops back to Feed when history exists', async () => {
+    (router.canGoBack as jest.Mock).mockReturnValue(true);
+    render(<PhotosScreen />);
+    expect(await screen.findByText('← Back to Feed')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('album-back-btn'));
+    expect(router.back).toHaveBeenCalled();
+    expect(router.replace).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.queryByTestId('album-back-btn')).toBeNull());
+  });
+
+  it('replaces to Feed when Feed deep-linked in with no history', async () => {
+    render(<PhotosScreen />);
+    expect(await screen.findByText('MyTest')).toBeTruthy();
+    fireEvent.press(await screen.findByTestId('album-back-btn'));
+    expect(router.replace).toHaveBeenCalledWith('/');
+    expect(router.back).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.queryByTestId('album-back-btn')).toBeNull());
+  });
+
+  it('does not immediately re-open the album after Back', async () => {
+    render(<PhotosScreen />);
+    await screen.findByTestId('album-back-btn');
+    fireEvent.press(screen.getByTestId('album-back-btn'));
+    await waitFor(() => expect(screen.queryByTestId('album-back-btn')).toBeNull());
+    expect(await screen.findByText('Albums')).toBeTruthy();
   });
 });
