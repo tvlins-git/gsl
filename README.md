@@ -62,6 +62,17 @@ npx expo start
 
 Scan the QR code with Expo Go (development) or use a development build.
 
+### Expo Go on iOS Simulator
+
+Expo Go **57.0.6+** (57.0.9 is fine) ships Worklets **0.10.1** / Reanimated **4.5.1** natively. GSL pins the matching JS packages. The app also skips the Reanimated side-effect import inside Expo Go — Feed swipe-to-delete uses Gesture Handler `Swipeable`, and the album PhotoViewer uses React Native `Animated`, so Worklets is not needed at startup.
+
+Verify:
+
+1. `npx expo start` → open in Expo Go on iOS Simulator (iPhone 17 Pro is fine).
+2. App should get past the splash logo to **Feed**.
+3. On your own post, swipe left and tap **Delete**.
+4. Open an album → full-screen **PhotoViewer**, swipe between photos.
+
 ### 4. GitHub setup
 
 ```bash
