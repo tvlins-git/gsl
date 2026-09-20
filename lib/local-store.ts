@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DEFAULT_HARDCODED_USER, type AppUser } from '@/constants/hardcoded-user';
+import { selectAlbumPreviewPhotos } from './album-previews';
 import { getAppUsersSync } from './app-users';
 import { summarizePollAcceptance } from './polls';
 import type {
@@ -331,12 +332,12 @@ export const localStore = {
       .sort((a, b) => b.created_at.localeCompare(a.created_at));
     return events.map((event) => {
       const eventPhotos = data.photos.filter((p) => p.event_id === event.id);
-      const coverPhoto =
-        eventPhotos.slice().sort((a, b) => (b.ai_score ?? -1) - (a.ai_score ?? -1))[0] ?? null;
+      const previewPhotos = selectAlbumPreviewPhotos(eventPhotos);
       return {
         event,
         photoCount: eventPhotos.length,
-        coverPhoto,
+        previewPhotos,
+        coverPhoto: previewPhotos[0] ?? null,
         latestPhotoAt: eventPhotos.reduce<string | null>((latest, photo) => {
           if (!latest || photo.created_at > latest) return photo.created_at;
           return latest;

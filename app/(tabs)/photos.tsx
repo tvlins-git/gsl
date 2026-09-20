@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { PhotoEventRow } from '@/components/PhotoEventRow';
 import { PhotoGrid } from '@/components/PhotoGrid';
+import { PhotoViewer } from '@/components/PhotoViewer';
 import { UserAvatar } from '@/components/UserAvatar';
 import { Screen } from '@/components/ui/Screen';
 import { useAuth } from '@/contexts/AuthContext';
@@ -44,6 +45,7 @@ export default function PhotosScreen() {
   const [uploading, setUploading] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [newTitle, setNewTitle] = useState('');
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
 
   const loadSummaries = useCallback(async () => {
     if (!member) return;
@@ -165,6 +167,7 @@ export default function PhotosScreen() {
   const closeEvent = () => {
     setSelectedEvent(null);
     setPhotos([]);
+    setViewerIndex(null);
     loadSummaries();
   };
 
@@ -241,7 +244,19 @@ export default function PhotosScreen() {
           photos={photos}
           topPhotoIds={topPhotoIds}
           getImageUrl={getImageUrl}
+          onPhotoPress={(photo) => {
+            const index = photos.findIndex((item) => item.id === photo.id);
+            if (index >= 0) setViewerIndex(index);
+          }}
           onDeletePhoto={handleDeletePhoto}
+        />
+        <PhotoViewer
+          visible={viewerIndex != null}
+          photos={photos}
+          initialIndex={viewerIndex ?? 0}
+          getImageUrl={getImageUrl}
+          onClose={() => setViewerIndex(null)}
+          onDelete={handleDeletePhoto}
         />
       </Screen>
     );

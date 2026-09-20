@@ -71,6 +71,32 @@ describe('ActivityItem', () => {
     expect(screen.queryByTestId('delete-feed-item-post-1')).toBeNull();
   });
 
+  it('shows a compact album thumb strip from real photo URIs', () => {
+    render(
+      <ActivityItem
+        item={{
+          ...item,
+          thumbUris: ['file://thumb-1.jpg', 'file://thumb-2.jpg'],
+        }}
+        onPress={() => {}}
+      />
+    );
+    expect(screen.getByTestId('feed-item-album-1-thumbs')).toBeTruthy();
+    expect(screen.getByTestId('feed-item-album-1-thumbs-0').props.source).toEqual({
+      uri: 'file://thumb-1.jpg',
+    });
+    expect(screen.getByTestId('feed-item-album-1-thumbs-1').props.source).toEqual({
+      uri: 'file://thumb-2.jpg',
+    });
+    expect(screen.queryByTestId('feed-item-album-1-photo')).toBeNull();
+  });
+
+  it('keeps empty albums text-only without a broken thumb', () => {
+    render(<ActivityItem item={{ ...item, thumbUris: [] }} onPress={() => {}} />);
+    expect(screen.queryByTestId('feed-item-album-1-thumbs')).toBeNull();
+    expect(screen.getByText('Ski trip')).toBeTruthy();
+  });
+
   it('reveals Delete for swipe-to-delete when onDelete is provided', () => {
     const onDelete = jest.fn();
     render(

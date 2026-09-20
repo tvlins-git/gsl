@@ -1,8 +1,9 @@
 import { useRef } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { FeedPhoto } from '@/components/FeedPhoto';
 import { activityKindLabel, type ActivityItem as ActivityItemData } from '@/lib/activity-feed';
+import { ALBUM_FEED_THUMB_MAX } from '@/lib/album-previews';
 import { formatRelativeTime } from '@/lib/time';
 import { theme } from '@/constants/theme';
 
@@ -12,9 +13,36 @@ interface ActivityItemProps {
   onDelete?: () => void;
 }
 
+const THUMB_SIZE = 48;
+const THUMB_OVERLAP = 16;
+
+function AlbumThumbs({ uris, testID }: { uris: string[]; testID: string }) {
+  const shown = uris.slice(0, ALBUM_FEED_THUMB_MAX);
+  if (shown.length === 0) return null;
+
+  return (
+    <View style={styles.thumbs} testID={testID} accessibilityRole="image">
+      {shown.map((uri, index) => (
+        <Image
+          key={`${uri}-${index}`}
+          source={{ uri }}
+          style={[
+            styles.thumb,
+            index > 0 ? { marginLeft: -THUMB_OVERLAP } : null,
+            { zIndex: shown.length - index },
+          ]}
+          resizeMode="cover"
+          testID={`${testID}-${index}`}
+        />
+      ))}
+    </View>
+  );
+}
+
 export function ActivityItem({ item, onPress, onDelete }: ActivityItemProps) {
   const swipeableRef = useRef<Swipeable>(null);
   const photoTestId = `feed-item-${item.id}-photo`;
+  const thumbs = item.kind === 'post' ? [] : item.thumbUris ?? [];
 
   const row = (
     <Pressable
@@ -38,8 +66,11 @@ export function ActivityItem({ item, onPress, onDelete }: ActivityItemProps) {
             {item.subtitle} · {item.authorName} · {formatRelativeTime(item.timestamp)}
           </Text>
         </View>
+        <AlbumThumbs uris={thumbs} testID={`feed-item-${item.id}-thumbs`} />
       </View>
-      {item.imageUri ? <FeedPhoto uri={item.imageUri} testID={photoTestId} /> : null}
+      {item.kind === 'post' && item.imageUri ? (
+        <FeedPhoto uri={item.imageUri} testID={photoTestId} />
+      ) : null}
     </Pressable>
   );
 
@@ -124,6 +155,19 @@ const styles = StyleSheet.create({
   meta: {
     fontSize: 13,
     color: theme.colors.textSecondary,
+  },
+  thumbs: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: THUMB_SIZE,
+  },
+  thumb: {
+    width: THUMB_SIZE,
+    height: THUMB_SIZE,
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.borderLight,
+    borderWidth: 2,
+    borderColor: theme.colors.surface,
   },
   deleteAction: {
     width: 88,
