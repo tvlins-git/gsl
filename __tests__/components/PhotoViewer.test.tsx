@@ -1,6 +1,6 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react-native';
-import { PhotoViewer } from '@/components/PhotoViewer';
+import { PhotoViewer, albumViewerIndexAfterSwipe } from '@/components/PhotoViewer';
 import { buildPhoto } from '../factories';
 
 const photos = [
@@ -29,6 +29,12 @@ describe('PhotoViewer', () => {
 
     fireEvent.press(screen.getByTestId('photo-viewer-close'));
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it('advances when the stage is swiped left', () => {
+    expect(albumViewerIndexAfterSwipe(0, 2, -80, 0, 48)).toBe(1);
+    expect(albumViewerIndexAfterSwipe(1, 2, 80, 0, 48)).toBe(0);
+    expect(albumViewerIndexAfterSwipe(0, 2, -10, 0, 48)).toBe(0);
   });
 
   it('deletes the current photo from the viewer', () => {
