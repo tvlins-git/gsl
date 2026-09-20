@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Swipeable } from 'react-native-gesture-handler';
+import Swipeable from 'react-native-gesture-handler/Swipeable';
 import { FeedPhoto } from '@/components/FeedPhoto';
 import { activityKindLabel, type ActivityItem as ActivityItemData } from '@/lib/activity-feed';
 import {

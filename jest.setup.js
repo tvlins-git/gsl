@@ -10,10 +10,12 @@ jest.mock('@react-native-community/datetimepicker', () => {
 jest.mock('expo-font');
 jest.mock('expo-asset');
 jest.mock('expo-constants', () => ({
+  __esModule: true,
+  default: { appOwnership: null, expoConfig: { extra: {} } },
   expoConfig: { extra: {} },
 }));
 
-jest.mock('react-native-gesture-handler', () => {
+const mockSwipeable = () => {
   const React = require('react');
   const { View } = require('react-native');
   const Swipeable = React.forwardRef(
@@ -28,11 +30,21 @@ jest.mock('react-native-gesture-handler', () => {
       )
   );
   Swipeable.displayName = 'Swipeable';
+  return Swipeable;
+};
+
+jest.mock('react-native-gesture-handler', () => {
+  const Swipeable = mockSwipeable();
   return {
     Swipeable,
     GestureHandlerRootView: ({ children }) => children,
   };
 });
+
+jest.mock('react-native-gesture-handler/Swipeable', () => ({
+  __esModule: true,
+  default: mockSwipeable(),
+}));
 
 jest.mock('@/lib/supabase', () => ({
   supabase: {
