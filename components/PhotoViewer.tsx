@@ -38,6 +38,19 @@ interface PhotoViewerProps {
   onDelete?: (photo: Photo) => void;
 }
 
+type PointerLikeEvent = {
+  nativeEvent: {
+    pageX?: number;
+    clientX?: number;
+    changedTouches?: { pageX?: number }[];
+  };
+};
+
+function pointerX(event: PointerLikeEvent) {
+  const native = event.nativeEvent;
+  return native.pageX ?? native.clientX ?? native.changedTouches?.[0]?.pageX ?? 0;
+}
+
 export function PhotoViewer({
   visible,
   photos,
@@ -51,6 +64,7 @@ export function PhotoViewer({
   const indexRef = useRef(index);
   indexRef.current = index;
   const translateX = useRef(new Animated.Value(0)).current;
+  const dragOriginX = useRef<number | null>(null);
 
   const pageWidth = Math.max(width, 1);
   const safeIndex = photos.length === 0 ? 0 : Math.min(index, photos.length - 1);
@@ -59,11 +73,33 @@ export function PhotoViewer({
   const goTo = useCallback(
     (next: number) => {
       if (photos.length === 0) return;
-      const clamped = Math.max(0, Math.min(next, photos.length - 1));
-      setIndex(clamped);
+      setIndex(Math.max(0, Math.min(next, photos.length - 1)));
       translateX.setValue(0);
     },
     [photos.length, translateX]
+  );
+
+  const finishDrag = useCallback(
+    (dx: number, vx = 0) => {
+      const threshold = Math.max(48, pageWidth * 0.18);
+      const next = albumViewerIndexAfterSwipe(
+        indexRef.current,
+        photos.length,
+        dx,
+        vx,
+        threshold
+      );
+      if (next !== indexRef.current) {
+        goTo(next);
+        return;
+      }
+      Animated.spring(translateX, {
+        toValue: 0,
+        useNativeDriver: true,
+        friction: 8,
+      }).start();
+    },
+    [goTo, pageWidth, photos.length, translateX]
   );
 
   useEffect(() => {
@@ -89,41 +125,42 @@ export function PhotoViewer({
   const panResponder = useMemo(
     () =>
       PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
         onMoveShouldSetPanResponder: (_event, gesture) =>
           Math.abs(gesture.dx) > 8 && Math.abs(gesture.dx) > Math.abs(gesture.dy),
         onPanResponderMove: (_event, gesture) => {
           translateX.setValue(gesture.dx);
         },
         onPanResponderRelease: (_event, gesture) => {
-          const currentIndex = indexRef.current;
-          const threshold = Math.max(48, pageWidth * 0.18);
-          const next = albumViewerIndexAfterSwipe(
-            currentIndex,
-            photos.length,
-            gesture.dx,
-            gesture.vx,
-            threshold
-          );
-          if (next !== currentIndex) {
-            goTo(next);
-            return;
-          }
-          Animated.spring(translateX, {
-            toValue: 0,
-            useNativeDriver: true,
-            friction: 8,
-          }).start();
+          finishDrag(gesture.dx, gesture.vx);
         },
-        onPanResponderTerminate: () => {
-          Animated.spring(translateX, {
-            toValue: 0,
-            useNativeDriver: true,
-            friction: 8,
-          }).start();
-        },
+        onPanResponderTerminate: () => finishDrag(0),
       }),
-    [goTo, pageWidth, photos.length, translateX]
+    [finishDrag, translateX]
   );
+
+  const webDragHandlers =
+    Platform.OS === 'web'
+      ? {
+          onPointerDown: (event: PointerLikeEvent) => {
+            dragOriginX.current = pointerX(event);
+          },
+          onPointerMove: (event: PointerLikeEvent) => {
+            if (dragOriginX.current == null) return;
+            translateX.setValue(pointerX(event) - dragOriginX.current);
+          },
+          onPointerUp: (event: PointerLikeEvent) => {
+            if (dragOriginX.current == null) return;
+            const dx = pointerX(event) - dragOriginX.current;
+            dragOriginX.current = null;
+            finishDrag(dx);
+          },
+          onPointerCancel: () => {
+            dragOriginX.current = null;
+            finishDrag(0);
+          },
+        }
+      : {};
 
   if (!visible || photos.length === 0) return null;
 
@@ -167,21 +204,24 @@ export function PhotoViewer({
           )}
         </View>
 
-        <Animated.View
-          style={[styles.stage, { height: height - 88, transform: [{ translateX }] }]}
+        <View
+          style={[styles.stage, { height: height - 88 }]}
           testID="photo-viewer-stage"
           {...panResponder.panHandlers}
+          {...webDragHandlers}
         >
-          {current ? (
-            <Image
-              source={{ uri: getImageUrl(current, false) }}
-              style={styles.image}
-              resizeMode="contain"
-              testID={`photo-viewer-image-${current.id}`}
-              accessibilityRole="image"
-            />
-          ) : null}
-        </Animated.View>
+          <Animated.View style={[styles.imageShift, { transform: [{ translateX }] }]} pointerEvents="none">
+            {current ? (
+              <Image
+                source={{ uri: getImageUrl(current, false) }}
+                style={styles.image}
+                resizeMode="contain"
+                testID={`photo-viewer-image-${current.id}`}
+                accessibilityRole="image"
+              />
+            ) : null}
+          </Animated.View>
+        </View>
       </View>
     </Modal>
   );
@@ -220,6 +260,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   stage: {
+    flex: 1,
+    width: '100%',
+  },
+  imageShift: {
     flex: 1,
     width: '100%',
   },

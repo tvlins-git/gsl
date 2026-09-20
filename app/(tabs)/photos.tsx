@@ -114,17 +114,21 @@ export default function PhotosScreen() {
     if (!member || !selectedEvent) return;
     setUploading(true);
 
-    const compressed = await compressImage(uri, { maxWidth: 1200, quality: 0.8 });
-    const thumb = await compressImage(uri, { maxWidth: 300, quality: 0.7 });
-
     if (isLocalMode()) {
-      await localStore.addPhoto(selectedEvent.id, member.user_id, compressed.uri, thumb.uri);
+      const compressed = await compressImage(uri, { maxWidth: 1200, quality: 0.8, includeBase64: true });
+      const thumb = await compressImage(uri, { maxWidth: 300, quality: 0.7, includeBase64: true });
+      const fullUri = compressed.base64
+        ? `data:image/jpeg;base64,${compressed.base64}`
+        : compressed.uri;
+      const thumbUri = thumb.base64 ? `data:image/jpeg;base64,${thumb.base64}` : thumb.uri;
+      await localStore.addPhoto(selectedEvent.id, member.user_id, fullUri, thumbUri);
       await loadPhotos(selectedEvent.id);
       await loadSummaries();
       setUploading(false);
       return;
     }
 
+    const compressed = await compressImage(uri, { maxWidth: 1200, quality: 0.8 });
     const photoId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const storagePath = `${member.group_id}/${selectedEvent.id}/${photoId}.jpg`;
     const thumbPath = `${member.group_id}/${selectedEvent.id}/${photoId}_thumb.jpg`;
