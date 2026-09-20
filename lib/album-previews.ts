@@ -1,6 +1,15 @@
 import type { Photo } from './database.types';
 
-export const ALBUM_FEED_THUMB_MAX = 3;
+/** Locked designer tokens for Feed album/photos row thumbs. */
+export const ALBUM_FEED_THUMB_SIZE = 52;
+export const ALBUM_FEED_THUMB_GAP = 6;
+export const ALBUM_FEED_THUMB_RADIUS = 2;
+export const ALBUM_FEED_THUMB_VISIBLE = 4;
+export const ALBUM_FEED_THUMB_MAX = ALBUM_FEED_THUMB_VISIBLE;
+
+export function albumThumbOverflow(photoCount: number, visibleCount: number) {
+  return Math.max(0, photoCount - visibleCount);
+}
 
 export type AlbumPreviewPhoto = Pick<Photo, 'id' | 'storage_path' | 'thumb_path' | 'uploaded_by'>;
 

@@ -1,4 +1,4 @@
-import { selectAlbumPreviewPhotos } from '@/lib/album-previews';
+import { albumThumbOverflow, selectAlbumPreviewPhotos } from '@/lib/album-previews';
 import { buildPhoto } from '../factories';
 
 describe('selectAlbumPreviewPhotos', () => {
@@ -11,7 +11,7 @@ describe('selectAlbumPreviewPhotos', () => {
     ).toEqual([]);
   });
 
-  it('keeps the top three by score, then recency, using real storage paths', () => {
+  it('keeps the top four by score, then recency, using real storage paths', () => {
     const photos = [
       buildPhoto({
         id: 'low',
@@ -41,12 +41,25 @@ describe('selectAlbumPreviewPhotos', () => {
         ai_score: 0.2,
         created_at: '2026-09-04T10:00:00.000Z',
       }),
+      buildPhoto({
+        id: 'fifth',
+        storage_path: 'file://fifth.jpg',
+        thumb_path: 'file://fifth-thumb.jpg',
+        ai_score: 0.15,
+        created_at: '2026-09-05T10:00:00.000Z',
+      }),
     ];
 
     expect(selectAlbumPreviewPhotos(photos).map((photo) => photo.id)).toEqual([
       'best',
       'mid',
       'fourth',
+      'fifth',
     ]);
+  });
+
+  it('counts overflow past the visible strip', () => {
+    expect(albumThumbOverflow(2, 2)).toBe(0);
+    expect(albumThumbOverflow(12, 4)).toBe(8);
   });
 });

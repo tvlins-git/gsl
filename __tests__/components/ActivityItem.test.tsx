@@ -77,18 +77,49 @@ describe('ActivityItem', () => {
         item={{
           ...item,
           thumbUris: ['file://thumb-1.jpg', 'file://thumb-2.jpg'],
+          photoCount: 2,
         }}
         onPress={() => {}}
       />
     );
     expect(screen.getByTestId('feed-item-album-1-thumbs')).toBeTruthy();
-    expect(screen.getByTestId('feed-item-album-1-thumbs-0').props.source).toEqual({
-      uri: 'file://thumb-1.jpg',
-    });
+    const first = screen.getByTestId('feed-item-album-1-thumbs-0');
+    const strip = StyleSheet.flatten(screen.getByTestId('feed-item-album-1-thumbs').props.style);
+    const thumbStyle = StyleSheet.flatten(first.props.style);
+    expect(first.props.source).toEqual({ uri: 'file://thumb-1.jpg' });
+    expect(first.props.resizeMode).toBe('cover');
+    expect(thumbStyle.width).toBe(52);
+    expect(thumbStyle.height).toBe(52);
+    expect(thumbStyle.borderRadius).toBe(2);
+    expect(thumbStyle.borderWidth).toBeUndefined();
+    expect(strip.gap).toBe(6);
     expect(screen.getByTestId('feed-item-album-1-thumbs-1').props.source).toEqual({
       uri: 'file://thumb-2.jpg',
     });
     expect(screen.queryByTestId('feed-item-album-1-photo')).toBeNull();
+    expect(screen.queryByTestId('feed-item-album-1-thumbs-more')).toBeNull();
+  });
+
+  it('caps the strip and shows +N when the album has more photos', () => {
+    render(
+      <ActivityItem
+        item={{
+          ...item,
+          thumbUris: [
+            'file://a.jpg',
+            'file://b.jpg',
+            'file://c.jpg',
+            'file://d.jpg',
+            'file://e.jpg',
+          ],
+          photoCount: 12,
+        }}
+        onPress={() => {}}
+      />
+    );
+    expect(screen.getByTestId('feed-item-album-1-thumbs-3')).toBeTruthy();
+    expect(screen.queryByTestId('feed-item-album-1-thumbs-4')).toBeNull();
+    expect(screen.getByText('+8')).toBeTruthy();
   });
 
   it('keeps empty albums text-only without a broken thumb', () => {

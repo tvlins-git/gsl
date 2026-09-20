@@ -24,6 +24,7 @@ export type ActivityItem = {
   imageUri?: string | null;
   imagePath?: string | null;
   thumbUris?: string[];
+  photoCount?: number;
 };
 
 export type ActivitySources = {
@@ -101,6 +102,7 @@ export function buildActivityItems(input: {
       authorName: author,
       sourceId: summary.event.id,
       thumbUris,
+      photoCount: summary.photoCount,
     });
 
     const latest = summary.latestPhotoAt;
@@ -117,6 +119,7 @@ export function buildActivityItems(input: {
           authorName: author,
           sourceId: summary.event.id,
           thumbUris,
+          photoCount: summary.photoCount,
         });
       }
     }

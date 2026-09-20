@@ -136,6 +136,7 @@ describe('buildActivityItems', () => {
     expect(items[0]).toMatchObject({
       kind: 'album',
       thumbUris: ['file://thumb-1.jpg', 'file://thumb-2.jpg'],
+      photoCount: 2,
     });
   });
 

@@ -3,7 +3,13 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { FeedPhoto } from '@/components/FeedPhoto';
 import { activityKindLabel, type ActivityItem as ActivityItemData } from '@/lib/activity-feed';
-import { ALBUM_FEED_THUMB_MAX } from '@/lib/album-previews';
+import {
+  ALBUM_FEED_THUMB_GAP,
+  ALBUM_FEED_THUMB_RADIUS,
+  ALBUM_FEED_THUMB_SIZE,
+  ALBUM_FEED_THUMB_VISIBLE,
+  albumThumbOverflow,
+} from '@/lib/album-previews';
 import { formatRelativeTime } from '@/lib/time';
 import { theme } from '@/constants/theme';
 
@@ -13,12 +19,18 @@ interface ActivityItemProps {
   onDelete?: () => void;
 }
 
-const THUMB_SIZE = 48;
-const THUMB_OVERLAP = 16;
-
-function AlbumThumbs({ uris, testID }: { uris: string[]; testID: string }) {
-  const shown = uris.slice(0, ALBUM_FEED_THUMB_MAX);
+function AlbumThumbs({
+  uris,
+  photoCount,
+  testID,
+}: {
+  uris: string[];
+  photoCount?: number;
+  testID: string;
+}) {
+  const shown = uris.slice(0, ALBUM_FEED_THUMB_VISIBLE);
   if (shown.length === 0) return null;
+  const overflow = albumThumbOverflow(photoCount ?? uris.length, shown.length);
 
   return (
     <View style={styles.thumbs} testID={testID} accessibilityRole="image">
@@ -26,15 +38,16 @@ function AlbumThumbs({ uris, testID }: { uris: string[]; testID: string }) {
         <Image
           key={`${uri}-${index}`}
           source={{ uri }}
-          style={[
-            styles.thumb,
-            index > 0 ? { marginLeft: -THUMB_OVERLAP } : null,
-            { zIndex: shown.length - index },
-          ]}
+          style={styles.thumb}
           resizeMode="cover"
           testID={`${testID}-${index}`}
         />
       ))}
+      {overflow > 0 ? (
+        <Text style={styles.more} testID={`${testID}-more`}>
+          +{overflow}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -66,7 +79,11 @@ export function ActivityItem({ item, onPress, onDelete }: ActivityItemProps) {
             {item.subtitle} · {item.authorName} · {formatRelativeTime(item.timestamp)}
           </Text>
         </View>
-        <AlbumThumbs uris={thumbs} testID={`feed-item-${item.id}-thumbs`} />
+        <AlbumThumbs
+          uris={thumbs}
+          photoCount={item.photoCount}
+          testID={`feed-item-${item.id}-thumbs`}
+        />
       </View>
       {item.kind === 'post' && item.imageUri ? (
         <FeedPhoto uri={item.imageUri} testID={photoTestId} />
@@ -159,15 +176,18 @@ const styles = StyleSheet.create({
   thumbs: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: THUMB_SIZE,
+    gap: ALBUM_FEED_THUMB_GAP,
+    height: ALBUM_FEED_THUMB_SIZE,
   },
   thumb: {
-    width: THUMB_SIZE,
-    height: THUMB_SIZE,
-    borderRadius: theme.radius.sm,
-    backgroundColor: theme.colors.borderLight,
-    borderWidth: 2,
-    borderColor: theme.colors.surface,
+    width: ALBUM_FEED_THUMB_SIZE,
+    height: ALBUM_FEED_THUMB_SIZE,
+    borderRadius: ALBUM_FEED_THUMB_RADIUS,
+  },
+  more: {
+    color: theme.colors.textMuted,
+    fontSize: 13,
+    fontWeight: '700',
   },
   deleteAction: {
     width: 88,

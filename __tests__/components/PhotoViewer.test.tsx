@@ -1,6 +1,7 @@
 import React from 'react';
+import { StyleSheet } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
-import { PhotoViewer, albumViewerIndexAfterSwipe } from '@/components/PhotoViewer';
+import { PhotoViewer, albumViewerIndexAfterSwipe, albumViewerShouldDismiss } from '@/components/PhotoViewer';
 import { buildPhoto } from '../factories';
 
 const photos = [
@@ -25,7 +26,11 @@ describe('PhotoViewer', () => {
     expect(screen.getByTestId('photo-viewer-image-p2').props.source).toEqual({
       uri: 'file://two.jpg',
     });
+    expect(screen.getByText('✕')).toBeTruthy();
     expect(screen.getByText('2 / 2')).toBeTruthy();
+    const counterStyle = StyleSheet.flatten(screen.getByTestId('photo-viewer-counter').props.style);
+    expect(counterStyle.color).toBe('#9a9a9a');
+    expect(screen.getByTestId('photo-viewer-image-p2').props.resizeMode).toBe('contain');
 
     fireEvent.press(screen.getByTestId('photo-viewer-close'));
     expect(onClose).toHaveBeenCalled();
@@ -35,6 +40,11 @@ describe('PhotoViewer', () => {
     expect(albumViewerIndexAfterSwipe(0, 2, -80, 0, 48)).toBe(1);
     expect(albumViewerIndexAfterSwipe(1, 2, 80, 0, 48)).toBe(0);
     expect(albumViewerIndexAfterSwipe(0, 2, -10, 0, 48)).toBe(0);
+  });
+
+  it('dismisses on a downward swipe, not a horizontal page', () => {
+    expect(albumViewerShouldDismiss(10, 120, 0.2)).toBe(true);
+    expect(albumViewerShouldDismiss(-90, 20, 0)).toBe(false);
   });
 
   it('deletes the current photo from the viewer', () => {
