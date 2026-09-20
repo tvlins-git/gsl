@@ -272,8 +272,7 @@ function PhotoViewerBody({
         {...webDragHandlers}
       >
         <Animated.View
-          style={[styles.imageShift, { transform: [{ translateX }, { translateY }] }]}
-          pointerEvents="none"
+          style={[styles.imageShift, { transform: [{ translateX }, { translateY }], pointerEvents: 'none' }]}
         >
           {current ? (
             <Image
