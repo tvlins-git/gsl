@@ -1,4 +1,10 @@
-import { isCameraPickerAvailable, pickImageUri } from '@/lib/pick-image';
+import {
+  DEFAULT_ALBUM_SELECTION_LIMIT,
+  imagePickerOptions,
+  isCameraPickerAvailable,
+  pickImageUri,
+  pickImageUris,
+} from '@/lib/pick-image';
 
 const mockRequestCameraPermissionsAsync = jest.fn();
 const mockRequestMediaLibraryPermissionsAsync = jest.fn();
@@ -15,7 +21,26 @@ jest.mock('expo-image-picker', () => ({
     mockRequestMediaLibraryPermissionsAsync(...args),
   launchCameraAsync: (...args: unknown[]) => mockLaunchCameraAsync(...args),
   launchImageLibraryAsync: (...args: unknown[]) => mockLaunchImageLibraryAsync(...args),
+  UIImagePickerPresentationStyle: { FULL_SCREEN: 'fullScreen' },
 }));
+
+const singlePickerOptions = {
+  mediaTypes: ['images'],
+  quality: 1,
+  allowsMultipleSelection: false,
+  selectionLimit: 1,
+  orderedSelection: false,
+  presentationStyle: 'fullScreen',
+};
+
+const albumPickerOptions = {
+  mediaTypes: ['images'],
+  quality: 1,
+  allowsMultipleSelection: true,
+  selectionLimit: DEFAULT_ALBUM_SELECTION_LIMIT,
+  orderedSelection: true,
+  presentationStyle: 'fullScreen',
+};
 
 describe('isCameraPickerAvailable', () => {
   it('is hidden on web even when Device.isDevice is true', () => {
@@ -34,6 +59,30 @@ describe('isCameraPickerAvailable', () => {
   });
 });
 
+describe('imagePickerOptions', () => {
+  it('keeps gallery single-select unless multiple is requested', () => {
+    expect(imagePickerOptions('gallery')).toEqual(singlePickerOptions);
+    expect(imagePickerOptions('gallery', { multiple: false })).toEqual(singlePickerOptions);
+  });
+
+  it('enables multi-select with a default cap of 20 for album gallery', () => {
+    expect(imagePickerOptions('gallery', { multiple: true })).toEqual(albumPickerOptions);
+  });
+
+  it('honors a custom selectionLimit when multiple is true', () => {
+    expect(imagePickerOptions('gallery', { multiple: true, selectionLimit: 10 })).toEqual({
+      ...albumPickerOptions,
+      selectionLimit: 10,
+    });
+  });
+
+  it('never enables multiple selection for camera captures', () => {
+    expect(imagePickerOptions('camera', { multiple: true, selectionLimit: 20 })).toEqual(
+      singlePickerOptions
+    );
+  });
+});
+
 describe('pickImageUri', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -48,11 +97,11 @@ describe('pickImageUri', () => {
 
     await expect(pickImageUri('camera')).resolves.toBe('file://camera.jpg');
     expect(mockRequestCameraPermissionsAsync).toHaveBeenCalled();
-    expect(mockLaunchCameraAsync).toHaveBeenCalledWith({ mediaTypes: ['images'], quality: 1 });
+    expect(mockLaunchCameraAsync).toHaveBeenCalledWith(singlePickerOptions);
     expect(mockLaunchImageLibraryAsync).not.toHaveBeenCalled();
   });
 
-  it('requests gallery permission then launches the library', async () => {
+  it('requests gallery permission then launches the library as single-select', async () => {
     mockRequestMediaLibraryPermissionsAsync.mockResolvedValue({ granted: true });
     mockLaunchImageLibraryAsync.mockResolvedValue({
       canceled: false,
@@ -61,8 +110,19 @@ describe('pickImageUri', () => {
 
     await expect(pickImageUri('gallery')).resolves.toBe('file://gallery.jpg');
     expect(mockRequestMediaLibraryPermissionsAsync).toHaveBeenCalled();
-    expect(mockLaunchImageLibraryAsync).toHaveBeenCalledWith({ mediaTypes: ['images'], quality: 1 });
+    expect(mockLaunchImageLibraryAsync).toHaveBeenCalledWith(singlePickerOptions);
     expect(mockLaunchCameraAsync).not.toHaveBeenCalled();
+  });
+
+  it('forces single-select even if a caller passes multiple: true', async () => {
+    mockRequestMediaLibraryPermissionsAsync.mockResolvedValue({ granted: true });
+    mockLaunchImageLibraryAsync.mockResolvedValue({
+      canceled: false,
+      assets: [{ uri: 'file://one.jpg' }, { uri: 'file://two.jpg' }],
+    });
+
+    await expect(pickImageUri('gallery', { multiple: true })).resolves.toBe('file://one.jpg');
+    expect(mockLaunchImageLibraryAsync).toHaveBeenCalledWith(singlePickerOptions);
   });
 
   it('does not open the picker when permission is denied', async () => {
@@ -73,5 +133,33 @@ describe('pickImageUri', () => {
     await expect(pickImageUri('gallery')).resolves.toBeNull();
     expect(mockLaunchCameraAsync).not.toHaveBeenCalled();
     expect(mockLaunchImageLibraryAsync).not.toHaveBeenCalled();
+  });
+});
+
+describe('pickImageUris', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('returns every selected gallery URI when multiple is enabled', async () => {
+    mockRequestMediaLibraryPermissionsAsync.mockResolvedValue({ granted: true });
+    mockLaunchImageLibraryAsync.mockResolvedValue({
+      canceled: false,
+      assets: [{ uri: 'file://one.jpg' }, { uri: 'file://two.jpg' }, { uri: 'file://three.jpg' }],
+    });
+
+    await expect(pickImageUris('gallery', { multiple: true })).resolves.toEqual([
+      'file://one.jpg',
+      'file://two.jpg',
+      'file://three.jpg',
+    ]);
+    expect(mockLaunchImageLibraryAsync).toHaveBeenCalledWith(albumPickerOptions);
+  });
+
+  it('returns an empty list when the picker is canceled', async () => {
+    mockRequestMediaLibraryPermissionsAsync.mockResolvedValue({ granted: true });
+    mockLaunchImageLibraryAsync.mockResolvedValue({ canceled: true, assets: null });
+
+    await expect(pickImageUris('gallery', { multiple: true })).resolves.toEqual([]);
   });
 });
