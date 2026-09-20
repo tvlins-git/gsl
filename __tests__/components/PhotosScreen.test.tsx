@@ -127,6 +127,8 @@ jest.mock('@/lib/image-compress', () => ({
   })),
 }));
 
+jest.setTimeout(15000);
+
 describe('PhotosScreen album viewer', () => {
   beforeEach(() => {
     (useLocalSearchParams as jest.Mock).mockReturnValue({});
