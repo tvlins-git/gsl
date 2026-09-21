@@ -10,8 +10,10 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PollGrid } from '@/components/PollGrid';
 import { PollSlotEditor } from '@/components/PollSlotEditor';
 import { Screen } from '@/components/ui/Screen';
@@ -49,6 +51,9 @@ export default function PlanScreen() {
   const [newSlots, setNewSlots] = useState<{ startsAt: string; endsAt: string }[]>([]);
   const [lockingSlotId, setLockingSlotId] = useState<string | null>(null);
   const [inviteMessage, setInviteMessage] = useState('');
+  const [slotPickerActive, setSlotPickerActive] = useState(false);
+  const { height: windowHeight } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
 
   const loadPolls = useCallback(async () => {
     if (!member) return;
@@ -432,39 +437,49 @@ export default function PlanScreen() {
 
       <Modal visible={showCreate} animationType="slide" transparent>
         <View style={sharedStyles.modalOverlay}>
-          <ScrollView contentContainerStyle={styles.modalScroll} keyboardShouldPersistTaps="handled">
-            <View style={sharedStyles.modalSheet}>
-              <View style={styles.modalHandle} />
-              <Text style={sharedStyles.modalTitle}>Create poll</Text>
-              <TextInput
-                style={sharedStyles.input}
-                placeholder="Poll title (e.g. September dinner)"
-                placeholderTextColor={theme.colors.textMuted}
-                value={newTitle}
-                onChangeText={setNewTitle}
-              />
-              <PollSlotEditor
-                slots={newSlots}
-                onSlotsChange={setNewSlots}
-                slotError={slotError}
-                onSlotError={setSlotError}
-              />
-              <Pressable
-                style={[
-                  sharedStyles.primaryBtn,
-                  (newSlots.length === 0 || !newTitle.trim()) && styles.createBtnDisabled,
-                ]}
-                onPress={handleCreatePoll}
-                disabled={newSlots.length === 0 || !newTitle.trim()}
-              >
-                <Text style={sharedStyles.primaryBtnText}>
-                  Create poll{newSlots.length > 0 ? ` (${newSlots.length} slots)` : ''}
-                </Text>
-              </Pressable>
-              <Pressable onPress={() => setShowCreate(false)} style={styles.cancelBtn}>
-                <Text style={styles.cancel}>Cancel</Text>
-              </Pressable>
-            </View>
+          <ScrollView
+            testID="create-poll-scroll"
+            style={[sharedStyles.modalSheet, styles.createSheet, { maxHeight: windowHeight * 0.92 }]}
+            contentContainerStyle={[
+              styles.createSheetContent,
+              { paddingBottom: Math.max(insets.bottom, theme.spacing.lg) + theme.spacing.md },
+            ]}
+            keyboardShouldPersistTaps="handled"
+            nestedScrollEnabled
+            canCancelContentTouches={false}
+            scrollEnabled={!slotPickerActive}
+          >
+            <View style={styles.modalHandle} />
+            <Text style={sharedStyles.modalTitle}>Create poll</Text>
+            <TextInput
+              style={sharedStyles.input}
+              placeholder="Poll title (e.g. September dinner)"
+              placeholderTextColor={theme.colors.textMuted}
+              value={newTitle}
+              onChangeText={setNewTitle}
+            />
+            <PollSlotEditor
+              slots={newSlots}
+              onSlotsChange={setNewSlots}
+              slotError={slotError}
+              onSlotError={setSlotError}
+              onPickerInteractionChange={setSlotPickerActive}
+            />
+            <Pressable
+              style={[
+                sharedStyles.primaryBtn,
+                (newSlots.length === 0 || !newTitle.trim()) && styles.createBtnDisabled,
+              ]}
+              onPress={handleCreatePoll}
+              disabled={newSlots.length === 0 || !newTitle.trim()}
+            >
+              <Text style={sharedStyles.primaryBtnText}>
+                Create poll{newSlots.length > 0 ? ` (${newSlots.length} slots)` : ''}
+              </Text>
+            </Pressable>
+            <Pressable onPress={() => setShowCreate(false)} style={styles.cancelBtn}>
+              <Text style={styles.cancel}>Cancel</Text>
+            </Pressable>
           </ScrollView>
         </View>
       </Modal>
@@ -605,7 +620,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  modalScroll: { flexGrow: 1, justifyContent: 'flex-end' },
+  createSheet: {
+    padding: 0,
+    width: '100%',
+    overflow: 'hidden',
+  },
+  createSheetContent: {
+    padding: theme.spacing.xxl,
+    gap: theme.spacing.md,
+  },
   modalHandle: {
     alignSelf: 'center',
     width: 36,
