@@ -1,5 +1,6 @@
 import { Image, StyleSheet, Text, View } from 'react-native';
 import { APP_NAME } from '@/constants/brand';
+import { theme } from '@/constants/theme';
 
 interface GslNavTitleProps {
   /** e.g. "Hosts" → renders "GSL · Hosts" */
@@ -38,8 +39,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 17,
-    fontWeight: '800',
-    letterSpacing: 1,
-    color: '#1c1c1e',
+    fontWeight: '700',
+    color: theme.colors.text,
   },
 });

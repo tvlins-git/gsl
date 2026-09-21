@@ -12,6 +12,16 @@ Deno.test('filterRecipients excludes sender', () => {
   assertEquals(filtered.every((t) => t.userId !== 'u2'), true);
 });
 
+Deno.test('filterRecipients include list targets tagged users', () => {
+  const tokens = [
+    { userId: 'u1', token: 'tok1' },
+    { userId: 'u2', token: 'tok2' },
+    { userId: 'u3', token: 'tok3' },
+  ];
+  const filtered = filterRecipients(tokens, ['u1'], ['u2']);
+  assertEquals(filtered.map((t) => t.userId), ['u2']);
+});
+
 Deno.test('filterRecipients deduplicates tokens', () => {
   const tokens = [
     { userId: 'u1', token: 'tok1' },

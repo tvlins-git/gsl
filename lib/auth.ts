@@ -1,15 +1,17 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
+  ADMIN_USER_ID,
   DEFAULT_HARDCODED_USER,
-  getHardcodedUser,
-  type HardcodedUser,
+  type AppUser,
 } from '@/constants/hardcoded-user';
+import { ensureAppUsersLoaded, getAppUser } from './app-users';
 import {
   createLocalMember,
   disableLocalMode,
   enableLocalMode,
   getLocalGroupMembers,
   isLocalMode,
+  localStore,
   setActiveLocalUser,
 } from './local-store';
 import { supabase } from './supabase';
@@ -27,12 +29,13 @@ export async function clearLoggedOut() {
   await AsyncStorage.removeItem(LOGGED_OUT_KEY);
 }
 
-export async function getStoredUser(): Promise<HardcodedUser> {
+export async function getStoredUser(): Promise<AppUser> {
+  await ensureAppUsersLoaded();
   const id = await AsyncStorage.getItem(SELECTED_USER_KEY);
-  return getHardcodedUser(id ?? '') ?? DEFAULT_HARDCODED_USER;
+  return (await getAppUser(id ?? '')) ?? DEFAULT_HARDCODED_USER;
 }
 
-export async function setStoredUser(user: HardcodedUser) {
+export async function setStoredUser(user: AppUser) {
   await AsyncStorage.setItem(SELECTED_USER_KEY, user.id);
 }
 
@@ -42,9 +45,9 @@ export async function signOutUser() {
   await AsyncStorage.setItem(LOGGED_OUT_KEY, 'true');
 }
 
-/** Sign in with a hardcoded user; returns session or null (caller enables local mode). */
-export async function ensureHardcodedSession(user: HardcodedUser) {
-  const { email, displayName } = user;
+/** Sign in with an app user; returns session or null (caller enables local mode). */
+export async function ensureHardcodedSession(user: AppUser) {
+  const { email, displayName, role, id } = user;
   const password = await getEffectivePassword(user);
   await setStoredUser(user);
 
@@ -52,7 +55,7 @@ export async function ensureHardcodedSession(user: HardcodedUser) {
   if (existing.session) {
     const { data: { user: authUser } } = await supabase.auth.getUser();
     if (authUser?.email === email) {
-      await ensureMemberRecord(displayName);
+      await ensureMemberRecord(displayName, role, id);
       return existing.session;
     }
     await supabase.auth.signOut();
@@ -60,7 +63,7 @@ export async function ensureHardcodedSession(user: HardcodedUser) {
 
   const signIn = await supabase.auth.signInWithPassword({ email, password });
   if (!signIn.error && signIn.data.session) {
-    await ensureMemberRecord(displayName);
+    await ensureMemberRecord(displayName, role, id);
     return signIn.data.session;
   }
 
@@ -72,7 +75,7 @@ export async function ensureHardcodedSession(user: HardcodedUser) {
   if (signUp.error?.message?.toLowerCase().includes('already registered')) {
     const retry = await supabase.auth.signInWithPassword({ email, password });
     if (retry.data.session) {
-      await ensureMemberRecord(displayName);
+      await ensureMemberRecord(displayName, role, id);
       return retry.data.session;
     }
     return null;
@@ -81,39 +84,45 @@ export async function ensureHardcodedSession(user: HardcodedUser) {
   if (signUp.error) return null;
 
   if (signUp.data.session) {
-    await bootstrapIfNeeded(displayName);
+    await bootstrapIfNeeded(displayName, role, id);
     return signUp.data.session;
   }
 
   const retry = await supabase.auth.signInWithPassword({ email, password });
   if (retry.data.session) {
-    await ensureMemberRecord(displayName);
+    await ensureMemberRecord(displayName, role, id);
     return retry.data.session;
   }
 
   return null;
 }
 
-async function bootstrapIfNeeded(displayName: string) {
+async function bootstrapIfNeeded(displayName: string, role: AppUser['role'], appUserId: string) {
   const bootstrapped = await isGroupBootstrapped();
-  if (!bootstrapped) {
+  if (!bootstrapped && (role === 'admin' || appUserId === ADMIN_USER_ID)) {
     await supabase.rpc('bootstrap_admin_group', { p_display_name: displayName });
   }
-  await ensureMemberRecord(displayName);
+  await ensureMemberRecord(displayName, role, appUserId);
 }
 
-async function ensureMemberRecord(displayName: string) {
+async function ensureMemberRecord(displayName: string, role: AppUser['role'], appUserId: string) {
+  const memberRole = role === 'admin' || appUserId === ADMIN_USER_ID ? 'admin' : 'member';
   const member = await getCurrentMemberFromDb();
   if (member) {
-    if (member.display_name !== displayName) {
-      await supabase.from('members').update({ display_name: displayName }).eq('id', member.id);
+    const updates: { display_name?: string; role?: 'admin' | 'member' } = {};
+    if (member.display_name !== displayName) updates.display_name = displayName;
+    if (member.role !== memberRole) updates.role = memberRole;
+    if (Object.keys(updates).length > 0) {
+      await supabase.from('members').update(updates).eq('id', member.id);
     }
     return;
   }
 
   const bootstrapped = await isGroupBootstrapped();
   if (!bootstrapped) {
-    await supabase.rpc('bootstrap_admin_group', { p_display_name: displayName });
+    if (memberRole === 'admin') {
+      await supabase.rpc('bootstrap_admin_group', { p_display_name: displayName });
+    }
     return;
   }
 
@@ -125,7 +134,7 @@ async function ensureMemberRecord(displayName: string) {
         group_id: group.id,
         user_id: user.id,
         display_name: displayName,
-        role: 'admin',
+        role: memberRole,
       },
       { onConflict: 'group_id,user_id' }
     );
@@ -147,12 +156,18 @@ async function getCurrentMemberFromDb(): Promise<Member | null> {
 }
 
 export async function getCurrentMember(): Promise<Member | null> {
-  if (isLocalMode()) return createLocalMember();
+  if (isLocalMode()) {
+    await localStore.hydrate();
+    return createLocalMember();
+  }
   return getCurrentMemberFromDb();
 }
 
 export async function getGroupMembers(groupId: string): Promise<Member[]> {
-  if (isLocalMode()) return getLocalGroupMembers();
+  if (isLocalMode()) {
+    await localStore.hydrate();
+    return getLocalGroupMembers();
+  }
   const { data, error } = await supabase
     .from('members')
     .select('*')
@@ -163,7 +178,10 @@ export async function getGroupMembers(groupId: string): Promise<Member[]> {
 }
 
 export async function updateMemberProfile(memberId: string, displayName: string, avatarUrl?: string) {
-  if (isLocalMode()) return createLocalMember();
+  if (isLocalMode()) {
+    await localStore.hydrate();
+    return createLocalMember();
+  }
   const { data, error } = await supabase
     .from('members')
     .update({ display_name: displayName, avatar_url: avatarUrl ?? null })
@@ -174,14 +192,30 @@ export async function updateMemberProfile(memberId: string, displayName: string,
   return data;
 }
 
-export function activateLocalMode(user: HardcodedUser) {
+export async function updateMemberContactEmail(memberId: string, email: string | null) {
+  const trimmed = email?.trim() || null;
+  if (isLocalMode()) {
+    return localStore.updateMemberEmail(memberId, trimmed);
+  }
+  const { data, error } = await supabase
+    .from('members')
+    .update({ contact_email: trimmed })
+    .eq('id', memberId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export function activateLocalMode(user: AppUser) {
   enableLocalMode();
   setActiveLocalUser(user);
+  void localStore.hydrate();
   return createLocalMember();
 }
 
 export async function signInWithPassword(
-  user: HardcodedUser,
+  user: AppUser,
   password: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   if (!(await validateUserPassword(user, password))) {

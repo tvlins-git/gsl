@@ -16,9 +16,9 @@ export interface Database {
         { id?: string; name?: string; created_by?: string | null; created_at?: string }
       >;
       members: TableDef<
-        { id: string; group_id: string; user_id: string; display_name: string; avatar_url: string | null; role: 'admin' | 'member'; created_at: string },
-        { id?: string; group_id: string; user_id: string; display_name: string; avatar_url?: string | null; role?: 'admin' | 'member'; created_at?: string },
-        { id?: string; group_id?: string; user_id?: string; display_name?: string; avatar_url?: string | null; role?: 'admin' | 'member'; created_at?: string }
+        { id: string; group_id: string; user_id: string; display_name: string; avatar_url: string | null; contact_email: string | null; role: 'admin' | 'member'; created_at: string },
+        { id?: string; group_id: string; user_id: string; display_name: string; avatar_url?: string | null; contact_email?: string | null; role?: 'admin' | 'member'; created_at?: string },
+        { id?: string; group_id?: string; user_id?: string; display_name?: string; avatar_url?: string | null; contact_email?: string | null; role?: 'admin' | 'member'; created_at?: string }
       >;
       invite_codes: TableDef<
         { id: string; group_id: string; code: string; used_by: string | null; used_at: string | null; expires_at: string; created_at: string },
@@ -36,9 +36,9 @@ export interface Database {
         { id?: string; group_id?: string; year?: number; month?: number; assigned_member_id?: string | null; updated_by?: string | null; updated_at?: string }
       >;
       polls: TableDef<
-        { id: string; group_id: string; title: string; created_by: string; status: 'open' | 'closed'; created_at: string },
-        { id?: string; group_id: string; title: string; created_by: string; status?: 'open' | 'closed'; created_at?: string },
-        { id?: string; group_id?: string; title?: string; created_by?: string; status?: 'open' | 'closed'; created_at?: string }
+        { id: string; group_id: string; title: string; created_by: string; status: 'open' | 'closed'; chosen_slot_id: string | null; created_at: string },
+        { id?: string; group_id: string; title: string; created_by: string; status?: 'open' | 'closed'; chosen_slot_id?: string | null; created_at?: string },
+        { id?: string; group_id?: string; title?: string; created_by?: string; status?: 'open' | 'closed'; chosen_slot_id?: string | null; created_at?: string }
       >;
       poll_slots: TableDef<
         { id: string; poll_id: string; starts_at: string; ends_at: string },
@@ -75,6 +75,40 @@ export interface Database {
         { id?: string; thread_id: string; sender_id: string; body: string; created_at?: string },
         { id?: string; thread_id?: string; sender_id?: string; body?: string; created_at?: string }
       >;
+      feed_posts: TableDef<
+        {
+          id: string;
+          group_id: string;
+          author_id: string;
+          body: string;
+          image_path: string | null;
+          tag_all: boolean;
+          created_at: string;
+        },
+        {
+          id?: string;
+          group_id: string;
+          author_id: string;
+          body?: string;
+          image_path?: string | null;
+          tag_all?: boolean;
+          created_at?: string;
+        },
+        {
+          id?: string;
+          group_id?: string;
+          author_id?: string;
+          body?: string;
+          image_path?: string | null;
+          tag_all?: boolean;
+          created_at?: string;
+        }
+      >;
+      feed_post_tags: TableDef<
+        { post_id: string; user_id: string },
+        { post_id: string; user_id: string },
+        { post_id?: string; user_id?: string }
+      >;
     };
     Views: { [_ in never]: never };
     Functions: {
@@ -97,3 +131,5 @@ export type PhotoEvent = Database['public']['Tables']['photo_events']['Row'];
 export type Photo = Database['public']['Tables']['photos']['Row'];
 export type Thread = Database['public']['Tables']['threads']['Row'];
 export type Message = Database['public']['Tables']['messages']['Row'];
+export type FeedPost = Database['public']['Tables']['feed_posts']['Row'];
+export type FeedPostTag = Database['public']['Tables']['feed_post_tags']['Row'];

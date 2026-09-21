@@ -15,6 +15,7 @@ CREATE TABLE members (
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   display_name TEXT NOT NULL,
   avatar_url TEXT,
+  contact_email TEXT,
   role TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('admin', 'member')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE(group_id, user_id)
@@ -56,6 +57,7 @@ CREATE TABLE polls (
   title TEXT NOT NULL,
   created_by UUID NOT NULL REFERENCES auth.users(id),
   status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'closed')),
+  chosen_slot_id UUID,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -65,6 +67,10 @@ CREATE TABLE poll_slots (
   starts_at TIMESTAMPTZ NOT NULL,
   ends_at TIMESTAMPTZ NOT NULL
 );
+
+ALTER TABLE polls
+  ADD CONSTRAINT polls_chosen_slot_id_fkey
+  FOREIGN KEY (chosen_slot_id) REFERENCES poll_slots(id) ON DELETE SET NULL;
 
 CREATE TABLE poll_responses (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -117,6 +123,28 @@ CREATE TABLE messages (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE TABLE feed_posts (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  group_id UUID NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+  author_id UUID NOT NULL REFERENCES auth.users(id),
+  body TEXT NOT NULL DEFAULT '',
+  image_path TEXT,
+  tag_all BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT feed_posts_has_content CHECK (
+    length(btrim(body)) > 0 OR image_path IS NOT NULL
+  )
+);
+
+CREATE INDEX feed_posts_group_id_created_at_idx
+  ON feed_posts (group_id, created_at DESC);
+
+CREATE TABLE feed_post_tags (
+  post_id UUID NOT NULL REFERENCES feed_posts(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  PRIMARY KEY (post_id, user_id)
+);
+
 -- Helper: get current user's group_id
 CREATE OR REPLACE FUNCTION auth_group_id() RETURNS UUID AS $$
   SELECT group_id FROM members WHERE user_id = auth.uid() LIMIT 1;
@@ -140,6 +168,8 @@ ALTER TABLE photos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE threads ENABLE ROW LEVEL SECURITY;
 ALTER TABLE thread_members ENABLE ROW LEVEL SECURITY;
 ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE feed_posts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE feed_post_tags ENABLE ROW LEVEL SECURITY;
 
 -- Groups: members can read their group
 CREATE POLICY groups_select ON groups FOR SELECT
@@ -235,8 +265,34 @@ CREATE POLICY messages_all ON messages FOR ALL
     SELECT 1 FROM threads t WHERE t.id = thread_id AND t.group_id = auth_group_id()
   ));
 
--- Storage bucket (run via dashboard or separate migration)
--- INSERT INTO storage.buckets (id, name, public) VALUES ('photos', 'photos', false);
+CREATE POLICY feed_posts_select ON feed_posts FOR SELECT
+  USING (group_id = auth_group_id());
+CREATE POLICY feed_posts_insert ON feed_posts FOR INSERT
+  WITH CHECK (group_id = auth_group_id() AND author_id = auth.uid());
+CREATE POLICY feed_posts_delete ON feed_posts FOR DELETE
+  USING (group_id = auth_group_id() AND author_id = auth.uid());
+
+CREATE POLICY feed_post_tags_select ON feed_post_tags FOR SELECT
+  USING (EXISTS (
+    SELECT 1 FROM feed_posts p WHERE p.id = post_id AND p.group_id = auth_group_id()
+  ));
+CREATE POLICY feed_post_tags_insert ON feed_post_tags FOR INSERT
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM feed_posts p
+      WHERE p.id = post_id AND p.group_id = auth_group_id() AND p.author_id = auth.uid()
+    )
+    AND EXISTS (
+      SELECT 1 FROM members m WHERE m.user_id = user_id AND m.group_id = auth_group_id()
+    )
+  );
+CREATE POLICY feed_post_tags_delete ON feed_post_tags FOR DELETE
+  USING (EXISTS (
+    SELECT 1 FROM feed_posts p
+    WHERE p.id = post_id AND p.group_id = auth_group_id() AND p.author_id = auth.uid()
+  ));
+
+-- Photos storage bucket is created in 007_photos_storage_bucket.sql
 -- Seed default GSL group (run after admin user signs up, or via service role)
 -- This migration documents the default group name; actual seed requires auth.users
 
@@ -317,4 +373,51 @@ CREATE POLICY invite_codes_admin_select ON invite_codes FOR SELECT
       SELECT 1 FROM members m
       WHERE m.user_id = auth.uid() AND m.group_id = auth_group_id() AND m.role = 'admin'
     )
+  );
+
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES (
+  'photos',
+  'photos',
+  true,
+  15728640,
+  ARRAY['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/heic']::text[]
+)
+ON CONFLICT (id) DO NOTHING;
+
+DROP POLICY IF EXISTS photos_objects_select ON storage.objects;
+DROP POLICY IF EXISTS photos_storage_select ON storage.objects;
+CREATE POLICY photos_storage_select ON storage.objects
+  FOR SELECT
+  USING (bucket_id = 'photos');
+
+DROP POLICY IF EXISTS photos_objects_insert ON storage.objects;
+DROP POLICY IF EXISTS photos_storage_insert ON storage.objects;
+CREATE POLICY photos_storage_insert ON storage.objects
+  FOR INSERT TO authenticated
+  WITH CHECK (
+    bucket_id = 'photos'
+    AND (storage.foldername(name))[1] = auth_group_id()::text
+  );
+
+DROP POLICY IF EXISTS photos_objects_update ON storage.objects;
+DROP POLICY IF EXISTS photos_storage_update ON storage.objects;
+CREATE POLICY photos_storage_update ON storage.objects
+  FOR UPDATE TO authenticated
+  USING (
+    bucket_id = 'photos'
+    AND (storage.foldername(name))[1] = auth_group_id()::text
+  )
+  WITH CHECK (
+    bucket_id = 'photos'
+    AND (storage.foldername(name))[1] = auth_group_id()::text
+  );
+
+DROP POLICY IF EXISTS photos_objects_delete ON storage.objects;
+DROP POLICY IF EXISTS photos_storage_delete ON storage.objects;
+CREATE POLICY photos_storage_delete ON storage.objects
+  FOR DELETE TO authenticated
+  USING (
+    bucket_id = 'photos'
+    AND (storage.foldername(name))[1] = auth_group_id()::text
   );

@@ -1,6 +1,7 @@
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { TimeWheelPicker } from '@/components/TimeWheelPicker';
 import { theme } from '@/constants/theme';
 import { formatSlotTime, buildPollSlotFromDates, type PollSlotTimes } from '@/lib/polls';
 
@@ -11,6 +12,7 @@ interface PollSlotEditorProps {
   onSlotsChange: (slots: DraftSlot[]) => void;
   slotError?: string;
   onSlotError?: (message: string) => void;
+  onPickerInteractionChange?: (active: boolean) => void;
 }
 
 function defaultStartTime() {
@@ -22,7 +24,6 @@ function defaultStartTime() {
 function WebDateInput({ value, onChange }: { value: Date; onChange: (d: Date) => void }) {
   const dateStr = `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
   return (
-    // @ts-expect-error — web-only native input
     <input
       type="date"
       value={dateStr}
@@ -31,25 +32,6 @@ function WebDateInput({ value, onChange }: { value: Date; onChange: (d: Date) =>
         if (!y || !m || !d) return;
         const next = new Date(value);
         next.setFullYear(y, m - 1, d);
-        onChange(next);
-      }}
-      style={webInputStyle}
-    />
-  );
-}
-
-function WebTimeInput({ value, onChange }: { value: Date; onChange: (d: Date) => void }) {
-  const timeStr = `${String(value.getHours()).padStart(2, '0')}:${String(value.getMinutes()).padStart(2, '0')}`;
-  return (
-    // @ts-expect-error — web-only native input
-    <input
-      type="time"
-      value={timeStr}
-      onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-        const [h, min] = e.target.value.split(':').map(Number);
-        if (Number.isNaN(h) || Number.isNaN(min)) return;
-        const next = new Date(value);
-        next.setHours(h, min, 0, 0);
         onChange(next);
       }}
       style={webInputStyle}
@@ -67,7 +49,13 @@ const webInputStyle = {
   backgroundColor: theme.colors.surface,
 };
 
-export function PollSlotEditor({ slots, onSlotsChange, slotError, onSlotError }: PollSlotEditorProps) {
+export function PollSlotEditor({
+  slots,
+  onSlotsChange,
+  slotError,
+  onSlotError,
+  onPickerInteractionChange,
+}: PollSlotEditorProps) {
   const [selectedDate, setSelectedDate] = useState(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -75,7 +63,6 @@ export function PollSlotEditor({ slots, onSlotsChange, slotError, onSlotError }:
   });
   const [startTime, setStartTime] = useState(defaultStartTime);
   const [showDatePicker, setShowDatePicker] = useState(Platform.OS === 'ios');
-  const [showTimePicker, setShowTimePicker] = useState(Platform.OS === 'ios');
 
   const addSlot = () => {
     onSlotError?.('');
@@ -96,18 +83,12 @@ export function PollSlotEditor({ slots, onSlotsChange, slotError, onSlotError }:
     if (date) setSelectedDate(date);
   };
 
-  const onTimeChange = (_event: DateTimePickerEvent, date?: Date) => {
-    if (Platform.OS === 'android') setShowTimePicker(false);
-    if (date) setStartTime(date);
-  };
-
   const dateLabel = selectedDate.toLocaleDateString(undefined, {
     weekday: 'short',
     month: 'short',
     day: 'numeric',
     year: 'numeric',
   });
-  const timeLabel = startTime.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
 
   return (
     <View style={styles.wrap}>
@@ -137,26 +118,11 @@ export function PollSlotEditor({ slots, onSlotsChange, slotError, onSlotError }:
       )}
 
       <Text style={styles.fieldLabel}>Start time (2 h slot)</Text>
-      {Platform.OS === 'web' ? (
-        <WebTimeInput value={startTime} onChange={setStartTime} />
-      ) : (
-        <>
-          {Platform.OS === 'android' && (
-            <Pressable style={styles.pickerBtn} onPress={() => setShowTimePicker(true)}>
-              <Text style={styles.pickerBtnText}>{timeLabel}</Text>
-            </Pressable>
-          )}
-          {(showTimePicker || Platform.OS === 'ios') && (
-            <DateTimePicker
-              value={startTime}
-              mode="time"
-              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-              is24Hour
-              onChange={onTimeChange}
-            />
-          )}
-        </>
-      )}
+      <TimeWheelPicker
+        value={startTime}
+        onChange={setStartTime}
+        onInteractionChange={onPickerInteractionChange}
+      />
 
       {slotError ? <Text style={styles.error}>{slotError}</Text> : null}
 
@@ -190,8 +156,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: theme.colors.textSecondary,
     marginTop: 4,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
   },
   pickerBtn: {
     borderWidth: 1,

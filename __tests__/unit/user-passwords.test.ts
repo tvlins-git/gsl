@@ -42,11 +42,11 @@ describe('user-passwords', () => {
   });
 
   it('resets password and validates against the new one', async () => {
-    const user = HARDCODED_USERS[1];
-    const result = await resetUserPassword(user, 'jesper', 'newpass', 'newpass');
+    const user = HARDCODED_USERS[0];
+    const result = await resetUserPassword(user, 'thomas', 'newpass', 'newpass');
     expect(result).toEqual({ ok: true });
     await expect(validateUserPassword(user, 'newpass')).resolves.toBe(true);
-    await expect(validateUserPassword(user, 'jesper')).resolves.toBe(false);
+    await expect(validateUserPassword(user, 'thomas')).resolves.toBe(false);
     await expect(getEffectivePassword(user)).resolves.toBe('newpass');
   });
 

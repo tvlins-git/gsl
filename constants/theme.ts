@@ -2,30 +2,32 @@ import { Platform, StyleSheet } from 'react-native';
 
 export const theme = {
   colors: {
-    bg: '#f2f2f7',
+    // Logo-aligned monochrome: black mark on near-white.
+    bg: '#f5f5f5',
     surface: '#ffffff',
-    text: '#1c1c1e',
-    textSecondary: '#636366',
-    textMuted: '#8e8e93',
-    border: '#e5e5ea',
-    borderLight: '#f0f0f5',
-    primary: '#1c1c1e',
-    primaryPressed: '#3a3a3c',
+    text: '#111111',
+    textSecondary: '#525252',
+    textMuted: '#8a8a8a',
+    border: '#e5e5e5',
+    borderLight: '#f0f0f0',
+    primary: '#111111',
+    primaryPressed: '#000000',
     onPrimary: '#ffffff',
-    accent: '#2563eb',
-    accentSoft: '#eef4ff',
-    danger: '#dc2626',
-    dangerSoft: '#fef2f2',
-    success: '#15803d',
-    successSoft: '#ecfdf3',
-    warningSoft: '#fff7ed',
-    infoSoft: '#eff6ff',
+    accent: '#111111',
+    accentSoft: '#ececec',
+    danger: '#c53030',
+    dangerSoft: '#f5e8e8',
+    success: '#111111',
+    successSoft: '#ececec',
+    warningSoft: '#e8e8e8',
+    infoSoft: '#f0f0f0',
+    storyRing: '#111111',
   },
   radius: {
-    sm: 8,
-    md: 12,
-    lg: 16,
-    xl: 20,
+    sm: 10,
+    md: 16,
+    lg: 22,
+    xl: 28,
     pill: 999,
   },
   spacing: {
@@ -40,16 +42,22 @@ export const theme = {
 
 export const shadow = Platform.select({
   ios: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.08,
+    shadowRadius: 20,
   },
-  android: { elevation: 2 },
+  android: { elevation: 3 },
   default: {
-    boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+    boxShadow: '0 8px 28px rgba(0,0,0,0.08)',
   },
 });
+
+export const feedColumn = {
+  width: '100%' as const,
+  maxWidth: 560,
+  alignSelf: 'center' as const,
+};
 
 export const sharedStyles = StyleSheet.create({
   screen: {
@@ -63,13 +71,11 @@ export const sharedStyles = StyleSheet.create({
   card: {
     backgroundColor: theme.colors.surface,
     borderRadius: theme.radius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: theme.colors.border,
     ...shadow,
   },
   primaryBtn: {
     backgroundColor: theme.colors.primary,
-    borderRadius: theme.radius.md,
+    borderRadius: theme.radius.pill,
     paddingVertical: 14,
     paddingHorizontal: theme.spacing.lg,
     alignItems: 'center',
@@ -78,11 +84,11 @@ export const sharedStyles = StyleSheet.create({
   primaryBtnText: {
     color: theme.colors.onPrimary,
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   secondaryBtn: {
     backgroundColor: theme.colors.surface,
-    borderRadius: theme.radius.md,
+    borderRadius: theme.radius.pill,
     paddingVertical: 12,
     paddingHorizontal: theme.spacing.lg,
     alignItems: 'center',
@@ -105,12 +111,37 @@ export const sharedStyles = StyleSheet.create({
     color: theme.colors.text,
   },
   sectionTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: theme.colors.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
+    fontSize: 15,
+    fontWeight: '700',
+    color: theme.colors.text,
     marginBottom: theme.spacing.sm,
+  },
+  toolBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: theme.spacing.lg,
+    paddingTop: theme.spacing.md,
+    paddingBottom: theme.spacing.sm,
+    gap: theme.spacing.md,
+  },
+  toolBarTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: theme.colors.text,
+  },
+  toolBarAction: {
+    backgroundColor: theme.colors.primary,
+    borderRadius: theme.radius.pill,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  toolBarActionText: {
+    color: theme.colors.onPrimary,
+    fontSize: 14,
+    fontWeight: '700',
   },
   empty: {
     textAlign: 'center',
@@ -121,7 +152,7 @@ export const sharedStyles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
+    backgroundColor: 'rgba(0,0,0,0.4)',
     justifyContent: 'flex-end',
   },
   modalSheet: {
@@ -133,7 +164,7 @@ export const sharedStyles = StyleSheet.create({
     maxHeight: '92%',
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '700',
     color: theme.colors.text,
   },

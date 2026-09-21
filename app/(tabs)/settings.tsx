@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { router } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -15,17 +16,27 @@ import { UserAvatar } from '@/components/UserAvatar';
 import { UserOptionRow } from '@/components/UserOptionRow';
 import { useAuth } from '@/contexts/AuthContext';
 import {
+  ADMIN_USER_ID,
   DEFAULT_HARDCODED_USER,
-  HARDCODED_USERS,
-  getHardcodedUser,
+  isAdminUser,
+  type AppUser,
 } from '@/constants/hardcoded-user';
-import { getStoredUser } from '@/lib/auth';
-import { resetUserPassword } from '@/lib/user-passwords';
-import { sharedStyles, theme } from '@/constants/theme';
+import {
+  createAppUser,
+  deleteAppUser,
+  listAppUsers,
+  resolveSignedInAppUser,
+} from '@/lib/app-users';
+import { getStoredUser, updateMemberContactEmail } from '@/lib/auth';
+import { isValidContactEmail } from '@/lib/calendar-invite';
+import { clearPasswordOverride, resetUserPassword } from '@/lib/user-passwords';
+import { APP_VERSION } from '@/constants/brand';
+import { feedColumn, sharedStyles, theme } from '@/constants/theme';
 
 export default function SettingsScreen() {
-  const { member, loggedOut, signOut, signIn, loading, localMode } = useAuth();
+  const { member, loggedOut, signOut, signIn, loading, localMode, refreshMember } = useAuth();
   const [busy, setBusy] = useState(false);
+  const [users, setUsers] = useState<AppUser[]>([]);
   const [selectedUserId, setSelectedUserId] = useState(DEFAULT_HARDCODED_USER.id);
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
@@ -34,16 +45,41 @@ export default function SettingsScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [resetError, setResetError] = useState('');
   const [resetSuccess, setResetSuccess] = useState('');
+  const [newUserName, setNewUserName] = useState('');
+  const [newUserPassword, setNewUserPassword] = useState('');
+  const [userMgmtError, setUserMgmtError] = useState('');
+  const [userMgmtSuccess, setUserMgmtSuccess] = useState('');
+  const [contactEmail, setContactEmail] = useState('');
+  const [emailError, setEmailError] = useState('');
+  const [emailSuccess, setEmailSuccess] = useState('');
+
+  const refreshUsers = useCallback(async () => {
+    const list = await listAppUsers();
+    setUsers(list);
+    return list;
+  }, []);
+
+  useEffect(() => {
+    refreshUsers().catch(() => undefined);
+  }, [refreshUsers, member, loggedOut]);
 
   useEffect(() => {
     if (!loggedOut && member) return;
     getStoredUser().then((user) => setSelectedUserId(user.id));
   }, [loggedOut, member]);
 
-  const selectedUser = getHardcodedUser(selectedUserId) ?? DEFAULT_HARDCODED_USER;
-  const signedInUser = member
-    ? HARDCODED_USERS.find((user) => user.displayName === member.display_name)
-    : undefined;
+  useEffect(() => {
+    setContactEmail(member?.contact_email ?? '');
+    setEmailError('');
+    setEmailSuccess('');
+  }, [member?.id, member?.contact_email]);
+
+  const selectedUser =
+    users.find((user) => user.id === selectedUserId) ??
+    users[0] ??
+    DEFAULT_HARDCODED_USER;
+  const signedInUser = resolveSignedInAppUser(member?.display_name);
+  const isAdmin = isAdminUser(member) || isAdminUser(signedInUser);
 
   const handleSignOut = async () => {
     setBusy(true);
@@ -55,6 +91,13 @@ export default function SettingsScreen() {
       setConfirmPassword('');
       setResetError('');
       setResetSuccess('');
+      setUserMgmtError('');
+      setUserMgmtSuccess('');
+      setNewUserName('');
+      setNewUserPassword('');
+      setContactEmail('');
+      setEmailError('');
+      setEmailSuccess('');
     } finally {
       setBusy(false);
     }
@@ -106,6 +149,74 @@ export default function SettingsScreen() {
     }
   };
 
+  const handleCreateUser = async () => {
+    if (!signedInUser || !isAdmin) return;
+
+    setBusy(true);
+    setUserMgmtError('');
+    setUserMgmtSuccess('');
+    try {
+      const result = await createAppUser({
+        displayName: newUserName,
+        password: newUserPassword,
+      });
+      if (!result.ok) {
+        setUserMgmtError(result.error);
+        return;
+      }
+      setNewUserName('');
+      setNewUserPassword('');
+      setUserMgmtSuccess(`Created ${result.user.displayName}.`);
+      await refreshUsers();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleDeleteUser = async (user: AppUser) => {
+    if (!signedInUser || !isAdmin) return;
+
+    setBusy(true);
+    setUserMgmtError('');
+    setUserMgmtSuccess('');
+    try {
+      const result = await deleteAppUser(user.id, signedInUser.id);
+      if (!result.ok) {
+        setUserMgmtError(result.error);
+        return;
+      }
+      await clearPasswordOverride(user.id);
+      setUserMgmtSuccess(`Deleted ${user.displayName}.`);
+      await refreshUsers();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleSaveEmail = async () => {
+    if (!member) return;
+
+    const trimmed = contactEmail.trim();
+    if (trimmed && !isValidContactEmail(trimmed)) {
+      setEmailError('Enter a valid email address.');
+      setEmailSuccess('');
+      return;
+    }
+
+    setBusy(true);
+    setEmailError('');
+    setEmailSuccess('');
+    try {
+      await updateMemberContactEmail(member.id, trimmed || null);
+      await refreshMember();
+      setEmailSuccess(trimmed ? 'Email saved for calendar invites.' : 'Email cleared.');
+    } catch {
+      setEmailError('Could not save email. Try again.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (loading) {
     return <Screen loading />;
   }
@@ -126,13 +237,148 @@ export default function SettingsScreen() {
               <Text style={styles.profileName}>{member.display_name}</Text>
               <View style={styles.badgeRow}>
                 <StatusBadge status="signed in" />
+                {isAdmin && (
+                  <View style={styles.adminBadge}>
+                    <Text style={styles.adminBadgeText}>Admin</Text>
+                  </View>
+                )}
                 {localMode && (
                   <View style={styles.localBadge}>
                     <Text style={styles.localBadgeText}>Local mode</Text>
                   </View>
                 )}
               </View>
+              <Text style={styles.versionText} testID="app-version">
+                Version {APP_VERSION}
+              </Text>
             </View>
+
+            <View style={[styles.sectionCard, sharedStyles.card]}>
+              <Text style={sharedStyles.sectionTitle}>Email</Text>
+              <Text style={styles.sectionHint}>
+                Used for calendar invites when a plan date is locked in.
+              </Text>
+              <Text style={styles.fieldLabel}>Email address</Text>
+              <TextInput
+                style={sharedStyles.input}
+                placeholder="you@example.com"
+                placeholderTextColor={theme.colors.textMuted}
+                value={contactEmail}
+                onChangeText={(value) => {
+                  setContactEmail(value);
+                  setEmailError('');
+                  setEmailSuccess('');
+                }}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="email"
+                textContentType="emailAddress"
+                testID="contact-email-input"
+              />
+              {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
+              {emailSuccess ? <Text style={styles.successText}>{emailSuccess}</Text> : null}
+              <Pressable
+                style={[sharedStyles.secondaryBtn, busy && styles.btnDisabled]}
+                onPress={handleSaveEmail}
+                disabled={busy}
+                testID="save-email-btn"
+              >
+                {busy ? (
+                  <ActivityIndicator color={theme.colors.text} />
+                ) : (
+                  <Text style={sharedStyles.secondaryBtnText}>Save email</Text>
+                )}
+              </Pressable>
+            </View>
+
+            {isAdmin ? (
+              <View style={[styles.sectionCard, sharedStyles.card]} testID="admin-users-section">
+                <Text style={sharedStyles.sectionTitle}>Users</Text>
+                <Text style={styles.sectionHint}>
+                  Create and delete login accounts. Only Hr. Lins is the default admin and cannot be
+                  deleted.
+                </Text>
+
+                <View style={styles.userMgmtList}>
+                  {users.map((user) => {
+                    const canDelete =
+                      user.id !== ADMIN_USER_ID &&
+                      user.id !== signedInUser?.id &&
+                      user.role !== 'admin';
+                    return (
+                      <View key={user.id} style={styles.userMgmtRow} testID={`managed-user-${user.id}`}>
+                        <UserAvatar name={user.displayName} size={40} />
+                        <View style={styles.userMgmtText}>
+                          <Text style={styles.userMgmtName}>{user.displayName}</Text>
+                          <Text style={styles.userMgmtMeta}>
+                            {user.role === 'admin' ? 'Admin' : 'Member'}
+                          </Text>
+                        </View>
+                        {canDelete ? (
+                          <Pressable
+                            style={styles.deleteUserBtn}
+                            onPress={() => handleDeleteUser(user)}
+                            disabled={busy}
+                            testID={`delete-user-${user.id}`}
+                          >
+                            <Text style={styles.deleteUserText}>Delete</Text>
+                          </Pressable>
+                        ) : (
+                          <Text style={styles.userMgmtLocked}>Protected</Text>
+                        )}
+                      </View>
+                    );
+                  })}
+                </View>
+
+                <Text style={styles.fieldLabel}>New user name</Text>
+                <TextInput
+                  style={sharedStyles.input}
+                  placeholder="Display name"
+                  placeholderTextColor={theme.colors.textMuted}
+                  value={newUserName}
+                  onChangeText={(value) => {
+                    setNewUserName(value);
+                    setUserMgmtError('');
+                    setUserMgmtSuccess('');
+                  }}
+                  autoCapitalize="words"
+                  autoCorrect={false}
+                  testID="new-user-name-input"
+                />
+                <Text style={styles.fieldLabel}>Temporary password</Text>
+                <TextInput
+                  style={sharedStyles.input}
+                  placeholder="Password"
+                  placeholderTextColor={theme.colors.textMuted}
+                  value={newUserPassword}
+                  onChangeText={(value) => {
+                    setNewUserPassword(value);
+                    setUserMgmtError('');
+                    setUserMgmtSuccess('');
+                  }}
+                  secureTextEntry
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  testID="new-user-password-input"
+                />
+                {userMgmtError ? <Text style={styles.errorText}>{userMgmtError}</Text> : null}
+                {userMgmtSuccess ? <Text style={styles.successText}>{userMgmtSuccess}</Text> : null}
+                <Pressable
+                  style={[sharedStyles.primaryBtn, busy && styles.btnDisabled]}
+                  onPress={handleCreateUser}
+                  disabled={busy}
+                  testID="create-user-btn"
+                >
+                  {busy ? (
+                    <ActivityIndicator color={theme.colors.onPrimary} />
+                  ) : (
+                    <Text style={sharedStyles.primaryBtnText}>Create user</Text>
+                  )}
+                </Pressable>
+              </View>
+            ) : null}
 
             <View style={[styles.sectionCard, sharedStyles.card]}>
               <Text style={sharedStyles.sectionTitle}>Reset password</Text>
@@ -204,6 +450,23 @@ export default function SettingsScreen() {
             </View>
 
             <View style={[styles.sectionCard, sharedStyles.card]}>
+              <Text style={sharedStyles.sectionTitle}>Group</Text>
+              <Pressable
+                style={styles.navRow}
+                onPress={() => router.push('/hosts')}
+                testID="open-hosts-btn"
+                accessibilityRole="button"
+                accessibilityLabel="Hosts"
+              >
+                <View style={styles.navRowText}>
+                  <Text style={styles.navRowTitle}>Hosts</Text>
+                  <Text style={styles.navRowHint}>Monthly host rotation</Text>
+                </View>
+                <Text style={styles.navRowChevron}>›</Text>
+              </Pressable>
+            </View>
+
+            <View style={[styles.sectionCard, sharedStyles.card]}>
               <Text style={sharedStyles.sectionTitle}>Account</Text>
               <Pressable
                 style={[styles.logoutBtn, busy && styles.btnDisabled]}
@@ -218,6 +481,10 @@ export default function SettingsScreen() {
                 )}
               </Pressable>
             </View>
+
+            <Text style={styles.versionText} testID="app-version-footer">
+              Version {APP_VERSION}
+            </Text>
           </>
         ) : (
           <>
@@ -225,12 +492,15 @@ export default function SettingsScreen() {
               <Logo size={80} showTitle={false} />
               <Text style={styles.heroTitle}>Welcome to GSL</Text>
               <Text style={styles.heroSubtitle}>Choose your account and enter your password</Text>
+              <Text style={styles.versionText} testID="app-version-login">
+                Version {APP_VERSION}
+              </Text>
             </View>
 
             <View style={[styles.sectionCard, sharedStyles.card]}>
               <Text style={sharedStyles.sectionTitle}>Select user</Text>
               <View style={styles.userList}>
-                {HARDCODED_USERS.map((user) => (
+                {users.map((user) => (
                   <UserOptionRow
                     key={user.id}
                     user={user}
@@ -283,6 +553,7 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   content: {
+    ...feedColumn,
     padding: theme.spacing.lg,
     paddingBottom: theme.spacing.xxl,
     gap: theme.spacing.lg,
@@ -313,8 +584,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: theme.colors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
   },
   userList: {
     gap: theme.spacing.sm,
@@ -338,6 +607,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: theme.spacing.sm,
     marginTop: theme.spacing.sm,
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+  },
+  adminBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: theme.radius.pill,
+    backgroundColor: theme.colors.accentSoft,
+  },
+  adminBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: theme.colors.accent,
   },
   localBadge: {
     paddingHorizontal: 8,
@@ -346,16 +628,56 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.warningSoft,
   },
   localBadgeText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
-    color: '#b45309',
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
+    color: theme.colors.textSecondary,
   },
   sectionHint: {
     fontSize: 14,
     color: theme.colors.textSecondary,
     lineHeight: 20,
+  },
+  userMgmtList: {
+    gap: theme.spacing.sm,
+  },
+  userMgmtRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: theme.colors.border,
+  },
+  userMgmtText: {
+    flex: 1,
+    gap: 2,
+  },
+  userMgmtName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: theme.colors.text,
+  },
+  userMgmtMeta: {
+    fontSize: 13,
+    color: theme.colors.textSecondary,
+  },
+  userMgmtLocked: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: theme.colors.textMuted,
+  },
+  deleteUserBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: theme.radius.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.danger,
+    backgroundColor: theme.colors.dangerSoft,
+  },
+  deleteUserText: {
+    color: theme.colors.danger,
+    fontSize: 13,
+    fontWeight: '600',
   },
   errorText: {
     color: theme.colors.danger,
@@ -364,6 +686,30 @@ const styles = StyleSheet.create({
   successText: {
     color: theme.colors.success,
     fontSize: 14,
+  },
+  navRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+  },
+  navRowText: {
+    flex: 1,
+    gap: 2,
+  },
+  navRowTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: theme.colors.text,
+  },
+  navRowHint: {
+    fontSize: 13,
+    color: theme.colors.textSecondary,
+  },
+  navRowChevron: {
+    fontSize: 22,
+    color: theme.colors.textMuted,
+    lineHeight: 24,
   },
   logoutBtn: {
     paddingVertical: 14,
@@ -380,5 +726,11 @@ const styles = StyleSheet.create({
   },
   btnDisabled: {
     opacity: 0.6,
+  },
+  versionText: {
+    textAlign: 'center',
+    fontSize: 13,
+    color: theme.colors.textMuted,
+    marginTop: theme.spacing.sm,
   },
 });

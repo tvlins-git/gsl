@@ -1,5 +1,5 @@
-import * as ImagePicker from 'expo-image-picker';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -12,37 +12,55 @@ import {
 } from 'react-native';
 import { PhotoEventRow } from '@/components/PhotoEventRow';
 import { PhotoGrid } from '@/components/PhotoGrid';
+import { PhotoViewer } from '@/components/PhotoViewer';
+import { UserAvatar } from '@/components/UserAvatar';
 import { Screen } from '@/components/ui/Screen';
 import { useAuth } from '@/contexts/AuthContext';
-import type { Photo, PhotoEvent } from '@/lib/database.types';
+import { getGroupMembers } from '@/lib/auth';
+import type { Member, Photo, PhotoEvent } from '@/lib/database.types';
 import { compressImage } from '@/lib/image-compress';
 import { isLocalMode, localStore } from '@/lib/local-store';
+import { uploadJpegToPhotos } from '@/lib/photo-upload';
 import {
   deletePhotoEvent,
-  formatEventDate,
   formatPhotoCount,
+  getPhotoPublicUrl,
   loadPhotoEventSummaries,
   type PhotoEventSummary,
 } from '@/lib/photo-events';
+import { albumBackAction, albumBackButtonText, albumBackLabel, firstSearchParam } from '@/lib/album-back';
+import { isCameraPickerAvailable, pickImageUris } from '@/lib/pick-image';
 import { deletePhoto } from '@/lib/photo-list';
+import { formatRelativeTime } from '@/lib/time';
 import { supabase } from '@/lib/supabase';
-import { sharedStyles, theme } from '@/constants/theme';
+import { feedColumn, sharedStyles, theme } from '@/constants/theme';
 
 export default function PhotosScreen() {
   const { member } = useAuth();
+  const params = useLocalSearchParams<{ eventId?: string | string[]; from?: string | string[] }>();
+  const eventId = firstSearchParam(params.eventId);
+  const from = firstSearchParam(params.from);
+  const openedEventId = useRef<string | null>(null);
   const [summaries, setSummaries] = useState<PhotoEventSummary[]>([]);
+  const [members, setMembers] = useState<Member[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<PhotoEvent | null>(null);
+  const [openedFromLink, setOpenedFromLink] = useState(false);
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [newTitle, setNewTitle] = useState('');
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
 
   const loadSummaries = useCallback(async () => {
     if (!member) return;
     setLoading(true);
-    const data = await loadPhotoEventSummaries(member.group_id);
+    const [data, groupMembers] = await Promise.all([
+      loadPhotoEventSummaries(member.group_id),
+      getGroupMembers(member.group_id),
+    ]);
     setSummaries(data);
+    setMembers(groupMembers);
     setLoading(false);
   }, [member]);
 
@@ -61,7 +79,20 @@ export default function PhotosScreen() {
     if (selectedEvent) loadPhotos(selectedEvent.id);
   }, [selectedEvent, loadPhotos]);
 
+  useEffect(() => {
+    if (!eventId || openedEventId.current === eventId) return;
+    const match = summaries.find((item) => item.event.id === eventId);
+    if (match) {
+      openedEventId.current = eventId;
+      setOpenedFromLink(true);
+      setSelectedEvent(match.event);
+    }
+  }, [eventId, summaries]);
+
   const selectedSummary = summaries.find((s) => s.event.id === selectedEvent?.id);
+  const nameForUser = (userId?: string | null) =>
+    members.find((item) => item.user_id === userId)?.display_name
+    ?? (member && userId === member.user_id ? member.display_name : 'Friend');
 
   const topPhotoIds = useMemo(() => {
     const scored = photos.filter((p) => p.ai_score != null);
@@ -69,14 +100,7 @@ export default function PhotosScreen() {
     return new Set(scored.slice(0, topN).map((p) => p.id));
   }, [photos]);
 
-  const getImageUrl = (photo: Photo, thumb = false) => {
-    if (isLocalMode()) {
-      return thumb && photo.thumb_path ? photo.thumb_path : photo.storage_path;
-    }
-    const path = thumb && photo.thumb_path ? photo.thumb_path : photo.storage_path;
-    const { data } = supabase.storage.from('photos').getPublicUrl(path);
-    return data.publicUrl;
-  };
+  const getImageUrl = (photo: Photo, thumb = false) => getPhotoPublicUrl(photo, thumb);
 
   const handleCreateEvent = async () => {
     if (!member || !newTitle.trim()) return;
@@ -88,6 +112,7 @@ export default function PhotosScreen() {
           .select()
           .single()).data;
     if (data) {
+      setOpenedFromLink(false);
       setSelectedEvent(data);
       await loadSummaries();
     }
@@ -95,30 +120,27 @@ export default function PhotosScreen() {
     setNewTitle('');
   };
 
-  const uploadImage = async (uri: string) => {
+  const persistAlbumPhoto = async (uri: string) => {
     if (!member || !selectedEvent) return;
-    setUploading(true);
-
-    const compressed = await compressImage(uri, { maxWidth: 1200, quality: 0.8 });
-    const thumb = await compressImage(uri, { maxWidth: 300, quality: 0.7 });
 
     if (isLocalMode()) {
-      await localStore.addPhoto(selectedEvent.id, member.user_id, compressed.uri, thumb.uri);
-      await loadPhotos(selectedEvent.id);
-      await loadSummaries();
-      setUploading(false);
+      const compressed = await compressImage(uri, { maxWidth: 1200, quality: 0.8, includeBase64: true });
+      const thumb = await compressImage(uri, { maxWidth: 300, quality: 0.7, includeBase64: true });
+      const fullUri = compressed.base64
+        ? `data:image/jpeg;base64,${compressed.base64}`
+        : compressed.uri;
+      const thumbUri = thumb.base64 ? `data:image/jpeg;base64,${thumb.base64}` : thumb.uri;
+      await localStore.addPhoto(selectedEvent.id, member.user_id, fullUri, thumbUri);
       return;
     }
 
+    const compressed = await compressImage(uri, { maxWidth: 1200, quality: 0.8 });
     const photoId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const storagePath = `${member.group_id}/${selectedEvent.id}/${photoId}.jpg`;
     const thumbPath = `${member.group_id}/${selectedEvent.id}/${photoId}_thumb.jpg`;
 
-    const fullBlob = await (await fetch(compressed.uri)).blob();
-    const thumbBlob = await (await fetch(thumb.uri)).blob();
-
-    await supabase.storage.from('photos').upload(storagePath, fullBlob, { contentType: 'image/jpeg' });
-    await supabase.storage.from('photos').upload(thumbPath, thumbBlob, { contentType: 'image/jpeg' });
+    await uploadJpegToPhotos(storagePath, uri, { maxWidth: 1200, quality: 0.8 });
+    await uploadJpegToPhotos(thumbPath, uri, { maxWidth: 300, quality: 0.7 });
 
     const { data: photo } = await supabase
       .from('photos')
@@ -135,36 +157,54 @@ export default function PhotosScreen() {
 
     if (photo) {
       await supabase.functions.invoke('score-photo', { body: { photo_id: photo.id } }).catch(() => undefined);
+    }
+  };
+
+  const uploadImages = async (uris: string[]) => {
+    if (!member || !selectedEvent || uris.length === 0) return;
+    setUploading(true);
+    try {
+      for (const uri of uris) {
+        try {
+          await persistAlbumPhoto(uri);
+        } catch {
+          // Keep the rest of the batch; a single bad asset should not drop the others.
+        }
+      }
       await loadPhotos(selectedEvent.id);
       await loadSummaries();
+    } finally {
+      setUploading(false);
     }
-
-    setUploading(false);
   };
 
   const pickFromGallery = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      quality: 1,
-    });
-    if (!result.canceled && result.assets[0]) {
-      await uploadImage(result.assets[0].uri);
-    }
+    const uris = await pickImageUris('gallery', { multiple: true });
+    await uploadImages(uris);
   };
 
   const takePhoto = async () => {
-    const perm = await ImagePicker.requestCameraPermissionsAsync();
-    if (!perm.granted) return;
-    const result = await ImagePicker.launchCameraAsync({ quality: 1 });
-    if (!result.canceled && result.assets[0]) {
-      await uploadImage(result.assets[0].uri);
-    }
+    const uris = await pickImageUris('camera');
+    await uploadImages(uris);
   };
 
   const closeEvent = () => {
     setSelectedEvent(null);
+    setOpenedFromLink(false);
     setPhotos([]);
+    setViewerIndex(null);
     loadSummaries();
+  };
+
+  const handleAlbumBack = () => {
+    const dest = albumBackAction({
+      openedFromLink,
+      from,
+      canGoBack: router.canGoBack(),
+    });
+    closeEvent();
+    if (dest.type === 'back') router.back();
+    else if (dest.type === 'replace') router.replace(dest.href);
   };
 
   const handleDeletePhoto = async (photo: Photo) => {
@@ -177,6 +217,7 @@ export default function PhotosScreen() {
   const handleDeleteEvent = async (eventId: string) => {
     await deletePhotoEvent(eventId);
     if (selectedEvent?.id === eventId) {
+      setOpenedFromLink(false);
       setSelectedEvent(null);
       setPhotos([]);
     }
@@ -188,16 +229,24 @@ export default function PhotosScreen() {
   }
 
   if (selectedEvent) {
+    const backFrom = openedFromLink ? from : undefined;
     return (
       <Screen>
-        <Pressable onPress={closeEvent} style={styles.backBtn}>
-          <Text style={styles.back}>← Back to events</Text>
+        <Pressable
+          onPress={handleAlbumBack}
+          style={styles.backBtn}
+          testID="album-back-btn"
+          accessibilityRole="button"
+          accessibilityLabel={albumBackLabel(backFrom)}
+        >
+          <Text style={styles.back}>{albumBackButtonText(backFrom)}</Text>
         </Pressable>
         <View style={[styles.detailHeader, sharedStyles.card]}>
+          <UserAvatar name={nameForUser(selectedEvent.created_by)} size={48} />
           <View style={styles.detailTitleBlock}>
             <Text style={styles.detailTitle}>{selectedEvent.title}</Text>
             <Text style={styles.detailMeta}>
-              Added {formatEventDate(selectedEvent.created_at)}
+              {nameForUser(selectedEvent.created_by)} · {formatRelativeTime(selectedEvent.created_at)}
               {selectedSummary ? ` · ${formatPhotoCount(selectedSummary.photoCount)}` : ''}
             </Text>
           </View>
@@ -220,16 +269,19 @@ export default function PhotosScreen() {
             style={[styles.actionBtn, sharedStyles.primaryBtn, uploading && styles.actionDisabled]}
             onPress={pickFromGallery}
             disabled={uploading}
+            testID="album-gallery-btn"
           >
             <Text style={sharedStyles.primaryBtnText}>Gallery</Text>
           </Pressable>
-          <Pressable
-            style={[styles.actionBtn, sharedStyles.secondaryBtn, uploading && styles.actionDisabled]}
-            onPress={takePhoto}
-            disabled={uploading}
-          >
-            <Text style={sharedStyles.secondaryBtnText}>Camera</Text>
-          </Pressable>
+          {isCameraPickerAvailable() ? (
+            <Pressable
+              style={[styles.actionBtn, sharedStyles.secondaryBtn, uploading && styles.actionDisabled]}
+              onPress={takePhoto}
+              disabled={uploading}
+            >
+              <Text style={sharedStyles.secondaryBtnText}>Camera</Text>
+            </Pressable>
+          ) : null}
           {uploading && <ActivityIndicator color={theme.colors.primary} />}
         </View>
 
@@ -237,7 +289,19 @@ export default function PhotosScreen() {
           photos={photos}
           topPhotoIds={topPhotoIds}
           getImageUrl={getImageUrl}
+          onPhotoPress={(photo) => {
+            const index = photos.findIndex((item) => item.id === photo.id);
+            if (index >= 0) setViewerIndex(index);
+          }}
           onDeletePhoto={handleDeletePhoto}
+        />
+        <PhotoViewer
+          visible={viewerIndex != null}
+          photos={photos}
+          initialIndex={viewerIndex ?? 0}
+          getImageUrl={getImageUrl}
+          onClose={() => setViewerIndex(null)}
+          onDelete={handleDeletePhoto}
         />
       </Screen>
     );
@@ -245,27 +309,37 @@ export default function PhotosScreen() {
 
   return (
     <Screen>
-      <Pressable
-        style={[styles.createBtn, sharedStyles.primaryBtn]}
-        onPress={() => setShowCreate(true)}
-        testID="create-photo-event-btn"
-      >
-        <Text style={sharedStyles.primaryBtnText}>+ New event</Text>
-      </Pressable>
-
       <FlatList
         data={summaries}
         keyExtractor={(item) => item.event.id}
         contentContainerStyle={styles.list}
+        ListHeaderComponent={
+          <View style={sharedStyles.toolBar}>
+            <Text style={sharedStyles.toolBarTitle}>Albums</Text>
+            <Pressable
+              style={sharedStyles.toolBarAction}
+              onPress={() => setShowCreate(true)}
+              testID="create-photo-event-btn"
+            >
+              <Text style={sharedStyles.toolBarActionText}>New album</Text>
+            </Pressable>
+          </View>
+        }
         renderItem={({ item }) => (
           <PhotoEventRow
             summary={item}
-            onPress={() => setSelectedEvent(item.event)}
+            authorName={nameForUser(item.event.created_by)}
+            onPress={() => {
+              setOpenedFromLink(false);
+              setSelectedEvent(item.event);
+            }}
             onDelete={() => handleDeleteEvent(item.event.id)}
           />
         )}
         ListEmptyComponent={
-          <Text style={sharedStyles.empty}>Create an event to start uploading photos.</Text>
+          <Text style={sharedStyles.empty}>
+            No albums yet. Start one and drop in a few photos.
+          </Text>
         }
       />
 
@@ -295,11 +369,8 @@ export default function PhotosScreen() {
 }
 
 const styles = StyleSheet.create({
-  createBtn: {
-    margin: theme.spacing.lg,
-    marginBottom: theme.spacing.sm,
-  },
   list: {
+    ...feedColumn,
     paddingHorizontal: theme.spacing.lg,
     paddingBottom: theme.spacing.xxl,
   },
@@ -314,8 +385,7 @@ const styles = StyleSheet.create({
   },
   detailHeader: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
+    alignItems: 'center',
     marginHorizontal: theme.spacing.lg,
     marginBottom: theme.spacing.md,
     padding: theme.spacing.lg,

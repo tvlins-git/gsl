@@ -1,7 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { DEFAULT_HARDCODED_USER, HARDCODED_USERS, type HardcodedUser } from '@/constants/hardcoded-user';
+import { DEFAULT_HARDCODED_USER, type AppUser } from '@/constants/hardcoded-user';
+import { selectAlbumPreviewPhotos } from './album-previews';
+import { getAppUsersSync } from './app-users';
 import { summarizePollAcceptance } from './polls';
 import type {
+  FeedPost,
+  FeedPostTag,
   HostAssignment,
   Member,
   Message,
@@ -15,23 +19,26 @@ import type {
 
 export const LOCAL_GROUP_ID = '00000000-0000-4000-8000-000000000001';
 
-const LOCAL_USER_IDS: Record<HardcodedUser['id'], { memberId: string; userId: string }> = {
-  'hr-lins': {
-    memberId: '00000000-0000-4000-8000-000000000002',
-    userId: '00000000-0000-4000-8000-000000000003',
-  },
-  'hr-andersen': {
-    memberId: '00000000-0000-4000-8000-000000000004',
-    userId: '00000000-0000-4000-8000-000000000005',
-  },
-};
-
 const STORAGE_KEY = 'gsl_local_data_v1';
 
 let localModeActive = false;
-let activeLocalUser: HardcodedUser = DEFAULT_HARDCODED_USER;
+let activeLocalUser: AppUser = DEFAULT_HARDCODED_USER;
+let memberEmailCache: Record<string, string> = {};
 
-export function setActiveLocalUser(user: HardcodedUser) {
+function memberFromAppUser(user: AppUser): Member {
+  return {
+    id: user.localMemberId,
+    group_id: LOCAL_GROUP_ID,
+    user_id: user.localUserId,
+    display_name: user.displayName,
+    avatar_url: null,
+    contact_email: contactEmailFor(user.localMemberId),
+    role: user.role,
+    created_at: new Date().toISOString(),
+  };
+}
+
+export function setActiveLocalUser(user: AppUser) {
   activeLocalUser = user;
 }
 
@@ -47,32 +54,18 @@ export function isLocalMode() {
   return localModeActive;
 }
 
+function contactEmailFor(memberId: string): string | null {
+  const email = memberEmailCache[memberId]?.trim();
+  return email || null;
+}
+
 export function createLocalMember(): Member {
-  const ids = LOCAL_USER_IDS[activeLocalUser.id];
-  return {
-    id: ids.memberId,
-    group_id: LOCAL_GROUP_ID,
-    user_id: ids.userId,
-    display_name: activeLocalUser.displayName,
-    avatar_url: null,
-    role: 'admin',
-    created_at: new Date().toISOString(),
-  };
+  const live = getAppUsersSync().find((user) => user.id === activeLocalUser.id) ?? activeLocalUser;
+  return memberFromAppUser(live);
 }
 
 export function getLocalGroupMembers(): Member[] {
-  return HARDCODED_USERS.map((user) => {
-    const ids = LOCAL_USER_IDS[user.id];
-    return {
-      id: ids.memberId,
-      group_id: LOCAL_GROUP_ID,
-      user_id: ids.userId,
-      display_name: user.displayName,
-      avatar_url: null,
-      role: 'admin',
-      created_at: new Date().toISOString(),
-    };
-  });
+  return getAppUsersSync().map(memberFromAppUser);
 }
 
 interface LocalData {
@@ -84,6 +77,9 @@ interface LocalData {
   messages: Message[];
   photo_events: PhotoEvent[];
   photos: Photo[];
+  feed_posts: FeedPost[];
+  feed_post_tags: FeedPostTag[];
+  member_emails: Record<string, string>;
 }
 
 const emptyData = (): LocalData => ({
@@ -95,13 +91,24 @@ const emptyData = (): LocalData => ({
   messages: [],
   photo_events: [],
   photos: [],
+  feed_posts: [],
+  feed_post_tags: [],
+  member_emails: {},
 });
 
 async function readData(): Promise<LocalData> {
   const raw = await AsyncStorage.getItem(STORAGE_KEY);
   if (!raw) return emptyData();
   try {
-    return { ...emptyData(), ...JSON.parse(raw) };
+    const parsed = JSON.parse(raw) as Partial<LocalData>;
+    memberEmailCache = parsed.member_emails ?? {};
+    return {
+      ...emptyData(),
+      ...parsed,
+      feed_posts: parsed.feed_posts ?? [],
+      feed_post_tags: parsed.feed_post_tags ?? [],
+      member_emails: parsed.member_emails ?? {},
+    };
   } catch {
     return emptyData();
   }
@@ -120,6 +127,11 @@ function uuid() {
 }
 
 export const localStore = {
+  /** Load persisted local data into memory (emails, etc.). */
+  async hydrate() {
+    await readData();
+  },
+
   async getHostAssignments(groupId: string) {
     const data = await readData();
     return data.host_assignments.filter((a) => a.group_id === groupId);
@@ -153,7 +165,14 @@ export const localStore = {
 
   async getPolls(groupId: string) {
     const data = await readData();
-    return data.polls.filter((p) => p.group_id === groupId).sort((a, b) => b.created_at.localeCompare(a.created_at));
+    return data.polls
+      .filter((p) => p.group_id === groupId)
+      .map((p) => ({
+        ...p,
+        chosen_slot_id: p.chosen_slot_id ?? null,
+        status: p.status ?? 'open',
+      }))
+      .sort((a, b) => b.created_at.localeCompare(a.created_at));
   },
 
   async getPollSlots(pollId: string) {
@@ -174,6 +193,7 @@ export const localStore = {
       title,
       created_by: userId,
       status: 'open',
+      chosen_slot_id: null,
       created_at: new Date().toISOString(),
     };
     data.polls.push(poll);
@@ -228,6 +248,31 @@ export const localStore = {
     data.poll_slots = data.poll_slots.filter((s) => s.poll_id !== pollId);
     data.poll_responses = data.poll_responses.filter((r) => !slotIds.includes(r.slot_id));
     await writeData(data);
+  },
+
+  async updateMemberEmail(memberId: string, email: string | null) {
+    const data = await readData();
+    const trimmed = email?.trim() ?? '';
+    if (trimmed) {
+      data.member_emails[memberId] = trimmed;
+    } else {
+      delete data.member_emails[memberId];
+    }
+    memberEmailCache = { ...data.member_emails };
+    await writeData(data);
+    return createLocalMember();
+  },
+
+  async lockPoll(pollId: string, slotId: string) {
+    const data = await readData();
+    const poll = data.polls.find((p) => p.id === pollId);
+    if (!poll) throw new Error('Poll not found');
+    const slot = data.poll_slots.find((s) => s.id === slotId && s.poll_id === pollId);
+    if (!slot) throw new Error('Slot not found');
+    poll.status = 'closed';
+    poll.chosen_slot_id = slotId;
+    await writeData(data);
+    return poll;
   },
 
   async getThreads(groupId: string) {
@@ -285,10 +330,20 @@ export const localStore = {
     const events = data.photo_events
       .filter((e) => e.group_id === groupId)
       .sort((a, b) => b.created_at.localeCompare(a.created_at));
-    return events.map((event) => ({
-      event,
-      photoCount: data.photos.filter((p) => p.event_id === event.id).length,
-    }));
+    return events.map((event) => {
+      const eventPhotos = data.photos.filter((p) => p.event_id === event.id);
+      const previewPhotos = selectAlbumPreviewPhotos(eventPhotos);
+      return {
+        event,
+        photoCount: eventPhotos.length,
+        previewPhotos,
+        coverPhoto: previewPhotos[0] ?? null,
+        latestPhotoAt: eventPhotos.reduce<string | null>((latest, photo) => {
+          if (!latest || photo.created_at > latest) return photo.created_at;
+          return latest;
+        }, null),
+      };
+    });
   },
 
   async createPhotoEvent(groupId: string, title: string, userId: string, eventDate?: string) {
@@ -340,5 +395,60 @@ export const localStore = {
     data.photo_events = data.photo_events.filter((e) => e.id !== eventId);
     data.photos = data.photos.filter((p) => p.event_id !== eventId);
     await writeData(data);
+  },
+
+  async deleteFeedPost(postId: string) {
+    const data = await readData();
+    data.feed_posts = (data.feed_posts ?? []).filter((post) => post.id !== postId);
+    data.feed_post_tags = (data.feed_post_tags ?? []).filter((tag) => tag.post_id !== postId);
+    await writeData(data);
+  },
+
+  async getFeedPosts(groupId: string) {
+    const data = await readData();
+    const posts = data.feed_posts ?? [];
+    const tags = data.feed_post_tags ?? [];
+    return posts
+      .filter((post) => post.group_id === groupId)
+      .sort((a, b) => b.created_at.localeCompare(a.created_at))
+      .map((post) => ({
+        ...post,
+        taggedUserIds: tags.filter((tag) => tag.post_id === post.id).map((tag) => tag.user_id),
+        imageUri: post.image_path,
+      }));
+  },
+
+  async createFeedPost(input: {
+    groupId: string;
+    authorId: string;
+    body: string;
+    imagePath: string | null;
+    tagAll: boolean;
+    taggedUserIds: string[];
+  }): Promise<FeedPost & { taggedUserIds: string[]; imageUri: string | null }> {
+    const data = await readData();
+    data.feed_posts ??= [];
+    data.feed_post_tags ??= [];
+    const post: FeedPost = {
+      id: uuid(),
+      group_id: input.groupId,
+      author_id: input.authorId,
+      body: input.body,
+      image_path: input.imagePath,
+      tag_all: input.tagAll,
+      created_at: new Date().toISOString(),
+    };
+    data.feed_posts.push(post);
+    if (!input.tagAll) {
+      for (const userId of input.taggedUserIds) {
+        data.feed_post_tags.push({ post_id: post.id, user_id: userId });
+      }
+    }
+    await writeData(data);
+    return {
+      ...post,
+      taggedUserIds: input.tagAll ? [] : input.taggedUserIds,
+      imageUri: post.image_path,
+    };
   },
 };

@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { APP_NAME } from '@/constants/brand';
+import { theme } from '@/constants/theme';
 import { Logo } from './Logo';
 
 interface GslHeaderProps {
@@ -41,12 +42,11 @@ const styles = StyleSheet.create({
   },
   compactTitle: {
     fontSize: 22,
-    fontWeight: '800',
-    letterSpacing: 3,
-    color: '#111',
+    fontWeight: '700',
+    color: theme.colors.text,
   },
   subtitle: {
     fontSize: 14,
-    color: '#666',
+    color: theme.colors.textMuted,
   },
 });

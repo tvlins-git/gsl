@@ -49,10 +49,9 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.borderLight,
   },
   text: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
+    textTransform: 'capitalize',
   },
   openText: {
     color: theme.colors.success,

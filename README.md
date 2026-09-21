@@ -45,19 +45,14 @@ cp .env.example .env
    EXPO_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
    EXPO_PUBLIC_SUPABASE_ANON_KEY=eyJ...
    ```
-3. Run migrations:
-   ```bash
-   supabase link --project-ref <your-ref>
-   supabase db push
-   ```
-4. Create a **photos** storage bucket (private) in the Supabase dashboard
-5. Deploy Edge Functions:
+3. Run migrations (`supabase db push`). `007_photos_storage_bucket.sql` creates the public **photos** bucket (15MB, jpeg/png/webp/heic) and storage RLS keyed to `auth_group_id()` so members can write under `{group_id}/...`. Feed images live at `{group_id}/feed/{post_id}.jpg`.
+4. Deploy Edge Functions:
    ```bash
    supabase functions deploy score-photo
    supabase functions deploy send-push
    supabase secrets set GOOGLE_CLOUD_VISION_API_KEY=<your-key>
    ```
-6. **Single user:** The app auto-signs in as **Hr. Lins** (no login screen). On first launch it creates the Supabase account if needed.
+5. **Single user:** The app auto-signs in as **Hr. Lins** (no login screen). On first launch it creates the Supabase account if needed.
 
 ### 3. Run the app
 
@@ -66,6 +61,30 @@ npx expo start
 ```
 
 Scan the QR code with Expo Go (development) or use a development build.
+
+### Expo Go on iOS Simulator
+
+Expo Go **57.0.6+** (57.0.9 is fine) ships Worklets **0.10.1** / Reanimated **4.5.1** natively. GSL pins the matching JS packages. The app also skips the Reanimated side-effect import inside Expo Go — Feed swipe-to-delete uses Gesture Handler `Swipeable`, and the album PhotoViewer uses React Native `Animated`, so Worklets is not needed at startup.
+
+Verify:
+
+1. `npx expo start` → open in Expo Go on iOS Simulator (iPhone 17 Pro is fine).
+2. App should get past the splash logo to **Feed**.
+3. On your own post, swipe left and tap **Delete**.
+4. Open an album → full-screen **PhotoViewer**, swipe between photos.
+
+### Album Gallery multi-select
+
+Album **Gallery** uses the system picker with multi-select (up to 20 photos). Feed **Gallery** stays single-select (one photo per post).
+
+**iOS test plan (Simulator + device):**
+
+1. Photos tab → open an album → tap **Gallery**.
+2. Tap several photos. Numbered badges appear (iOS 15+).
+3. Tap **Add** (top right) to confirm. Checkmarks alone do not add them.
+4. All selected photos should appear in the album grid.
+
+**Simulator Add/Done trap:** On some iOS Simulator runtimes, PHPicker shows checkmarks but no **Add** button. That is an Apple simulator bug, not the app forcing single-select. Cancel with **X** and retry, or pick on a physical device. Do not set album `allowsMultipleSelection` back to `false` to work around it — Feed already stays single-select via `pickImageUri`.
 
 ### 4. GitHub setup
 

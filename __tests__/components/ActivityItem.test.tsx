@@ -1,0 +1,143 @@
+import React from 'react';
+import { StyleSheet } from 'react-native';
+import { fireEvent, render, screen } from '@testing-library/react-native';
+import { ActivityItem } from '@/components/ActivityItem';
+import type { ActivityItem as ActivityItemData } from '@/lib/activity-feed';
+
+jest.mock('@/lib/local-store', () => ({
+  isLocalMode: jest.fn(() => true),
+  localStore: {},
+}));
+
+const item: ActivityItemData = {
+  id: 'album-1',
+  kind: 'album',
+  title: 'Ski trip',
+  subtitle: 'New album · 2 photos',
+  timestamp: new Date().toISOString(),
+  path: '/photos?eventId=1',
+  authorName: 'Hr. Lins',
+};
+
+describe('ActivityItem', () => {
+  it('renders kind, title, and subtitle', () => {
+    render(<ActivityItem item={item} onPress={() => {}} />);
+    expect(screen.getByText('Album')).toBeTruthy();
+    expect(screen.getByText('Ski trip')).toBeTruthy();
+    expect(screen.getByText(/New album · 2 photos/)).toBeTruthy();
+    expect(screen.getByTestId('feed-item-album-1')).toBeTruthy();
+  });
+
+  it('calls onPress', () => {
+    const onPress = jest.fn();
+    render(<ActivityItem item={item} onPress={onPress} />);
+    fireEvent.press(screen.getByTestId('feed-item-album-1'));
+    expect(onPress).toHaveBeenCalled();
+  });
+
+  it('labels locked plan items distinctly', () => {
+    render(
+      <ActivityItem
+        item={{ ...item, id: 'plan-lock-1', kind: 'plan_lock', subtitle: 'Date locked' }}
+        onPress={() => {}}
+      />
+    );
+    expect(screen.getByText('Plan')).toBeTruthy();
+    expect(screen.getByText(/Date locked/)).toBeTruthy();
+  });
+
+  it('renders a post photo on its own full-width row below the title', () => {
+    render(
+      <ActivityItem
+        item={{
+          ...item,
+          id: 'post-1',
+          kind: 'post',
+          title: 'Hello GSL',
+          subtitle: 'Tagged everyone',
+          imageUri: 'file://photo.jpg',
+        }}
+        onPress={() => {}}
+      />
+    );
+    expect(screen.getByText('Post')).toBeTruthy();
+    expect(screen.getByText('Hello GSL')).toBeTruthy();
+    const photo = screen.getByTestId('feed-item-post-1-photo');
+    expect(photo.props.resizeMode).toBe('contain');
+    const photoStyle = StyleSheet.flatten(photo.props.style);
+    expect(photoStyle.width).toBe('100%');
+    expect(photoStyle.aspectRatio).toBeGreaterThan(0);
+    expect(photoStyle.height).toBeUndefined();
+    expect(screen.queryByTestId('delete-feed-item-post-1')).toBeNull();
+  });
+
+  it('shows a compact album thumb strip from real photo URIs', () => {
+    render(
+      <ActivityItem
+        item={{
+          ...item,
+          thumbUris: ['file://thumb-1.jpg', 'file://thumb-2.jpg'],
+          photoCount: 2,
+        }}
+        onPress={() => {}}
+      />
+    );
+    expect(screen.getByTestId('feed-item-album-1-thumbs')).toBeTruthy();
+    const first = screen.getByTestId('feed-item-album-1-thumbs-0');
+    const strip = StyleSheet.flatten(screen.getByTestId('feed-item-album-1-thumbs').props.style);
+    const thumbStyle = StyleSheet.flatten(first.props.style);
+    expect(first.props.source).toEqual({ uri: 'file://thumb-1.jpg' });
+    expect(first.props.resizeMode).toBe('cover');
+    expect(thumbStyle.width).toBe(52);
+    expect(thumbStyle.height).toBe(52);
+    expect(thumbStyle.borderRadius).toBe(2);
+    expect(thumbStyle.borderWidth).toBeUndefined();
+    expect(strip.gap).toBe(6);
+    expect(screen.getByTestId('feed-item-album-1-thumbs-1').props.source).toEqual({
+      uri: 'file://thumb-2.jpg',
+    });
+    expect(screen.queryByTestId('feed-item-album-1-photo')).toBeNull();
+    expect(screen.queryByTestId('feed-item-album-1-thumbs-more')).toBeNull();
+  });
+
+  it('caps the strip and shows +N when the album has more photos', () => {
+    render(
+      <ActivityItem
+        item={{
+          ...item,
+          thumbUris: [
+            'file://a.jpg',
+            'file://b.jpg',
+            'file://c.jpg',
+            'file://d.jpg',
+            'file://e.jpg',
+          ],
+          photoCount: 12,
+        }}
+        onPress={() => {}}
+      />
+    );
+    expect(screen.getByTestId('feed-item-album-1-thumbs-3')).toBeTruthy();
+    expect(screen.queryByTestId('feed-item-album-1-thumbs-4')).toBeNull();
+    expect(screen.getByText('+8')).toBeTruthy();
+  });
+
+  it('keeps empty albums text-only without a broken thumb', () => {
+    render(<ActivityItem item={{ ...item, thumbUris: [] }} onPress={() => {}} />);
+    expect(screen.queryByTestId('feed-item-album-1-thumbs')).toBeNull();
+    expect(screen.getByText('Ski trip')).toBeTruthy();
+  });
+
+  it('reveals Delete for swipe-to-delete when onDelete is provided', () => {
+    const onDelete = jest.fn();
+    render(
+      <ActivityItem
+        item={{ ...item, id: 'post-1', kind: 'post', title: 'Hello GSL' }}
+        onPress={() => {}}
+        onDelete={onDelete}
+      />
+    );
+    fireEvent.press(screen.getByTestId('delete-feed-item-post-1'));
+    expect(onDelete).toHaveBeenCalled();
+  });
+});

@@ -15,8 +15,13 @@ import { Screen } from '@/components/ui/Screen';
 import { useAuth } from '@/contexts/AuthContext';
 import { getGroupMembers } from '@/lib/auth';
 import type { Message, Member } from '@/lib/database.types';
-import { sortMessagesChronologically } from '@/lib/messages';
-import { isLocalMode, localStore } from '@/lib/local-store';
+import {
+  createOptimisticMessage,
+  mergeMessages,
+  sortMessagesChronologically,
+} from '@/lib/messages';
+import { listThreadMessages, sendThreadMessage } from '@/lib/thread-messages';
+import { isLocalMode } from '@/lib/local-store';
 import { supabase } from '@/lib/supabase';
 import { sharedStyles, theme } from '@/constants/theme';
 
@@ -33,13 +38,14 @@ export default function ThreadScreen() {
 
   const loadMessages = useCallback(async () => {
     if (!id || !member) return;
-    const m = await getGroupMembers(member.group_id);
-    const msgs = isLocalMode()
-      ? await localStore.getMessages(id)
-      : (await supabase.from('messages').select('*').eq('thread_id', id)).data ?? [];
-    setMessages(sortMessagesChronologically(msgs));
-    setMembers(m);
-    setLoading(false);
+    try {
+      const m = await getGroupMembers(member.group_id);
+      const msgs = await listThreadMessages(id);
+      setMessages(sortMessagesChronologically(msgs));
+      setMembers(m);
+    } finally {
+      setLoading(false);
+    }
   }, [id, member]);
 
   useEffect(() => {
@@ -53,7 +59,7 @@ export default function ThreadScreen() {
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'messages', filter: `thread_id=eq.${id}` },
         (payload) => {
-          setMessages((prev) => sortMessagesChronologically([...prev, payload.new as Message]));
+          setMessages((prev) => mergeMessages(prev, [payload.new as Message]));
         }
       )
       .subscribe();
@@ -68,28 +74,33 @@ export default function ThreadScreen() {
     const text = body.trim();
     setBody('');
 
-    if (isLocalMode()) {
-      const msg = await localStore.addMessage(id, member.user_id, text);
-      setMessages((prev) => sortMessagesChronologically([...prev, msg]));
+    const optimistic = createOptimisticMessage(id, member.user_id, text);
+    setMessages((prev) => mergeMessages(prev, [optimistic]));
+
+    try {
+      const saved = await sendThreadMessage(id, member.user_id, text);
+      setMessages((prev) => mergeMessages(prev, [saved]));
+    } catch {
+      await loadMessages();
       return;
     }
 
-    await supabase.from('messages').insert({
-      thread_id: id,
-      sender_id: member.user_id,
-      body: text,
-    });
+    if (isLocalMode()) return;
 
-    await supabase.functions.invoke('send-push', {
-      body: {
-        type: 'chat',
-        group_id: member.group_id,
-        exclude_user_ids: [member.user_id],
-        title: 'GSL',
-        body: `${member.display_name}: ${text}`,
-        data: { threadId: id },
-      },
-    }).catch(() => undefined);
+    try {
+      await supabase.functions.invoke('send-push', {
+        body: {
+          type: 'chat',
+          group_id: member.group_id,
+          exclude_user_ids: [member.user_id],
+          title: 'GSL',
+          body: `${member.display_name}: ${text}`,
+          data: { threadId: id },
+        },
+      });
+    } catch {
+      // Push is best-effort; the message is already persisted and shown.
+    }
   };
 
   if (loading) {

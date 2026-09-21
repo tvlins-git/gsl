@@ -1,0 +1,39 @@
+import type { Photo } from './database.types';
+
+/** Locked designer tokens for Feed album/photos row thumbs. */
+export const ALBUM_FEED_THUMB_SIZE = 52;
+export const ALBUM_FEED_THUMB_GAP = 6;
+export const ALBUM_FEED_THUMB_RADIUS = 2;
+export const ALBUM_FEED_THUMB_VISIBLE = 4;
+export const ALBUM_FEED_THUMB_MAX = ALBUM_FEED_THUMB_VISIBLE;
+
+export function albumThumbOverflow(photoCount: number, visibleCount: number) {
+  return Math.max(0, photoCount - visibleCount);
+}
+
+export type AlbumPreviewPhoto = Pick<Photo, 'id' | 'storage_path' | 'thumb_path' | 'uploaded_by'>;
+
+export function hasAlbumPreviewSource(photo: Pick<Photo, 'storage_path' | 'thumb_path'>) {
+  return Boolean(photo.thumb_path || photo.storage_path);
+}
+
+export function selectAlbumPreviewPhotos(
+  photos: Pick<Photo, 'id' | 'storage_path' | 'thumb_path' | 'uploaded_by' | 'ai_score' | 'created_at'>[],
+  limit = ALBUM_FEED_THUMB_MAX
+): AlbumPreviewPhoto[] {
+  return photos
+    .filter(hasAlbumPreviewSource)
+    .slice()
+    .sort((a, b) => {
+      const scoreDiff = (b.ai_score ?? -1) - (a.ai_score ?? -1);
+      if (scoreDiff !== 0) return scoreDiff;
+      return b.created_at.localeCompare(a.created_at);
+    })
+    .slice(0, limit)
+    .map((photo) => ({
+      id: photo.id,
+      storage_path: photo.storage_path,
+      thumb_path: photo.thumb_path,
+      uploaded_by: photo.uploaded_by,
+    }));
+}
