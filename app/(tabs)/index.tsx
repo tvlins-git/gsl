@@ -1,10 +1,9 @@
 import { router, useFocusEffect, type Href } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Alert, FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { ActivityItem } from '@/components/ActivityItem';
 import { FeedComposer } from '@/components/FeedComposer';
 import { FeedPhoto } from '@/components/FeedPhoto';
-import { StoriesRow } from '@/components/StoriesRow';
 import { Screen } from '@/components/ui/Screen';
 import { useAuth } from '@/contexts/AuthContext';
 import { getGroupMembers } from '@/lib/auth';
@@ -13,9 +12,8 @@ import {
   loadActivitySources,
   type ActivityItem as ActivityItemData,
 } from '@/lib/activity-feed';
-import type { HostAssignment, Member } from '@/lib/database.types';
+import type { Member } from '@/lib/database.types';
 import { canDeleteFeedPost, deleteFeedPost } from '@/lib/feed-posts';
-import { generateMonthList } from '@/lib/hosts';
 import { formatRelativeTime } from '@/lib/time';
 import { formatUserFacingError } from '@/lib/user-error';
 import { feedColumn, sharedStyles, theme } from '@/constants/theme';
@@ -24,7 +22,6 @@ export default function FeedScreen() {
   const { member } = useAuth();
   const [items, setItems] = useState<ActivityItemData[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
-  const [hostAssignments, setHostAssignments] = useState<HostAssignment[]>([]);
   const [selectedPost, setSelectedPost] = useState<ActivityItemData | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -35,7 +32,6 @@ export default function FeedScreen() {
       loadActivitySources(member.group_id),
     ]);
     setMembers(groupMembers);
-    setHostAssignments(sources.hostAssignments);
     setItems(
       buildActivityItems({
         members: groupMembers,
@@ -54,15 +50,6 @@ export default function FeedScreen() {
       void loadFeed();
     }, [loadFeed])
   );
-
-  const highlightIds = useMemo(() => {
-    const current = generateMonthList(1)[0];
-    const hostId = current
-      ? hostAssignments.find((row) => row.year === current.year && row.month === current.month)
-          ?.assigned_member_id
-      : null;
-    return new Set(hostId ? [hostId] : []);
-  }, [hostAssignments]);
 
   const handleDeletePost = async (item: ActivityItemData) => {
     if (!member || !item.sourceId || !item.authorId) return;
@@ -96,10 +83,7 @@ export default function FeedScreen() {
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
         ListHeaderComponent={
-          <View>
-            <StoriesRow members={members} highlightIds={highlightIds} />
-            <FeedComposer members={members} author={member} onPosted={loadFeed} />
-          </View>
+          <FeedComposer members={members} author={member} onPosted={loadFeed} />
         }
         renderItem={({ item }) => (
           <ActivityItem
@@ -173,6 +157,7 @@ export default function FeedScreen() {
 const styles = StyleSheet.create({
   list: {
     ...feedColumn,
+    paddingTop: theme.spacing.md,
     paddingBottom: theme.spacing.xxl,
   },
   postMeta: {

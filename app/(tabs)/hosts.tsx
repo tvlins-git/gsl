@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { FlatList, Pressable, StyleSheet, Text } from 'react-native';
 import { HostMonthRow } from '@/components/HostMonthRow';
-import { StoriesRow } from '@/components/StoriesRow';
 import { Screen } from '@/components/ui/Screen';
 import { useAuth } from '@/contexts/AuthContext';
 import { getGroupMembers } from '@/lib/auth';
@@ -21,15 +20,6 @@ export default function HostsScreen() {
   const rowKey = (year: number, month: number) => `${year}-${month}`;
   const months = generateMonthList(monthCount).filter(
     (m) => !removedKeys.includes(rowKey(m.year, m.month))
-  );
-  const currentMonth = months.find((m) => m.isCurrent);
-  const currentHostId = currentMonth
-    ? assignments.find((a) => a.year === currentMonth.year && a.month === currentMonth.month)
-        ?.assigned_member_id
-    : null;
-  const highlightIds = useMemo(
-    () => new Set(currentHostId ? [currentHostId] : []),
-    [currentHostId]
   );
 
   const loadData = useCallback(async () => {
@@ -103,10 +93,7 @@ export default function HostsScreen() {
         keyExtractor={(item) => `${item.year}-${item.month}`}
         contentContainerStyle={styles.list}
         ListHeaderComponent={
-          <View>
-            <StoriesRow members={members} highlightIds={highlightIds} />
-            <Text style={styles.hint}>Tap a friend to assign the hangout host for that month.</Text>
-          </View>
+          <Text style={styles.hint}>Assign a hangout host for each month.</Text>
         }
         renderItem={({ item }) => (
           <HostMonthRow

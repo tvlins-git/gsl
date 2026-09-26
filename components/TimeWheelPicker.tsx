@@ -10,10 +10,11 @@ import {
 } from 'react-native';
 import { theme } from '@/constants/theme';
 
-export const TIME_WHEEL_ITEM_HEIGHT = 36;
-const VISIBLE_ITEMS = 5;
+export const TIME_WHEEL_ITEM_HEIGHT = 32;
+/** Three visible rows keeps Add slot / Create poll reachable on phone sheets. */
+const VISIBLE_ITEMS = 3;
 export const TIME_WHEEL_HEIGHT = TIME_WHEEL_ITEM_HEIGHT * VISIBLE_ITEMS;
-const SIDE_SPACER = TIME_WHEEL_ITEM_HEIGHT * 2;
+const SIDE_SPACER = TIME_WHEEL_ITEM_HEIGHT * Math.floor(VISIBLE_ITEMS / 2);
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const MINUTES = Array.from({ length: 60 }, (_, i) => i);
@@ -215,7 +216,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   itemText: {
-    fontSize: 20,
+    fontSize: 18,
     color: theme.colors.textMuted,
     fontVariant: ['tabular-nums'],
   },
@@ -224,7 +225,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   colon: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '600',
     color: theme.colors.text,
     width: 16,

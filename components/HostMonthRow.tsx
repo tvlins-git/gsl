@@ -16,8 +16,6 @@ interface HostMonthRowProps {
 }
 
 const ICON_SLOT = 28;
-/** Compact host selector — wide enough for names, not full-row stretch. */
-const PICKER_WIDTH = 168;
 
 export function HostMonthRow({
   month,
@@ -45,66 +43,74 @@ export function HostMonthRow({
       ) : (
         <View style={styles.emptyAvatar} />
       )}
-      <View style={styles.labelCol}>
-        <Text style={styles.monthLabel}>{month.label}</Text>
-        <Text style={styles.hostName} numberOfLines={1}>
-          {assigned?.display_name ?? 'No host yet'}
-        </Text>
-        {month.isCurrent && <Text style={styles.badgeCurrent}>This month</Text>}
-        {month.isNext && !month.isCurrent && <Text style={styles.badgeNext}>Up next</Text>}
-      </View>
 
-      <View style={styles.controls}>
+      <View style={styles.body}>
+        <View style={styles.header}>
+          <View style={styles.labelCol}>
+            <Text style={styles.monthLabel} numberOfLines={1}>
+              {month.label}
+            </Text>
+            <Text style={styles.hostName} numberOfLines={1}>
+              {assigned
+                ? `Host · ${assigned.display_name}`
+                : month.isNext && !month.isCurrent
+                  ? 'Host · Up next'
+                  : month.isCurrent
+                    ? 'Host · This month'
+                    : 'No host yet'}
+            </Text>
+          </View>
+
+          {/* Fixed action column so the clear (X) never shifts adjacent controls. */}
+          <View style={[styles.actionsCol, !onDelete && styles.actionsColClearOnly]}>
+            <View style={styles.iconSlot}>
+              {canClear ? (
+                <Pressable
+                  onPress={() => onAssign(null)}
+                  disabled={disabled}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Remove host for ${month.label}`}
+                  style={styles.iconBtn}
+                  testID={`host-remove-${month.year}-${month.month}`}
+                >
+                  <SymbolView
+                    name={{ ios: 'xmark', android: 'close', web: 'close' }}
+                    tintColor={theme.colors.textMuted}
+                    size={16}
+                  />
+                </Pressable>
+              ) : null}
+            </View>
+            {onDelete ? (
+              <View style={styles.iconSlot}>
+                <Pressable
+                  onPress={onDelete}
+                  disabled={disabled}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Delete ${month.label} row`}
+                  style={styles.iconBtn}
+                  testID={`host-delete-${month.year}-${month.month}`}
+                >
+                  <SymbolView
+                    name={{ ios: 'trash', android: 'delete', web: 'delete' }}
+                    tintColor={theme.colors.danger}
+                    size={18}
+                  />
+                </Pressable>
+              </View>
+            ) : null}
+          </View>
+        </View>
+
         <MemberSelect
           members={members}
           value={assignedMemberId}
           onChange={onAssign}
           disabled={disabled}
-          width={PICKER_WIDTH}
           testID={`host-picker-${month.year}-${month.month}`}
         />
-
-        {/* Fixed action column so the clear (X) never shifts adjacent controls. */}
-        <View style={[styles.actionsCol, !onDelete && styles.actionsColClearOnly]}>
-          <View style={styles.iconSlot}>
-            {canClear ? (
-              <Pressable
-                onPress={() => onAssign(null)}
-                disabled={disabled}
-                hitSlop={8}
-                accessibilityRole="button"
-                accessibilityLabel={`Remove host for ${month.label}`}
-                style={styles.iconBtn}
-                testID={`host-remove-${month.year}-${month.month}`}
-              >
-                <SymbolView
-                  name={{ ios: 'xmark', android: 'close', web: 'close' }}
-                  tintColor={theme.colors.textMuted}
-                  size={16}
-                />
-              </Pressable>
-            ) : null}
-          </View>
-          {onDelete ? (
-            <View style={styles.iconSlot}>
-              <Pressable
-                onPress={onDelete}
-                disabled={disabled}
-                hitSlop={8}
-                accessibilityRole="button"
-                accessibilityLabel={`Delete ${month.label} row`}
-                style={styles.iconBtn}
-                testID={`host-delete-${month.year}-${month.month}`}
-              >
-                <SymbolView
-                  name={{ ios: 'trash', android: 'delete', web: 'delete' }}
-                  tintColor={theme.colors.danger}
-                  size={18}
-                />
-              </Pressable>
-            </View>
-          ) : null}
-        </View>
       </View>
     </View>
   );
@@ -113,7 +119,7 @@ export function HostMonthRow({
 const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginHorizontal: theme.spacing.lg,
     marginBottom: theme.spacing.md,
     paddingVertical: theme.spacing.md,
@@ -135,6 +141,16 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border,
     backgroundColor: theme.colors.borderLight,
   },
+  body: {
+    flex: 1,
+    minWidth: 0,
+    gap: theme.spacing.sm,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: theme.spacing.sm,
+  },
   labelCol: {
     flex: 1,
     minWidth: 0,
@@ -150,29 +166,11 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
     fontWeight: '500',
   },
-  badgeCurrent: {
-    fontSize: 12,
-    color: theme.colors.accent,
-    fontWeight: '700',
-    marginTop: 2,
-  },
-  badgeNext: {
-    fontSize: 12,
-    color: theme.colors.textSecondary,
-    fontWeight: '700',
-    marginTop: 2,
-  },
-  controls: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexShrink: 0,
-  },
   actionsCol: {
     flexDirection: 'row',
     alignItems: 'center',
     flexShrink: 0,
-    width: ICON_SLOT * 2 + theme.spacing.sm,
-    marginLeft: theme.spacing.sm,
+    width: ICON_SLOT * 2,
   },
   actionsColClearOnly: {
     width: ICON_SLOT,
