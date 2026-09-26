@@ -1,12 +1,6 @@
 import { serve } from 'https://deno.land/std@0.208.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-
-function json(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': 'application/json' },
-  });
-}
+import { json, preflight } from './http.ts';
 
 function alreadyRegistered(message: string | undefined) {
   const text = message?.toLowerCase() ?? '';
@@ -20,18 +14,21 @@ function passwordForAuth(password: string) {
 }
 
 serve(async (req) => {
+  const early = preflight(req);
+  if (early) return early;
+
   if (req.method !== 'POST') {
-    return json({ error: 'Method not allowed' }, 405);
+    return json(req, { error: 'Method not allowed' }, 405);
   }
 
   const authHeader = req.headers.get('Authorization');
-  if (!authHeader) return json({ error: 'Not signed in.' }, 401);
+  if (!authHeader) return json(req, { error: 'Not signed in.' }, 401);
 
   const url = Deno.env.get('SUPABASE_URL');
   const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   if (!url || !anonKey || !serviceKey) {
-    return json({ error: 'Server is missing Supabase credentials.' }, 500);
+    return json(req, { error: 'Server is missing Supabase credentials.' }, 500);
   }
 
   const callerClient = createClient(url, anonKey, {
@@ -39,7 +36,7 @@ serve(async (req) => {
     auth: { persistSession: false, autoRefreshToken: false },
   });
   const { data: callerAuth, error: callerAuthError } = await callerClient.auth.getUser();
-  if (callerAuthError || !callerAuth.user) return json({ error: 'Not signed in.' }, 401);
+  if (callerAuthError || !callerAuth.user) return json(req, { error: 'Not signed in.' }, 401);
 
   const admin = createClient(url, serviceKey, {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -50,7 +47,7 @@ serve(async (req) => {
     .eq('user_id', callerAuth.user.id)
     .maybeSingle();
   if (callerMemberError || !callerMember || callerMember.role !== 'admin') {
-    return json({ error: 'Only an admin can add members.' }, 403);
+    return json(req, { error: 'Only an admin can add members.' }, 403);
   }
 
   const body = await req.json().catch(() => ({}));
@@ -58,7 +55,7 @@ serve(async (req) => {
   const email = String(body.email ?? '').trim().toLowerCase();
   const password = String(body.password ?? '');
   if (!displayName || !email || password.length < 4) {
-    return json({ error: 'Name, email, and a password are required.' }, 400);
+    return json(req, { error: 'Name, email, and a password are required.' }, 400);
   }
 
   let userId: string | null = null;
@@ -73,9 +70,9 @@ serve(async (req) => {
   } else if (alreadyRegistered(created.error?.message)) {
     userId = await findUserIdByEmail(admin, email);
   } else {
-    return json({ error: created.error?.message ?? 'Could not create the login.' }, 400);
+    return json(req, { error: created.error?.message ?? 'Could not create the login.' }, 400);
   }
-  if (!userId) return json({ error: 'Could not find that login.' }, 400);
+  if (!userId) return json(req, { error: 'Could not find that login.' }, 400);
 
   const { data: existing } = await admin
     .from('members')
@@ -87,7 +84,7 @@ serve(async (req) => {
     if (existing.role !== 'admin') {
       await admin.from('members').update({ display_name: displayName }).eq('id', existing.id);
     }
-    return json({ user_id: userId });
+    return json(req, { user_id: userId });
   }
 
   const { error: insertError } = await admin.from('members').insert({
@@ -96,9 +93,9 @@ serve(async (req) => {
     display_name: displayName,
     role: 'member',
   });
-  if (insertError) return json({ error: insertError.message }, 400);
+  if (insertError) return json(req, { error: insertError.message }, 400);
 
-  return json({ user_id: userId });
+  return json(req, { user_id: userId });
 });
 
 async function findUserIdByEmail(
