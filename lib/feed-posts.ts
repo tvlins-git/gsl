@@ -40,8 +40,9 @@ function createId() {
 const MENTION_TOKEN_RE = /@([\p{L}][\p{L}\p{N}._-]*)/gu;
 const ACTIVE_MENTION_RE = /(^|[\s])@([\p{L}\p{N}._-]*)$/u;
 
-export type FeedMentionMember = Pick<Member, 'user_id' | 'display_name' | 'avatar_url'> & {
+export type FeedMentionMember = Pick<Member, 'user_id' | 'display_name'> & {
   contact_email?: string | null;
+  avatar_url?: string | null;
 };
 
 export type FeedMentionSuggestion = {

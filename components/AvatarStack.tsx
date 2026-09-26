@@ -15,9 +15,9 @@ interface AvatarStackProps {
 }
 
 export function AvatarStack({ names, people, size = 28, max = 3 }: AvatarStackProps) {
-  const shown = (people ?? (names ?? []).map((name) => ({ name }))).filter(
-    (person) => Boolean(person.name)
-  ).slice(0, max);
+  const source: AvatarStackPerson[] =
+    people ?? (names ?? []).map((name) => ({ name, imageUri: null }));
+  const shown = source.filter((person) => Boolean(person.name)).slice(0, max);
   if (shown.length === 0) return null;
 
   const overlap = Math.round(size * 0.36);
