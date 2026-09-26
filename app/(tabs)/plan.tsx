@@ -573,7 +573,6 @@ export default function PlanScreen() {
           </>
         }
       >
-        <View style={styles.modalHandle} />
         <Text style={sharedStyles.modalTitle}>Create poll</Text>
         <TextInput
           style={sharedStyles.input}
@@ -744,14 +743,6 @@ const styles = StyleSheet.create({
   createSheetContent: {
     // Bottom padding is on the sticky footer (safe area + actions).
     paddingBottom: theme.spacing.md,
-  },
-  modalHandle: {
-    alignSelf: 'center',
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: theme.colors.border,
-    marginBottom: theme.spacing.sm,
   },
   cancelBtn: { paddingVertical: theme.spacing.sm },
   cancel: { textAlign: 'center', color: theme.colors.textSecondary, fontSize: 15 },

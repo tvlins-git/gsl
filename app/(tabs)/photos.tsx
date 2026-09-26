@@ -348,7 +348,6 @@ export default function PhotosScreen() {
         onRequestClose={() => setShowCreate(false)}
         testID="new-album-sheet"
       >
-        <View style={styles.modalHandle} />
         <Text style={sharedStyles.modalTitle}>New photo event</Text>
         <TextInput
           style={sharedStyles.input}
@@ -431,14 +430,6 @@ const styles = StyleSheet.create({
   },
   actionBtn: { flex: 1 },
   actionDisabled: { opacity: 0.45 },
-  modalHandle: {
-    alignSelf: 'center',
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: theme.colors.border,
-    marginBottom: theme.spacing.sm,
-  },
   cancelBtn: { paddingVertical: theme.spacing.sm },
   cancel: { textAlign: 'center', color: theme.colors.textSecondary, fontSize: 15 },
 });
