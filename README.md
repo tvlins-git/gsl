@@ -50,8 +50,14 @@ cp .env.example .env
    ```bash
    supabase functions deploy score-photo
    supabase functions deploy send-push
+   supabase functions deploy create-group-member
+   supabase functions deploy delete-group-member
    supabase secrets set GOOGLE_CLOUD_VISION_API_KEY=<your-key>
    ```
+   Profile **Create user** calls `create-group-member` once. Profile **Delete** calls
+   `delete-group-member` (admin-only) so the person is removed from `members` and Auth.
+   Feed/Hosts/Chat do **not** re-push the local login roster into `members` — that used
+   to resurrect people deleted in Supabase while still cached in AsyncStorage.
 5. **Single user:** The app auto-signs in as **Hr. Lins** (no login screen). On first launch it creates the Supabase account if needed.
 
 ### 3. Run the app

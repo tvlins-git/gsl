@@ -98,6 +98,18 @@ describe('app-users', () => {
     expect(users.some((user) => user.id === created.user.id)).toBe(false);
   });
 
+  it('keeps a deleted display name out of the local roster used for sync', async () => {
+    await ensureAppUsersLoaded();
+    const created = await createAppUser({ displayName: 'QA Probe', password: 'probe1' });
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+
+    await deleteAppUser(created.user.id, ADMIN_USER_ID);
+    const users = await listAppUsers();
+    expect(users.map((user) => user.displayName.toLowerCase())).not.toContain('qa probe');
+    expect(users.map((user) => user.email.toLowerCase())).not.toContain(created.user.email.toLowerCase());
+  });
+
   it('rejects create with short password', async () => {
     await ensureAppUsersLoaded();
     const result = await createAppUser({ displayName: 'Short', password: 'ab' });
