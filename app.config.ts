@@ -22,6 +22,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     infoPlist: {
       NSCameraUsageDescription: 'GSL needs camera access to upload event photos.',
       NSPhotoLibraryUsageDescription: 'GSL needs photo library access to upload event photos.',
+      ITSAppUsesNonExemptEncryption: false,
     },
   },
   android: {
