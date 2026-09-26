@@ -32,7 +32,9 @@ import { albumBackAction, albumBackButtonText, albumBackLabel, firstSearchParam 
 import { isCameraPickerAvailable, pickImageUris } from '@/lib/pick-image';
 import { deletePhoto } from '@/lib/photo-list';
 import { formatRelativeTime } from '@/lib/time';
+import { subscribeNotificationOpen, shouldRefreshPhotosOnNotification } from '@/lib/notification-refresh';
 import { subscribeToAlbumPhotoInserts } from '@/lib/photo-realtime';
+import { useNotificationRefresh } from '@/lib/use-notification-refresh';
 import { supabase } from '@/lib/supabase';
 import { feedColumn, sharedStyles, theme } from '@/constants/theme';
 
@@ -85,6 +87,36 @@ export default function PhotosScreen() {
   useEffect(() => {
     loadSummaries();
   }, [loadSummaries]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadSummaries();
+    }, [loadSummaries])
+  );
+
+  useNotificationRefresh(shouldRefreshPhotosOnNotification, loadSummaries);
+
+  useEffect(() => {
+    if (!member) return undefined;
+    return subscribeNotificationOpen((link) => {
+      if (link.type !== 'photos') return;
+      void (async () => {
+        const [data, groupMembers] = await Promise.all([
+          loadPhotoEventSummaries(member.group_id),
+          getGroupMembers(member.group_id),
+        ]);
+        setSummaries(data);
+        setMembers(groupMembers);
+        if (!link.eventId) return;
+        const match = data.find((item) => item.event.id === link.eventId);
+        if (!match) return;
+        openedEventId.current = link.eventId;
+        setOpenedFromLink(true);
+        setSelectedEvent(match.event);
+        await loadPhotos(match.event.id);
+      })();
+    });
+  }, [member, loadPhotos]);
 
   useEffect(() => {
     if (selectedEvent) loadPhotos(selectedEvent.id);

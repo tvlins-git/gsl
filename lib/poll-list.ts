@@ -57,6 +57,16 @@ export async function loadPollSummaries(
   return summaries;
 }
 
+export async function getPollById(pollId: string): Promise<Poll | null> {
+  if (isLocalMode()) {
+    return localStore.getPoll(pollId);
+  }
+
+  const { data, error } = await supabase.from('polls').select('*').eq('id', pollId).maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
 export async function deletePoll(pollId: string) {
   if (isLocalMode()) {
     await localStore.deletePoll(pollId);

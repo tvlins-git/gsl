@@ -28,7 +28,7 @@ import {
 } from '@/lib/calendar-invite';
 import { isLocalMode, localStore } from '@/lib/local-store';
 import { appendPollSlots, removePollSlot, updatePollSlotTimes } from '@/lib/poll-slots';
-import { deletePoll, loadPollSummaries, partitionPolls } from '@/lib/poll-list';
+import { deletePoll, getPollById, loadPollSummaries, partitionPolls } from '@/lib/poll-list';
 import { computeSlotScores, formatSlotTime } from '@/lib/polls';
 import {
   findPollThread,
@@ -40,6 +40,7 @@ import {
 import type { Member, Poll, PollSlot, Thread } from '@/lib/database.types';
 import { supabase } from '@/lib/supabase';
 import type { PollResponseValue } from '@/lib/polls';
+import { subscribeNotificationOpen } from '@/lib/notification-refresh';
 import { feedColumn, sharedStyles, theme } from '@/constants/theme';
 
 export default function PlanScreen() {
@@ -125,8 +126,20 @@ export default function PlanScreen() {
     useCallback(() => {
       if (!member) return;
       void getGroupMembers(member.group_id).then(setMembers);
-    }, [member])
+      void loadPolls();
+    }, [member, loadPolls])
   );
+
+  useEffect(() => {
+    return subscribeNotificationOpen((link) => {
+      if (link.type !== 'plan' || !member) return;
+      void (async () => {
+        await loadPolls();
+        const poll = await getPollById(link.pollId);
+        if (poll) await loadPollDetail(poll);
+      })();
+    });
+  }, [member, loadPolls, loadPollDetail]);
 
   useEffect(() => {
     if (!pollId || polls.length === 0 || selectedPoll?.id === pollId) return;

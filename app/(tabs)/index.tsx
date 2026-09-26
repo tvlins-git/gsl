@@ -15,6 +15,8 @@ import {
 import type { Member } from '@/lib/database.types';
 import { canDeleteFeedPost, deleteFeedPost } from '@/lib/feed-posts';
 import { canDeleteHostAssignment, deleteHostAssignment } from '@/lib/host-assignments';
+import { shouldRefreshFeedOnNotification } from '@/lib/notification-refresh';
+import { useNotificationRefresh } from '@/lib/use-notification-refresh';
 import { formatRelativeTime } from '@/lib/time';
 import { formatUserFacingError } from '@/lib/user-error';
 import { feedColumn, sharedStyles, theme } from '@/constants/theme';
@@ -51,6 +53,8 @@ export default function FeedScreen() {
       void loadFeed();
     }, [loadFeed])
   );
+
+  useNotificationRefresh(shouldRefreshFeedOnNotification, loadFeed);
 
   const handleDeletePost = async (item: ActivityItemData) => {
     if (!member || !item.sourceId || !item.authorId) return;

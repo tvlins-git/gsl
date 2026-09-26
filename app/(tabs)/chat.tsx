@@ -21,6 +21,8 @@ import { isLocalMode, localStore } from '@/lib/local-store';
 import { loadPollTitles } from '@/lib/poll-thread';
 import { deleteThread } from '@/lib/thread-list';
 import { supabase } from '@/lib/supabase';
+import { shouldRefreshChatListOnNotification } from '@/lib/notification-refresh';
+import { useNotificationRefresh } from '@/lib/use-notification-refresh';
 import { feedColumn, sharedStyles, theme } from '@/constants/theme';
 
 export default function ChatScreen() {
@@ -65,6 +67,8 @@ export default function ChatScreen() {
       void loadThreads();
     }, [loadThreads])
   );
+
+  useNotificationRefresh(shouldRefreshChatListOnNotification, loadThreads);
 
   const handleCreateThread = async () => {
     if (!member || !newName.trim()) return;

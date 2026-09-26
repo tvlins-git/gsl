@@ -26,7 +26,9 @@ import {
 } from '@/lib/messages';
 import { getPollLinkTarget } from '@/lib/poll-thread';
 import { getThread } from '@/lib/thread-list';
+import { shouldRefreshThreadOnNotification } from '@/lib/notification-refresh';
 import { subscribeToThreadInserts } from '@/lib/thread-realtime';
+import { useNotificationRefresh } from '@/lib/use-notification-refresh';
 import {
   buildChatPushPayload,
   listThreadMessages,
@@ -132,9 +134,19 @@ export default function ThreadScreen() {
     }, [member])
   );
 
-  useEffect(() => {
-    void loadMessages();
-  }, [loadMessages]);
+  useFocusEffect(
+    useCallback(() => {
+      void loadMessages();
+    }, [loadMessages])
+  );
+
+  useNotificationRefresh(
+    useCallback(
+      (link) => typeof id === 'string' && shouldRefreshThreadOnNotification(link, id),
+      [id]
+    ),
+    loadMessages
+  );
 
   useFocusEffect(
     useCallback(() => {
