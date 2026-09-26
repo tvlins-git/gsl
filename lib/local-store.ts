@@ -248,11 +248,13 @@ export const localStore = {
   async deletePoll(pollId: string) {
     const data = await readData();
     const slotIds = data.poll_slots.filter((s) => s.poll_id === pollId).map((s) => s.id);
+    const threadIds = new Set(
+      data.threads.filter((thread) => thread.poll_id === pollId).map((thread) => thread.id)
+    );
     data.polls = data.polls.filter((p) => p.id !== pollId);
     data.poll_slots = data.poll_slots.filter((s) => s.poll_id !== pollId);
-    for (const thread of data.threads) {
-      if (thread.poll_id === pollId) thread.poll_id = null;
-    }
+    data.threads = data.threads.filter((thread) => !threadIds.has(thread.id));
+    data.messages = data.messages.filter((message) => !threadIds.has(message.thread_id));
     data.poll_responses = data.poll_responses.filter((r) => !slotIds.includes(r.slot_id));
     await writeData(data);
   },
