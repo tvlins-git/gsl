@@ -211,6 +211,11 @@ describe('feed mention parsing', () => {
     const all = listFeedMentionSuggestions('', members);
     expect(all[0]).toMatchObject({ id: 'everyone', insert: 'everyone' });
     expect(all.map((item) => item.id)).toEqual(['everyone', 'user-1', 'user-2', 'user-3']);
+    expect(
+      listFeedMentionSuggestions('', [...members, { user_id: 'user-test', display_name: 'Test' }]).map(
+        (item) => item.insert
+      )
+    ).toContain('Test');
 
     const lins = listFeedMentionSuggestions('li', members);
     expect(lins.map((item) => item.id)).toEqual(['user-1']);

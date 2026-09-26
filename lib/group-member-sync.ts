@@ -1,4 +1,5 @@
 import { listAppUsers } from './app-users';
+import { passwordForAuth } from './auth-password';
 import { isLocalMode } from './local-store';
 import { isSupabaseConfigured, supabase } from './supabase';
 import { getEffectivePassword } from './user-passwords';
@@ -30,7 +31,7 @@ export async function syncLoginAccountsIntoGroup(groupId: string): Promise<strin
   for (const user of users) {
     const name = user.displayName.trim().toLowerCase();
     if (!name || names.has(name)) continue;
-    const password = await getEffectivePassword(user);
+    const password = passwordForAuth(await getEffectivePassword(user));
     const { error: invokeError } = await supabase.functions.invoke('create-group-member', {
       body: {
         email: user.email,

@@ -4,9 +4,7 @@ import { Platform, Pressable, StyleSheet, Text } from 'react-native';
 import { GslNavTitle } from '@/components/GslNavTitle';
 import { HeaderBackButton } from '@/components/HeaderBackButton';
 import { APP_NAME } from '@/constants/brand';
-import Colors from '@/constants/Colors';
 import { theme } from '@/constants/theme';
-import { useColorScheme } from '@/components/useColorScheme';
 import { SettingsAuthRedirect } from '@/components/SettingsAuthRedirect';
 
 function HostsHeaderLink() {
@@ -24,15 +22,15 @@ function HostsHeaderLink() {
 }
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
-
   return (
     <>
       <SettingsAuthRedirect />
       <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-        tabBarInactiveTintColor: Colors[colorScheme ?? 'light'].tabIconDefault,
+        // The bar itself is always the light surface. Dark-mode tint is white,
+        // which hides the selected tab on that bar.
+        tabBarActiveTintColor: theme.colors.primary,
+        tabBarInactiveTintColor: theme.colors.textMuted,
         tabBarStyle: {
           backgroundColor: theme.colors.surface,
           borderTopColor: theme.colors.border,
@@ -57,8 +55,12 @@ export default function TabLayout() {
           headerRight: () => <HostsHeaderLink />,
           tabBarLabel: 'Feed',
           tabBarAccessibilityLabel: 'Feed',
-          tabBarIcon: ({ color }) => (
-            <SymbolView name={{ ios: 'house', android: 'home', web: 'home' }} tintColor={color} size={24} />
+          tabBarIcon: ({ focused }) => (
+            <SymbolView
+              name={{ ios: 'house', android: 'home', web: 'home' }}
+              tintColor={focused ? theme.colors.primary : theme.colors.textMuted}
+              size={24}
+            />
           ),
         }}
       />
@@ -69,10 +71,10 @@ export default function TabLayout() {
           headerTitle: () => <GslNavTitle suffix="Photos" />,
           tabBarLabel: 'Photos',
           tabBarAccessibilityLabel: 'Photos',
-          tabBarIcon: ({ color }) => (
+          tabBarIcon: ({ focused }) => (
             <SymbolView
               name={{ ios: 'photo.on.rectangle', android: 'photo_library', web: 'photo_library' }}
-              tintColor={color}
+              tintColor={focused ? theme.colors.primary : theme.colors.textMuted}
               size={24}
             />
           ),
@@ -84,8 +86,12 @@ export default function TabLayout() {
           title: `${APP_NAME} · Plan`,
           headerTitle: () => <GslNavTitle suffix="Plan" />,
           tabBarLabel: 'Plan',
-          tabBarIcon: ({ color }) => (
-            <SymbolView name={{ ios: 'calendar', android: 'event', web: 'event' }} tintColor={color} size={24} />
+          tabBarIcon: ({ focused }) => (
+            <SymbolView
+              name={{ ios: 'calendar', android: 'event', web: 'event' }}
+              tintColor={focused ? theme.colors.primary : theme.colors.textMuted}
+              size={24}
+            />
           ),
         }}
       />
@@ -95,8 +101,12 @@ export default function TabLayout() {
           title: `${APP_NAME} · Chat`,
           headerTitle: () => <GslNavTitle suffix="Chat" />,
           tabBarLabel: 'Chat',
-          tabBarIcon: ({ color }) => (
-            <SymbolView name={{ ios: 'message', android: 'chat', web: 'chat' }} tintColor={color} size={24} />
+          tabBarIcon: ({ focused }) => (
+            <SymbolView
+              name={{ ios: 'message', android: 'chat', web: 'chat' }}
+              tintColor={focused ? theme.colors.primary : theme.colors.textMuted}
+              size={24}
+            />
           ),
         }}
       />
@@ -106,8 +116,12 @@ export default function TabLayout() {
           title: `${APP_NAME} · Profile`,
           headerTitle: () => <GslNavTitle suffix="Profile" />,
           tabBarLabel: 'Profile',
-          tabBarIcon: ({ color }) => (
-            <SymbolView name={{ ios: 'person.circle', android: 'account_circle', web: 'account_circle' }} tintColor={color} size={24} />
+          tabBarIcon: ({ focused }) => (
+            <SymbolView
+              name={{ ios: 'person.circle', android: 'account_circle', web: 'account_circle' }}
+              tintColor={focused ? theme.colors.primary : theme.colors.textMuted}
+              size={24}
+            />
           ),
         }}
       />
