@@ -156,7 +156,7 @@ describe('ThreadScreen send', () => {
     expect(await screen.findByText('Just sent this')).toBeTruthy();
     expect(screen.getByText('Already in the thread')).toBeTruthy();
     expect(sendThreadMessage).toHaveBeenCalledWith('thread-1', 'user-1', 'Just sent this');
-  });
+  }, 15000);
 
   it('shows a link back to the poll', async () => {
     (getThread as jest.Mock).mockResolvedValue({

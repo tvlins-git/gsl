@@ -78,6 +78,17 @@ describe('syncLoginAccountsIntoGroup', () => {
     });
   });
 
+  it('surfaces a blocked Edge Function request instead of treating the member as tagged', async () => {
+    (supabase.functions.invoke as jest.Mock).mockResolvedValue({
+      data: null,
+      error: { message: 'Failed to send a request to the Edge Function' },
+    });
+
+    await expect(syncLoginAccountsIntoGroup('group-1')).resolves.toEqual([
+      'Test: Failed to send a request to the Edge Function',
+    ]);
+  });
+
   it('skips accounts already in the group', async () => {
     (supabase.from as jest.Mock).mockReturnValue(membersQuery(['Hr. Lins', 'Test']));
     await syncLoginAccountsIntoGroup('group-1');
