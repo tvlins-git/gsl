@@ -14,6 +14,7 @@ import {
 } from '@/lib/activity-feed';
 import type { Member } from '@/lib/database.types';
 import { canDeleteFeedPost, deleteFeedPost } from '@/lib/feed-posts';
+import { canDeleteHostAssignment, deleteHostAssignment } from '@/lib/host-assignments';
 import { formatRelativeTime } from '@/lib/time';
 import { formatUserFacingError } from '@/lib/user-error';
 import { feedColumn, sharedStyles, theme } from '@/constants/theme';
@@ -67,6 +68,40 @@ export default function FeedScreen() {
     }
   };
 
+  const handleDeleteHost = async (item: ActivityItemData) => {
+    if (!member || !item.sourceId || !item.authorId) return;
+    try {
+      await deleteHostAssignment({
+        assignmentId: item.sourceId,
+        updatedBy: item.authorId,
+        currentUserId: member.user_id,
+      });
+      await loadFeed();
+    } catch (error) {
+      Alert.alert(
+        'Could not delete',
+        formatUserFacingError(error, 'Could not delete this host assignment.')
+      );
+    }
+  };
+
+  const feedItemOnDelete = (item: ActivityItemData) => {
+    if (!member) return undefined;
+    if (item.kind === 'post' && canDeleteFeedPost(item.authorId, member.user_id)) {
+      return () => {
+        Keyboard.dismiss();
+        void handleDeletePost(item);
+      };
+    }
+    if (item.kind === 'host' && canDeleteHostAssignment(item.authorId, member.user_id)) {
+      return () => {
+        Keyboard.dismiss();
+        void handleDeleteHost(item);
+      };
+    }
+    return undefined;
+  };
+
   if (loading || !member) {
     return <Screen loading />;
   }
@@ -97,14 +132,7 @@ export default function FeedScreen() {
               }
               router.push(item.path as Href);
             }}
-            onDelete={
-              item.kind === 'post' && canDeleteFeedPost(item.authorId, member.user_id)
-                ? () => {
-                    Keyboard.dismiss();
-                    void handleDeletePost(item);
-                  }
-                : undefined
-            }
+            onDelete={feedItemOnDelete(item)}
           />
         )}
         ListEmptyComponent={

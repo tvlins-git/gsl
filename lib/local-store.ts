@@ -194,6 +194,12 @@ export const localStore = {
     return row;
   },
 
+  async deleteHostAssignment(assignmentId: string) {
+    const data = await readData();
+    data.host_assignments = data.host_assignments.filter((a) => a.id !== assignmentId);
+    await writeData(data);
+  },
+
   async getPolls(groupId: string) {
     const data = await readData();
     return data.polls

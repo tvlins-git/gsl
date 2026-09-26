@@ -112,7 +112,7 @@ export function ActivityItem({ item, onPress, onDelete }: ActivityItemProps) {
             }}
             testID={`delete-feed-item-${item.id}`}
             accessibilityRole="button"
-            accessibilityLabel="Delete post"
+            accessibilityLabel={`Delete ${activityKindLabel(item.kind).toLowerCase()}`}
           >
             <Text style={styles.deleteActionText}>Delete</Text>
           </Pressable>
