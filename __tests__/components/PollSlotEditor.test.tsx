@@ -32,6 +32,31 @@ describe('PollSlotEditor', () => {
     expect(screen.getByTestId(`calendar-day-${today}`)).toBeTruthy();
   });
 
+  it('collapses the month grid after a day is chosen so the sheet can scroll', () => {
+    render(<Harness />);
+    const today = new Date().getDate();
+    fireEvent.press(screen.getByTestId(`calendar-day-${today}`));
+    expect(screen.queryByTestId('month-calendar')).toBeNull();
+    expect(screen.getByTestId('expand-poll-date')).toBeTruthy();
+    expect(screen.getByText('Change')).toBeTruthy();
+  });
+
+  it('collapses the month grid after adding a slot', () => {
+    render(<Harness />);
+    expect(screen.getByTestId('month-calendar')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('add-poll-slot'));
+    expect(screen.getByText('1 slot added')).toBeTruthy();
+    expect(screen.queryByTestId('month-calendar')).toBeNull();
+    expect(screen.getByTestId('expand-poll-date')).toBeTruthy();
+  });
+
+  it('re-expands the month grid from the compact date row', () => {
+    render(<Harness />);
+    fireEvent.press(screen.getByTestId('add-poll-slot'));
+    fireEvent.press(screen.getByTestId('expand-poll-date'));
+    expect(screen.getByTestId('month-calendar')).toBeTruthy();
+  });
+
   it('adds a 2-hour slot from the selected start time', () => {
     render(<Harness />);
     fireEvent.press(screen.getByTestId('add-poll-slot'));

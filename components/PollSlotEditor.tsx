@@ -22,34 +22,6 @@ function defaultStartTime() {
   return d;
 }
 
-function WebDateInput({ value, onChange }: { value: Date; onChange: (d: Date) => void }) {
-  const dateStr = `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
-  return (
-    <input
-      type="date"
-      value={dateStr}
-      onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-        const [y, m, d] = e.target.value.split('-').map(Number);
-        if (!y || !m || !d) return;
-        const next = new Date(value);
-        next.setFullYear(y, m - 1, d);
-        onChange(next);
-      }}
-      style={webInputStyle}
-    />
-  );
-}
-
-const webInputStyle = {
-  width: '100%',
-  padding: 12,
-  fontSize: 16,
-  borderRadius: theme.radius.md,
-  border: `1px solid ${theme.colors.border}`,
-  boxSizing: 'border-box' as const,
-  backgroundColor: theme.colors.surface,
-};
-
 export function PollSlotEditor({
   slots,
   onSlotsChange,
@@ -60,6 +32,8 @@ export function PollSlotEditor({
   const [selectedDate, setSelectedDate] = useState(() => startOfDay(new Date()));
   const [startTime, setStartTime] = useState(defaultStartTime);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  // Month grid is tall; collapse after adding a slot so Create stays reachable.
+  const [dateExpanded, setDateExpanded] = useState(true);
 
   const addSlot = () => {
     onSlotError?.('');
@@ -69,6 +43,7 @@ export function PollSlotEditor({
       return;
     }
     onSlotsChange([...slots, result]);
+    setDateExpanded(false);
   };
 
   const removeSlot = (index: number) => {
@@ -87,16 +62,36 @@ export function PollSlotEditor({
     year: 'numeric',
   });
 
+  const useMonthGrid = Platform.OS !== 'android';
+
   return (
     <View style={styles.wrap}>
       <Text style={styles.sectionLabel}>Add time slots</Text>
       <Text style={styles.hint}>Pick a date and start time, then tap &quot;Add slot&quot;. Repeat for more options.</Text>
 
       <Text style={styles.fieldLabel}>Date</Text>
-      {Platform.OS === 'web' ? (
-        <WebDateInput value={selectedDate} onChange={setSelectedDate} />
-      ) : Platform.OS === 'ios' ? (
-        <MonthCalendar value={selectedDate} onChange={setSelectedDate} minimumDate={startOfDay(new Date())} />
+      {useMonthGrid ? (
+        dateExpanded ? (
+          <MonthCalendar
+            value={selectedDate}
+            onChange={(next) => {
+              setSelectedDate(next);
+              setDateExpanded(false);
+            }}
+            minimumDate={startOfDay(new Date())}
+          />
+        ) : (
+          <Pressable
+            style={styles.pickerBtn}
+            onPress={() => setDateExpanded(true)}
+            accessibilityRole="button"
+            accessibilityLabel={`Selected date ${dateLabel}. Change date.`}
+            testID="expand-poll-date"
+          >
+            <Text style={styles.pickerBtnText}>{dateLabel}</Text>
+            <Text style={styles.changeText}>Change</Text>
+          </Pressable>
+        )
       ) : (
         <>
           <Pressable style={styles.pickerBtn} onPress={() => setShowDatePicker(true)}>
@@ -161,8 +156,13 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.md,
     padding: 14,
     backgroundColor: theme.colors.bg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: theme.spacing.sm,
   },
-  pickerBtnText: { fontSize: 16, color: theme.colors.text },
+  pickerBtnText: { fontSize: 16, color: theme.colors.text, flex: 1 },
+  changeText: { fontSize: 14, fontWeight: '600', color: theme.colors.accent },
   addBtn: {
     backgroundColor: theme.colors.bg,
     borderRadius: theme.radius.md,
