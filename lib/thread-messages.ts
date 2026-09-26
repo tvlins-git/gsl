@@ -15,6 +15,17 @@ export function resolveChatNotifyUserIds(
   return userIds.length > 0 ? userIds : null;
 }
 
+/** True when the message contains @everyone or at least one @name tag. */
+export function isChatTagNotification(
+  body: string,
+  members: FeedMentionMember[],
+  senderId: string
+): boolean {
+  const tags = parseFeedMentions(body, members);
+  if (tags.tagAll) return true;
+  return tags.userIds.some((userId) => userId !== senderId);
+}
+
 export function buildChatPushPayload(input: {
   groupId: string;
   senderId: string;
@@ -29,6 +40,7 @@ export function buildChatPushPayload(input: {
     group_id: input.groupId,
     exclude_user_ids: [input.senderId],
     ...(userIds ? { user_ids: userIds } : {}),
+    tag_notification: isChatTagNotification(input.text, input.members, input.senderId),
     title: 'GSL',
     body: `${input.senderName}: ${input.text}`,
     data: { threadId: input.threadId },

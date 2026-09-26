@@ -87,22 +87,34 @@ export async function buildJpegUploadBody(
   return response.arrayBuffer();
 }
 
+export type UploadJpegOptions = CompressOptions & {
+  /** Replace an existing object at the same path (avatars). */
+  upsert?: boolean;
+};
+
 export async function uploadJpegToPhotos(
   storagePath: string,
   imageUri: string,
-  options: CompressOptions = {}
+  options: UploadJpegOptions = {}
 ): Promise<string> {
+  const { upsert, ...compressOptions } = options;
   const compressed = await compressImage(imageUri, {
     maxWidth: 1200,
     quality: 0.8,
     includeBase64: true,
-    ...options,
+    ...compressOptions,
   });
   const filename = storagePath.split('/').pop() || 'photo.jpg';
   const body = await buildJpegUploadBody(compressed, filename);
   const { error } = await supabase.storage.from('photos').upload(storagePath, body, {
     contentType: JPEG_TYPE,
+    ...(upsert ? { upsert: true } : {}),
   });
   if (error) throw error;
   return storagePath;
+}
+
+export async function removePhotosObject(storagePath: string): Promise<void> {
+  const { error } = await supabase.storage.from('photos').remove([storagePath]);
+  if (error) throw error;
 }

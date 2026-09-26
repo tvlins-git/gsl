@@ -140,6 +140,7 @@ describe('feed post helpers', () => {
       group_id: 'group-1',
       exclude_user_ids: ['user-1'],
       user_ids: ['user-2'],
+      tag_notification: true,
       data: { postId: 'post-1' },
     });
     expect(payload.body).toBe('Hr. Lins: Hello');
@@ -158,6 +159,7 @@ describe('feed post helpers', () => {
       groupUserIds: ['user-1', 'user-2'],
     });
     expect(payload.user_ids).toBeUndefined();
+    expect(payload.tag_notification).toBe(true);
     expect(buildFeedPushBody({ authorName: 'Hr. Lins', body: '', hasImage: true })).toBe(
       'Hr. Lins posted a photo'
     );

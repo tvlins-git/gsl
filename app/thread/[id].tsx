@@ -2,6 +2,7 @@ import { router, useFocusEffect, useLocalSearchParams, type ErrorBoundaryProps }
 import { Component, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   FlatList,
+  Keyboard,
   Platform,
   Pressable,
   StyleSheet,
@@ -96,6 +97,7 @@ export default function ThreadScreen() {
   const listRef = useRef<FlatList>(null);
 
   const memberMap = Object.fromEntries(members.map((m) => [m.user_id, m.display_name]));
+  const avatarMap = Object.fromEntries(members.map((m) => [m.user_id, m.avatar_url]));
 
   const loadMessages = useCallback(async () => {
     if (!id || !member) return;
@@ -137,6 +139,7 @@ export default function ThreadScreen() {
     if (!member || !id || !mention.body.trim()) return;
     const text = mention.body.trim();
     mention.setBody('');
+    Keyboard.dismiss();
 
     const optimistic = createOptimisticMessage(id, member.user_id, text);
     setMessages((prev) => mergeMessages(prev, [optimistic]));
@@ -192,11 +195,14 @@ export default function ThreadScreen() {
             data={messages}
             keyExtractor={(item) => item.id}
             contentContainerStyle={styles.list}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
             onContentSizeChange={() => listRef.current?.scrollToEnd()}
             renderItem={({ item }) => (
               <MessageBubble
                 body={item.body}
                 senderName={memberMap[item.sender_id] ?? 'Unknown'}
+                senderAvatarUrl={avatarMap[item.sender_id]}
                 createdAt={item.created_at}
                 isOwn={item.sender_id === member?.user_id}
               />

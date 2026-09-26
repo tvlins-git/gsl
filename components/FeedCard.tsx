@@ -5,6 +5,7 @@ import { theme, shadow } from '@/constants/theme';
 
 interface FeedCardProps {
   authorName: string;
+  authorAvatarUrl?: string | null;
   title: string;
   timestamp: string;
   caption?: string;
@@ -18,6 +19,7 @@ interface FeedCardProps {
 
 export function FeedCard({
   authorName,
+  authorAvatarUrl,
   title,
   timestamp,
   caption,
@@ -32,7 +34,7 @@ export function FeedCard({
     <View style={[styles.card, shadow]}>
       <View style={styles.header}>
         <Pressable style={styles.headerMain} onPress={onPress} testID={testID}>
-          <UserAvatar name={authorName} size={40} />
+          <UserAvatar name={authorName} size={40} imageUri={authorAvatarUrl} />
           <View style={styles.headerText}>
             <Text style={styles.author} numberOfLines={1}>
               {authorName}

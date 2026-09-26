@@ -44,6 +44,7 @@ const mockMember = {
   display_name: 'Hr. Lins',
   avatar_url: null,
   contact_email: null,
+  notification_preference: 'all' as const,
   role: 'admin',
   created_at: '2026-01-01T00:00:00Z',
 };
@@ -72,6 +73,7 @@ jest.mock('@/lib/auth', () => ({
       display_name: 'Hr. Lins',
       avatar_url: null,
       contact_email: null,
+      notification_preference: 'all',
       role: 'admin',
       created_at: '2026-01-01T00:00:00Z',
     },

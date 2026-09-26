@@ -1,6 +1,6 @@
 import { router, useFocusEffect, type Href } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Alert, FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, FlatList, Keyboard, Modal, Pressable, StyleSheet, Text } from 'react-native';
 import { ActivityItem } from '@/components/ActivityItem';
 import { FeedComposer } from '@/components/FeedComposer';
 import { FeedPhoto } from '@/components/FeedPhoto';
@@ -81,6 +81,7 @@ export default function FeedScreen() {
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         automaticallyAdjustKeyboardInsets
         ListHeaderComponent={
           <FeedComposer members={members} author={member} onPosted={loadFeed} />
@@ -89,6 +90,7 @@ export default function FeedScreen() {
           <ActivityItem
             item={item}
             onPress={() => {
+              Keyboard.dismiss();
               if (item.kind === 'post') {
                 setSelectedPost(item);
                 return;
@@ -98,6 +100,7 @@ export default function FeedScreen() {
             onDelete={
               item.kind === 'post' && canDeleteFeedPost(item.authorId, member.user_id)
                 ? () => {
+                    Keyboard.dismiss();
                     void handleDeletePost(item);
                   }
                 : undefined

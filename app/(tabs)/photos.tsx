@@ -94,6 +94,10 @@ export default function PhotosScreen() {
     members.find((item) => item.user_id === userId)?.display_name
     ?? (member && userId === member.user_id ? member.display_name : 'Friend');
 
+  const avatarForUser = (userId?: string | null) =>
+    members.find((item) => item.user_id === userId)?.avatar_url
+    ?? (member && userId === member.user_id ? member.avatar_url : null);
+
   const topPhotoIds = useMemo(() => {
     const scored = photos.filter((p) => p.ai_score != null);
     const topN = Math.max(10, Math.ceil(scored.length * 0.2));
@@ -242,7 +246,11 @@ export default function PhotosScreen() {
           <Text style={styles.back}>{albumBackButtonText(backFrom)}</Text>
         </Pressable>
         <View style={[styles.detailHeader, sharedStyles.card]}>
-          <UserAvatar name={nameForUser(selectedEvent.created_by)} size={48} />
+          <UserAvatar
+            name={nameForUser(selectedEvent.created_by)}
+            size={48}
+            imageUri={avatarForUser(selectedEvent.created_by)}
+          />
           <View style={styles.detailTitleBlock}>
             <Text style={styles.detailTitle}>{selectedEvent.title}</Text>
             <Text style={styles.detailMeta}>
@@ -329,6 +337,7 @@ export default function PhotosScreen() {
           <PhotoEventRow
             summary={item}
             authorName={nameForUser(item.event.created_by)}
+            authorAvatarUrl={avatarForUser(item.event.created_by)}
             onPress={() => {
               setOpenedFromLink(false);
               setSelectedEvent(item.event);

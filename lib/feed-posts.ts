@@ -42,12 +42,14 @@ const ACTIVE_MENTION_RE = /(^|[\s])@([\p{L}\p{N}._-]*)$/u;
 
 export type FeedMentionMember = Pick<Member, 'user_id' | 'display_name'> & {
   contact_email?: string | null;
+  avatar_url?: string | null;
 };
 
 export type FeedMentionSuggestion = {
   id: string;
   label: string;
   insert: string;
+  imageUri?: string | null;
 };
 
 export type ActiveFeedMention = {
@@ -170,6 +172,7 @@ export function listFeedMentionSuggestions(
       id: member.user_id,
       label: member.display_name,
       insert: mentionInsertToken(member),
+      imageUri: member.avatar_url,
     });
   }
   return suggestions;
@@ -256,6 +259,8 @@ export function buildFeedSendPushPayload(input: {
     group_id: input.groupId,
     exclude_user_ids: targets.excludeUserIds,
     ...(targets.userIds ? { user_ids: targets.userIds } : {}),
+    // Feed only sends push when someone is tagged / tag_all.
+    tag_notification: true,
     title: 'GSL',
     body: buildFeedPushBody(input),
     data: { postId: input.postId },

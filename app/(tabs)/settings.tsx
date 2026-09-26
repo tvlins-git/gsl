@@ -26,13 +26,25 @@ import {
   listAppUsers,
   resolveSignedInAppUser,
 } from '@/lib/app-users';
-import { getStoredUser, updateMemberContactEmail } from '@/lib/auth';
+import {
+  getStoredUser,
+  memberNotificationPreference,
+  updateMemberContactEmail,
+  updateMemberNotificationPreference,
+} from '@/lib/auth';
+import { clearMemberAvatar, uploadMemberAvatar } from '@/lib/avatar-upload';
 import { isValidContactEmail } from '@/lib/calendar-invite';
 import {
   deleteLoginAccountFromGroup,
   syncLoginAccountsIntoGroup,
 } from '@/lib/group-member-sync';
+import {
+  NOTIFICATION_PREFERENCE_OPTIONS,
+  type NotificationPreference,
+} from '@/lib/notification-prefs';
+import { isCameraPickerAvailable, pickImageUri, type ImagePickSource } from '@/lib/pick-image';
 import { clearPasswordOverride, resetUserPassword } from '@/lib/user-passwords';
+import { formatUserFacingError } from '@/lib/user-error';
 import { APP_VERSION } from '@/constants/brand';
 import { feedColumn, sharedStyles, theme } from '@/constants/theme';
 
@@ -55,6 +67,11 @@ export default function SettingsScreen() {
   const [contactEmail, setContactEmail] = useState('');
   const [emailError, setEmailError] = useState('');
   const [emailSuccess, setEmailSuccess] = useState('');
+  const [avatarError, setAvatarError] = useState('');
+  const [avatarSuccess, setAvatarSuccess] = useState('');
+  const [notifyPref, setNotifyPref] = useState<NotificationPreference>('all');
+  const [notifyError, setNotifyError] = useState('');
+  const [notifySuccess, setNotifySuccess] = useState('');
 
   const refreshUsers = useCallback(async () => {
     const list = await listAppUsers();
@@ -76,6 +93,14 @@ export default function SettingsScreen() {
     setEmailError('');
     setEmailSuccess('');
   }, [member?.id, member?.contact_email]);
+
+  useEffect(() => {
+    setNotifyPref(memberNotificationPreference(member));
+    setNotifyError('');
+    setNotifySuccess('');
+    setAvatarError('');
+    setAvatarSuccess('');
+  }, [member?.id, member?.notification_preference, member?.avatar_url]);
 
   const selectedUser =
     users.find((user) => user.id === selectedUserId) ??
@@ -101,6 +126,10 @@ export default function SettingsScreen() {
       setContactEmail('');
       setEmailError('');
       setEmailSuccess('');
+      setAvatarError('');
+      setAvatarSuccess('');
+      setNotifyError('');
+      setNotifySuccess('');
     } finally {
       setBusy(false);
     }
@@ -239,6 +268,66 @@ export default function SettingsScreen() {
     }
   };
 
+  const handlePickAvatar = async (source: ImagePickSource) => {
+    if (!member) return;
+    setAvatarError('');
+    setAvatarSuccess('');
+    const uri = await pickImageUri(source);
+    if (!uri) return;
+
+    setBusy(true);
+    try {
+      await uploadMemberAvatar({
+        groupId: member.group_id,
+        userId: member.user_id,
+        memberId: member.id,
+        imageUri: uri,
+      });
+      await refreshMember();
+      setAvatarSuccess('Profile picture updated.');
+    } catch (err) {
+      setAvatarError(formatUserFacingError(err, 'Could not upload photo. Try again.'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleClearAvatar = async () => {
+    if (!member?.avatar_url) return;
+    setBusy(true);
+    setAvatarError('');
+    setAvatarSuccess('');
+    try {
+      await clearMemberAvatar({
+        groupId: member.group_id,
+        userId: member.user_id,
+        memberId: member.id,
+      });
+      await refreshMember();
+      setAvatarSuccess('Profile picture cleared.');
+    } catch (err) {
+      setAvatarError(formatUserFacingError(err, 'Could not clear photo. Try again.'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleSaveNotifyPref = async () => {
+    if (!member) return;
+    setBusy(true);
+    setNotifyError('');
+    setNotifySuccess('');
+    try {
+      await updateMemberNotificationPreference(member.id, notifyPref);
+      await refreshMember();
+      setNotifySuccess('Notification preference saved.');
+    } catch (err) {
+      setNotifyError(formatUserFacingError(err, 'Could not save preference. Try again.'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (loading) {
     return <Screen loading />;
   }
@@ -250,13 +339,18 @@ export default function SettingsScreen() {
       <ScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}
       >
         {isSignedIn ? (
           <>
             <View style={[styles.profileCard, sharedStyles.card]}>
-              <UserAvatar name={member.display_name} size={72} />
+              <UserAvatar
+                name={member.display_name}
+                size={72}
+                imageUri={member.avatar_url}
+              />
               <Text style={styles.profileName}>{member.display_name}</Text>
               <View style={styles.badgeRow}>
                 <StatusBadge status="signed in" />
@@ -271,9 +365,86 @@ export default function SettingsScreen() {
                   </View>
                 )}
               </View>
+              <View style={styles.avatarActions}>
+                {isCameraPickerAvailable() ? (
+                  <Pressable
+                    style={styles.avatarChip}
+                    onPress={() => handlePickAvatar('camera')}
+                    disabled={busy}
+                    testID="avatar-camera-btn"
+                  >
+                    <Text style={styles.avatarChipText}>Camera</Text>
+                  </Pressable>
+                ) : null}
+                <Pressable
+                  style={styles.avatarChip}
+                  onPress={() => handlePickAvatar('gallery')}
+                  disabled={busy}
+                  testID="avatar-gallery-btn"
+                >
+                  <Text style={styles.avatarChipText}>Gallery</Text>
+                </Pressable>
+                {member.avatar_url ? (
+                  <Pressable
+                    style={styles.avatarChip}
+                    onPress={handleClearAvatar}
+                    disabled={busy}
+                    testID="avatar-clear-btn"
+                  >
+                    <Text style={styles.avatarChipText}>Clear</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+              {avatarError ? <Text style={styles.errorText}>{avatarError}</Text> : null}
+              {avatarSuccess ? <Text style={styles.successText}>{avatarSuccess}</Text> : null}
               <Text style={styles.versionText} testID="app-version">
                 Version {APP_VERSION}
               </Text>
+            </View>
+
+            <View style={[styles.sectionCard, sharedStyles.card]}>
+              <Text style={sharedStyles.sectionTitle}>Notifications</Text>
+              <Text style={styles.sectionHint}>
+                Choose when GSL can send you a push. Your preference is stored on your member profile.
+              </Text>
+              {NOTIFICATION_PREFERENCE_OPTIONS.map((option) => {
+                const selected = notifyPref === option.value;
+                return (
+                  <Pressable
+                    key={option.value}
+                    style={[styles.notifyOption, selected && styles.notifyOptionSelected]}
+                    onPress={() => {
+                      setNotifyPref(option.value);
+                      setNotifyError('');
+                      setNotifySuccess('');
+                    }}
+                    disabled={busy}
+                    testID={`notify-pref-${option.value}`}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected }}
+                  >
+                    <View style={[styles.notifyRadio, selected && styles.notifyRadioSelected]} />
+                    <View style={styles.notifyTextWrap}>
+                      <Text style={styles.notifyLabel}>{option.label}</Text>
+                      <Text style={styles.notifyHint}>{option.hint}</Text>
+                    </View>
+                  </Pressable>
+                );
+              })}
+              {notifyError ? <Text style={styles.errorText}>{notifyError}</Text> : null}
+              {notifySuccess ? <Text style={styles.successText}>{notifySuccess}</Text> : null}
+              <Pressable
+                style={[sharedStyles.secondaryBtn, busy && styles.btnDisabled]}
+                onPress={handleSaveNotifyPref}
+                disabled={busy}
+                testID="save-notify-pref-btn"
+              >
+                {busy ? (
+                  <ActivityIndicator color={theme.colors.text} />
+                ) : (
+                  <Text style={sharedStyles.secondaryBtnText}>Save notifications</Text>
+                )}
+              </Pressable>
             </View>
 
             <View style={[styles.sectionCard, sharedStyles.card]}>
@@ -637,6 +808,68 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: theme.colors.textSecondary,
+  },
+  avatarActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: theme.spacing.sm,
+    marginTop: theme.spacing.sm,
+  },
+  avatarChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: theme.radius.pill,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.bg,
+  },
+  avatarChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: theme.colors.text,
+  },
+  notifyOption: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: theme.spacing.md,
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.bg,
+  },
+  notifyOptionSelected: {
+    borderColor: theme.colors.primary,
+    backgroundColor: theme.colors.accentSoft,
+  },
+  notifyRadio: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    marginTop: 2,
+    borderWidth: 2,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
+  },
+  notifyRadioSelected: {
+    borderColor: theme.colors.primary,
+    backgroundColor: theme.colors.primary,
+  },
+  notifyTextWrap: {
+    flex: 1,
+    gap: 2,
+  },
+  notifyLabel: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: theme.colors.text,
+  },
+  notifyHint: {
+    fontSize: 13,
+    color: theme.colors.textSecondary,
+    lineHeight: 18,
   },
   sectionHint: {
     fontSize: 14,
