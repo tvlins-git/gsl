@@ -1,4 +1,4 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   FlatList,
@@ -62,6 +62,13 @@ export default function ThreadScreen() {
       setLoading(false);
     }
   }, [id, member]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!member) return;
+      void getGroupMembers(member.group_id).then(setMembers);
+    }, [member])
+  );
 
   useEffect(() => {
     loadMessages();

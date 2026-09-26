@@ -5,6 +5,7 @@ import {
   type AppUser,
 } from '@/constants/hardcoded-user';
 import { ensureAppUsersLoaded, getAppUser } from './app-users';
+import { syncLoginAccountsIntoGroup } from './group-member-sync';
 import {
   createLocalMember,
   disableLocalMode,
@@ -168,6 +169,7 @@ export async function getGroupMembers(groupId: string): Promise<Member[]> {
     await localStore.hydrate();
     return getLocalGroupMembers();
   }
+  await syncLoginAccountsIntoGroup(groupId).catch(() => undefined);
   const { data, error } = await supabase
     .from('members')
     .select('*')

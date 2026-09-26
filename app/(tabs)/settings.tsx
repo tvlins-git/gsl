@@ -29,6 +29,7 @@ import {
 } from '@/lib/app-users';
 import { getStoredUser, updateMemberContactEmail } from '@/lib/auth';
 import { isValidContactEmail } from '@/lib/calendar-invite';
+import { syncLoginAccountsIntoGroup } from '@/lib/group-member-sync';
 import { clearPasswordOverride, resetUserPassword } from '@/lib/user-passwords';
 import { APP_VERSION } from '@/constants/brand';
 import { feedColumn, sharedStyles, theme } from '@/constants/theme';
@@ -166,6 +167,15 @@ export default function SettingsScreen() {
       }
       setNewUserName('');
       setNewUserPassword('');
+      if (member && !localMode) {
+        const failures = await syncLoginAccountsIntoGroup(member.group_id);
+        const failed = failures.find((line) => line.startsWith(`${result.user.displayName}:`));
+        if (failed) {
+          setUserMgmtError(`Created the login, but they could not be added for tagging. ${failed}`);
+          await refreshUsers();
+          return;
+        }
+      }
       setUserMgmtSuccess(`Created ${result.user.displayName}.`);
       await refreshUsers();
     } finally {

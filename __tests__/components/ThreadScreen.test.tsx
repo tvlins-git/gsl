@@ -24,10 +24,19 @@ const saved = buildMessage({
   created_at: '2026-07-13T12:00:00Z',
 });
 
-jest.mock('expo-router', () => ({
-  useLocalSearchParams: () => ({ id: 'thread-1' }),
-  router: { push: jest.fn() },
-}));
+jest.mock('expo-router', () => {
+  const { useEffect } = require('react');
+  return {
+    useLocalSearchParams: () => ({ id: 'thread-1' }),
+    router: { push: jest.fn() },
+    useFocusEffect: (effect: () => void) => {
+      useEffect(() => {
+        const cleanup = effect();
+        return typeof cleanup === 'function' ? cleanup : undefined;
+      }, [effect]);
+    },
+  };
+});
 
 jest.mock('@/lib/thread-list', () => ({
   getThread: jest.fn(async () => null),
