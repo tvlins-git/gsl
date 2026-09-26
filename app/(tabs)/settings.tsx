@@ -28,7 +28,10 @@ import {
 } from '@/lib/app-users';
 import { getStoredUser, updateMemberContactEmail } from '@/lib/auth';
 import { isValidContactEmail } from '@/lib/calendar-invite';
-import { syncLoginAccountsIntoGroup } from '@/lib/group-member-sync';
+import {
+  deleteLoginAccountFromGroup,
+  syncLoginAccountsIntoGroup,
+} from '@/lib/group-member-sync';
 import { clearPasswordOverride, resetUserPassword } from '@/lib/user-passwords';
 import { APP_VERSION } from '@/constants/brand';
 import { feedColumn, sharedStyles, theme } from '@/constants/theme';
@@ -189,6 +192,16 @@ export default function SettingsScreen() {
     setUserMgmtError('');
     setUserMgmtSuccess('');
     try {
+      if (!localMode) {
+        const remote = await deleteLoginAccountFromGroup({
+          email: user.email,
+          displayName: user.displayName,
+        });
+        if (!remote.ok) {
+          setUserMgmtError(remote.error);
+          return;
+        }
+      }
       const result = await deleteAppUser(user.id, signedInUser.id);
       if (!result.ok) {
         setUserMgmtError(result.error);

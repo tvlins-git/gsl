@@ -5,7 +5,6 @@ import {
   type AppUser,
 } from '@/constants/hardcoded-user';
 import { ensureAppUsersLoaded, getAppUser } from './app-users';
-import { syncLoginAccountsIntoGroup } from './group-member-sync';
 import {
   createLocalMember,
   disableLocalMode,
@@ -170,7 +169,8 @@ export async function getGroupMembers(groupId: string): Promise<Member[]> {
     await localStore.hydrate();
     return getLocalGroupMembers();
   }
-  await syncLoginAccountsIntoGroup(groupId).catch(() => undefined);
+  // Do not sync login accounts here — that resurrected deleted users from the
+  // local Profile roster. Remote members are created only on explicit Profile create.
   const { data, error } = await supabase
     .from('members')
     .select('*')
