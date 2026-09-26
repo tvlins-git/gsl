@@ -114,19 +114,21 @@ export default function WordGame({ language, onResult }: GameProps) {
           <p className="pip-mystery">?</p>
         )}
       </div>
-      <div className="pip-actions">
-        <button
-          type="button"
-          className={phase === 'listening' ? 'pip-action pip-listening' : 'pip-action'}
-          onClick={() => {
-            void sayWord();
-          }}
-          disabled={!card || phase === 'listening' || phase === 'yes'}
-        >
-          <Icon svg={icons.mic} />
-          {phase === 'listening' ? copy.listening : copy.sayTheWord}
-        </button>
-      </div>
+      {phase === 'yes' ? null : (
+        <div className="pip-actions">
+          <button
+            type="button"
+            className={phase === 'listening' ? 'pip-action pip-listening' : 'pip-action'}
+            onClick={() => {
+              void sayWord();
+            }}
+            disabled={!card || phase === 'listening'}
+          >
+            <Icon svg={icons.mic} />
+            {phase === 'listening' ? copy.listening : copy.sayTheWord}
+          </button>
+        </div>
+      )}
       {phase === 'yes' || phase === 'retry' ? (
         <button type="button" className="pip-next" onClick={next}>
           {copy.next}
