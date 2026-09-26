@@ -1,25 +1,10 @@
 import { SymbolView } from 'expo-symbols';
-import { router, Tabs } from 'expo-router';
-import { Platform, Pressable, StyleSheet, Text } from 'react-native';
+import { Tabs } from 'expo-router';
+import { Platform } from 'react-native';
 import { GslNavTitle } from '@/components/GslNavTitle';
-import { HeaderBackButton } from '@/components/HeaderBackButton';
 import { APP_NAME } from '@/constants/brand';
 import { theme } from '@/constants/theme';
 import { SettingsAuthRedirect } from '@/components/SettingsAuthRedirect';
-
-function HostsHeaderLink() {
-  return (
-    <Pressable
-      onPress={() => router.push('/hosts')}
-      testID="header-hosts-btn"
-      accessibilityRole="button"
-      accessibilityLabel="Hosts"
-      style={styles.headerLink}
-    >
-      <Text style={styles.headerLinkText}>Hosts</Text>
-    </Pressable>
-  );
-}
 
 export default function TabLayout() {
   return (
@@ -52,7 +37,6 @@ export default function TabLayout() {
         options={{
           title: 'Feed',
           headerTitle: () => <GslNavTitle title={APP_NAME} />,
-          headerRight: () => <HostsHeaderLink />,
           tabBarLabel: 'Feed',
           tabBarAccessibilityLabel: 'Feed',
           tabBarIcon: ({ focused }) => (
@@ -111,11 +95,28 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="hosts"
+        options={{
+          title: `${APP_NAME} · Hosts`,
+          headerTitle: () => <GslNavTitle suffix="Hosts" />,
+          tabBarLabel: 'Hosts',
+          tabBarAccessibilityLabel: 'Hosts',
+          tabBarIcon: ({ focused }) => (
+            <SymbolView
+              name={{ ios: 'person.2', android: 'group', web: 'group' }}
+              tintColor={focused ? theme.colors.primary : theme.colors.textMuted}
+              size={24}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="settings"
         options={{
           title: `${APP_NAME} · Profile`,
           headerTitle: () => <GslNavTitle suffix="Profile" />,
           tabBarLabel: 'Profile',
+          tabBarAccessibilityLabel: 'Profile',
           tabBarIcon: ({ focused }) => (
             <SymbolView
               name={{ ios: 'person.circle', android: 'account_circle', web: 'account_circle' }}
@@ -125,28 +126,7 @@ export default function TabLayout() {
           ),
         }}
       />
-      <Tabs.Screen
-        name="hosts"
-        options={{
-          href: null,
-          title: `${APP_NAME} · Hosts`,
-          headerTitle: () => <GslNavTitle suffix="Hosts" />,
-          headerLeft: () => <HeaderBackButton fallbackHref="/" />,
-        }}
-      />
     </Tabs>
     </>
   );
 }
-
-const styles = StyleSheet.create({
-  headerLink: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  headerLinkText: {
-    color: theme.colors.accent,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-});
