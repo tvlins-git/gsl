@@ -112,6 +112,8 @@ deno test --allow-env supabase/functions/
 
 ## Distribution
 
+Native store ids live in `app.config.ts`: iOS `bundleIdentifier` and Android `package` are both `com.tvlins.gsl`. The app name stays **GSL** and the slug stays `gsl`.
+
 ### Android (free — shared APK)
 
 ```bash
