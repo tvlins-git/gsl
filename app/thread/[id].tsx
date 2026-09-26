@@ -1,5 +1,5 @@
-import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { router, useFocusEffect, useLocalSearchParams, type ErrorBoundaryProps } from 'expo-router';
+import { Component, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   FlatList,
   KeyboardAvoidingView,
@@ -30,6 +30,59 @@ import { buildChatPushPayload, listThreadMessages, sendThreadMessage } from '@/l
 import { isLocalMode } from '@/lib/local-store';
 import { supabase } from '@/lib/supabase';
 import { sharedStyles, theme } from '@/constants/theme';
+
+/**
+ * Live updates sit under their own boundary. A refused realtime subscribe used
+ * to throw out of this screen and the root layout replaced the whole app.
+ */
+class ThreadSubscriptionBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+
+  static getDerivedStateFromError(): { failed: boolean } {
+    return { failed: true };
+  }
+
+  render() {
+    if (this.state.failed) return null;
+    return this.props.children;
+  }
+}
+
+function ThreadLiveUpdates({
+  threadId,
+  onInsert,
+}: {
+  threadId: string;
+  onInsert: (message: Message) => void;
+}) {
+  const onInsertRef = useRef(onInsert);
+  onInsertRef.current = onInsert;
+
+  useEffect(() => {
+    if (isLocalMode()) return;
+    try {
+      return subscribeToThreadInserts(threadId, (message) => {
+        onInsertRef.current(message);
+      });
+    } catch {
+      return undefined;
+    }
+  }, [threadId]);
+
+  return null;
+}
+
+export function ErrorBoundary({ retry }: ErrorBoundaryProps) {
+  return (
+    <View style={[sharedStyles.screen, styles.errorFallback]}>
+      <Text style={styles.errorTitle}>This chat hit a connection error.</Text>
+      <Text style={styles.errorBody}>The rest of GSL is still open. You can try the thread again.</Text>
+      <Pressable style={sharedStyles.primaryBtn} onPress={() => void retry()} testID="thread-error-retry">
+        <Text style={sharedStyles.primaryBtnText}>Try again</Text>
+      </Pressable>
+    </View>
+  );
+}
 
 export default function ThreadScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -72,14 +125,12 @@ export default function ThreadScreen() {
   );
 
   useEffect(() => {
-    loadMessages();
+    void loadMessages();
+  }, [loadMessages]);
 
-    if (isLocalMode() || !id) return;
-
-    return subscribeToThreadInserts(id, (message) => {
-      setMessages((prev) => mergeMessages(prev, [message]));
-    });
-  }, [id, loadMessages]);
+  const handleInsert = useCallback((message: Message) => {
+    setMessages((prev) => mergeMessages(prev, [message]));
+  }, []);
 
   const sendMessage = async () => {
     if (!member || !id || !mention.body.trim()) return;
@@ -115,61 +166,85 @@ export default function ThreadScreen() {
     }
   };
 
-  if (loading) {
-    return <Screen loading />;
-  }
+  const liveUpdates =
+    typeof id === 'string' && id.length > 0 ? (
+      <ThreadSubscriptionBoundary>
+        <ThreadLiveUpdates threadId={id} onInsert={handleInsert} />
+      </ThreadSubscriptionBoundary>
+    ) : null;
 
   return (
-    <KeyboardAvoidingView
-      style={sharedStyles.screen}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={90}
-    >
-      {pollLink ? (
-        <PollThreadLink
-          title={pollLink.title}
-          onPress={() => router.navigate(`/plan?pollId=${pollLink.id}`)}
-        />
-      ) : null}
-      <FlatList
-        ref={listRef}
-        data={messages}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.list}
-        onContentSizeChange={() => listRef.current?.scrollToEnd()}
-        renderItem={({ item }) => (
-          <MessageBubble
-            body={item.body}
-            senderName={memberMap[item.sender_id] ?? 'Unknown'}
-            createdAt={item.created_at}
-            isOwn={item.sender_id === member?.user_id}
+    <>
+      {liveUpdates}
+      {loading ? (
+        <Screen loading />
+      ) : (
+        <KeyboardAvoidingView
+          style={sharedStyles.screen}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          keyboardVerticalOffset={90}
+        >
+          {pollLink ? (
+            <PollThreadLink
+              title={pollLink.title}
+              onPress={() => router.navigate(`/plan?pollId=${pollLink.id}`)}
+            />
+          ) : null}
+          <FlatList
+            ref={listRef}
+            data={messages}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.list}
+            onContentSizeChange={() => listRef.current?.scrollToEnd()}
+            renderItem={({ item }) => (
+              <MessageBubble
+                body={item.body}
+                senderName={memberMap[item.sender_id] ?? 'Unknown'}
+                createdAt={item.created_at}
+                isOwn={item.sender_id === member?.user_id}
+              />
+            )}
           />
-        )}
-      />
-      <View style={styles.composer}>
-        <MentionSuggestions
-          suggestions={mention.suggestions}
-          onSelect={mention.insertMention}
-          testIDPrefix="message"
-        />
-        <View style={styles.inputRow}>
-          <TextInput
-            style={styles.input}
-            placeholder="Message… use @name to notify"
-            placeholderTextColor={theme.colors.textMuted}
-            {...mention.inputProps}
-            testID="message-input"
-          />
-          <Pressable style={styles.sendBtn} onPress={sendMessage} testID="send-message">
-            <Text style={styles.sendText}>Send</Text>
-          </Pressable>
-        </View>
-      </View>
-    </KeyboardAvoidingView>
+          <View style={styles.composer}>
+            <MentionSuggestions
+              suggestions={mention.suggestions}
+              onSelect={mention.insertMention}
+              testIDPrefix="message"
+            />
+            <View style={styles.inputRow}>
+              <TextInput
+                style={styles.input}
+                placeholder="Message… use @name to notify"
+                placeholderTextColor={theme.colors.textMuted}
+                {...mention.inputProps}
+                testID="message-input"
+              />
+              <Pressable style={styles.sendBtn} onPress={sendMessage} testID="send-message">
+                <Text style={styles.sendText}>Send</Text>
+              </Pressable>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      )}
+    </>
   );
 }
 
 const styles = StyleSheet.create({
+  errorFallback: {
+    justifyContent: 'center',
+    padding: theme.spacing.lg,
+    gap: theme.spacing.md,
+  },
+  errorTitle: {
+    color: theme.colors.text,
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  errorBody: {
+    color: theme.colors.textSecondary,
+    fontSize: 16,
+  },
   list: { paddingVertical: theme.spacing.md },
   composer: {
     backgroundColor: theme.colors.surface,
