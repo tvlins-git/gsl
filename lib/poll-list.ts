@@ -63,6 +63,9 @@ export async function deletePoll(pollId: string) {
     return;
   }
 
+  const { error: threadError } = await supabase.from('threads').delete().eq('poll_id', pollId);
+  if (threadError) throw threadError;
+
   const { error } = await supabase.from('polls').delete().eq('id', pollId);
   if (error) throw error;
 }
