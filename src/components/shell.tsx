@@ -1,16 +1,12 @@
 "use client";
 
+import { FriendArt } from "@/components/friends";
 import { PipBird } from "@/components/pip-bird";
+import { RewardCelebration } from "@/components/reward-celebration";
 import type { GameProps, LearningLanguage } from "@/games/types";
 import { cheer, t } from "@/lib/i18n";
+import type { FriendId } from "@/lib/friends";
 import type { ShellProfile } from "@/lib/profile";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Star } from "lucide-react";
 import Link from "next/link";
 import { createContext, useContext, useEffect, useState } from "react";
@@ -20,6 +16,8 @@ type ProgressPayload = {
   currentStreak: number;
   bestStreak: number;
   milestone: number | null;
+  unlockedFriends?: FriendId[];
+  unlockedFriend?: FriendId | null;
 };
 
 type ShellContextValue = {
@@ -59,6 +57,7 @@ export function Shell({
 }) {
   const [profile, setProfile] = useState(initialProfile);
   const [milestone, setMilestone] = useState<number | null>(null);
+  const [unlockedFriend, setUnlockedFriend] = useState<FriendId | null>(null);
   const [hop, setHop] = useState(false);
   const [pending, setPending] = useState(false);
   const copy = t(profile.language);
@@ -98,6 +97,7 @@ export function Shell({
         stars: data.stars,
         currentStreak: data.currentStreak,
         bestStreak: data.bestStreak,
+        unlockedFriends: data.unlockedFriends ?? current.unlockedFriends,
       }));
       if (result.correct) {
         setHop(true);
@@ -105,6 +105,7 @@ export function Shell({
       }
       if (data.milestone) {
         setMilestone(data.milestone);
+        setUnlockedFriend(data.unlockedFriend ?? null);
         void playCheer(profile.language, data.milestone);
       }
     } finally {
@@ -121,60 +122,61 @@ export function Shell({
           {backHref ? (
             <Link
               href={backHref}
-              className="flex min-h-14 min-w-14 items-center justify-center rounded-full bg-white text-lg font-extrabold text-[#2c2416] ring-2 ring-[#edd9bc]"
+              className="flex min-h-14 min-w-14 items-center justify-center rounded-full bg-[#fff8e8]/90 text-lg font-extrabold text-[#5c3d24] ring-2 ring-[#e8c9a0]"
               aria-label={copy.back}
             >
               ←
             </Link>
           ) : (
-            <PipBird className={`size-14 ${hop ? "pip-hop" : ""}`} />
+            <PipBird
+              className={`size-14 ${hop ? "pip-hop" : ""}`}
+              animate="bob"
+            />
           )}
           <div className="ml-auto flex items-center gap-2">
-            <p className="rounded-full bg-white px-4 py-2 text-lg font-extrabold text-[#2c2416] ring-2 ring-[#edd9bc]">
-              <span className="text-[#e36a5d]">{profile.currentStreak}</span>{" "}
-              <span className="text-base font-bold text-[#6d5c48]">
+            <p className="rounded-full bg-[#fff8e8]/90 px-4 py-2 text-lg font-extrabold text-[#5c3d24] ring-2 ring-[#e8c9a0]">
+              <span className="text-[#c4894a]">{profile.currentStreak}</span>{" "}
+              <span className="text-base font-bold text-[#8b6a4a]">
                 {copy.inARow}
               </span>
             </p>
-            <p className="flex min-h-12 items-center gap-1 rounded-full bg-[#f6d365] px-4 text-lg font-extrabold text-[#2c2416]">
-              <Star className="size-5 fill-[#e36a5d] text-[#e36a5d]" />
+            <p className="flex min-h-12 items-center gap-1 rounded-full bg-[#f6d56a] px-4 text-lg font-extrabold text-[#5c3d24]">
+              <Star className="size-5 fill-[#e8a050] text-[#e8a050]" />
               {profile.stars}
               <span className="sr-only">{copy.stars}</span>
             </p>
           </div>
         </header>
         {profile.preview ? (
-          <p className="mb-4 rounded-2xl bg-white/80 px-4 py-3 text-sm text-[#6d5c48] ring-1 ring-[#edd9bc]">
+          <p className="mb-4 rounded-2xl bg-[#fff8e8]/80 px-4 py-3 text-sm text-[#8b6a4a] ring-1 ring-[#e8c9a0]">
             {copy.preview}
           </p>
         ) : null}
         <main className="flex flex-1 flex-col">{children}</main>
-      </div>
-      <Dialog
-        open={milestone !== null}
-        onOpenChange={(open) => {
-          if (!open) setMilestone(null);
-        }}
-      >
-        <DialogContent className="sm:max-w-md">
-          <div className="flex flex-col items-center gap-3 py-4 text-center">
-            <PipBird className="pip-hop size-28" />
-            <DialogTitle className="text-3xl font-extrabold">
-              {milestone ? cheer(profile.language, milestone) : ""}
-            </DialogTitle>
-            <DialogDescription className="text-lg text-[#6d5c48]">
-              <Star className="mr-1 inline size-5 fill-[#e36a5d] text-[#e36a5d]" />
-              {profile.stars} {copy.stars}
-            </DialogDescription>
-            <Button
-              className="mt-2 h-14 rounded-full px-8 text-lg font-extrabold"
-              onClick={() => setMilestone(null)}
-            >
-              {copy.keepGoing}
-            </Button>
+        {!activity && profile.unlockedFriends.length > 1 ? (
+          <div className="mt-4 flex items-center justify-center gap-1 pb-2">
+            {profile.unlockedFriends.map((id) => (
+              <FriendArt
+                key={id}
+                id={id}
+                className="size-12"
+                animate={id === "pip" ? "bob" : "idle"}
+              />
+            ))}
           </div>
-        </DialogContent>
-      </Dialog>
+        ) : null}
+      </div>
+      <RewardCelebration
+        open={milestone !== null}
+        milestone={milestone}
+        unlockedFriend={unlockedFriend}
+        stars={profile.stars}
+        language={profile.language}
+        onClose={() => {
+          setMilestone(null);
+          setUnlockedFriend(null);
+        }}
+      />
     </ShellContext.Provider>
   );
 }

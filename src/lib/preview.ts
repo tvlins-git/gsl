@@ -1,4 +1,10 @@
 import type { LearningLanguage } from "@/games/types";
+import {
+  friendIdsForStars,
+  isFriendId,
+  mergeUnlockedFriends,
+  type FriendId,
+} from "@/lib/friends";
 import { isLearningLanguage } from "@/lib/i18n";
 import { cookies } from "next/headers";
 
@@ -13,6 +19,7 @@ export type PreviewProfile = {
   bestStreak: number;
   mathLevel: number;
   mathCorrect: number;
+  unlockedFriends: FriendId[];
 };
 
 export function emptyPreview(displayName: string): PreviewProfile {
@@ -25,6 +32,7 @@ export function emptyPreview(displayName: string): PreviewProfile {
     bestStreak: 0,
     mathLevel: 1,
     mathCorrect: 0,
+    unlockedFriends: friendIdsForStars(0),
   };
 }
 
@@ -34,18 +42,25 @@ export async function readPreview(): Promise<PreviewProfile | null> {
   if (!raw) return null;
 
   try {
-    const parsed = JSON.parse(raw) as Partial<PreviewProfile>;
+    const parsed = JSON.parse(raw) as Partial<PreviewProfile> & {
+      unlockedFriends?: string[];
+    };
     if (!parsed.displayName || !parsed.language) return null;
     if (!isLearningLanguage(parsed.language)) return null;
+    const stars = parsed.stars ?? 0;
+    const stored = Array.isArray(parsed.unlockedFriends)
+      ? parsed.unlockedFriends.filter(isFriendId)
+      : undefined;
     return {
       id: "preview",
       displayName: parsed.displayName,
       language: parsed.language,
-      stars: parsed.stars ?? 0,
+      stars,
       currentStreak: parsed.currentStreak ?? 0,
       bestStreak: parsed.bestStreak ?? 0,
       mathLevel: parsed.mathLevel ?? 1,
       mathCorrect: parsed.mathCorrect ?? 0,
+      unlockedFriends: mergeUnlockedFriends(stored, stars),
     };
   } catch {
     return null;

@@ -31,38 +31,46 @@ export function HomeScreen() {
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-5">
-      <div className="flex items-center gap-3">
-        <PipBird className="size-20" />
-        <h1 className="text-4xl font-extrabold text-[#2c2416]">
-          {copy.hello} {profile.displayName}
-        </h1>
-      </div>
-      <LanguageSwitch />
-      <div className="grid flex-1 gap-4 sm:grid-cols-2">
-        <Link
-          href="/math"
-          className="flex min-h-48 flex-col items-center justify-center gap-3 rounded-[2rem] bg-[#e36a5d] text-white shadow-sm"
-        >
-          <span className="flex items-center text-5xl font-black">
-            <Plus className="size-12" strokeWidth={3} />
-            <Minus className="size-12" strokeWidth={3} />
-          </span>
-          <span className="text-3xl font-extrabold">{copy.math}</span>
-        </Link>
-        <Link
-          href="/language"
-          className="flex min-h-48 flex-col items-center justify-center gap-3 rounded-[2rem] bg-[#2a9d8f] text-white shadow-sm"
-        >
-          <BookOpen className="size-14" strokeWidth={2.4} />
-          <span className="text-3xl font-extrabold">{copy.language}</span>
-        </Link>
+    <div className="relative flex flex-1 flex-col">
+      <div className="pip-cozy-hero flex flex-1 flex-col items-center justify-center gap-6 text-center">
+        <p className="pip-brand text-6xl font-black tracking-tight text-[#5c3d24] sm:text-7xl">
+          Pip
+        </p>
+        <PipBird className="size-40 sm:size-48" animate="bob" />
+        <div className="space-y-2">
+          <h1 className="text-3xl font-extrabold text-[#5c3d24] sm:text-4xl">
+            {copy.hello} {profile.displayName}
+          </h1>
+          <p className="mx-auto max-w-sm text-base font-semibold text-[#8b6a4a]">
+            {copy.playLanguage}
+          </p>
+        </div>
+        <div className="flex w-full max-w-md flex-col gap-3 sm:flex-row">
+          <Link
+            href="/math"
+            className="flex min-h-20 flex-1 items-center justify-center gap-3 rounded-full bg-[#e8895a] px-6 text-white shadow-[0_8px_0_#c46a3a] transition-transform active:translate-y-1 active:shadow-none"
+          >
+            <span className="flex items-center font-black">
+              <Plus className="size-7" strokeWidth={3} />
+              <Minus className="size-7" strokeWidth={3} />
+            </span>
+            <span className="text-2xl font-extrabold">{copy.math}</span>
+          </Link>
+          <Link
+            href="/language"
+            className="flex min-h-20 flex-1 items-center justify-center gap-3 rounded-full bg-[#c4894a] px-6 text-white shadow-[0_8px_0_#8b5e3c] transition-transform active:translate-y-1 active:shadow-none"
+          >
+            <BookOpen className="size-8" strokeWidth={2.4} />
+            <span className="text-2xl font-extrabold">{copy.language}</span>
+          </Link>
+        </div>
+        <LanguageSwitch />
       </div>
       <Dialog>
         <DialogTrigger asChild>
           <button
             type="button"
-            className="self-center px-3 py-2 text-sm font-bold text-[#6d5c48] underline-offset-4 hover:underline"
+            className="self-center px-3 py-2 text-sm font-bold text-[#8b6a4a] underline-offset-4 hover:underline"
           >
             {copy.grownUp}
           </button>

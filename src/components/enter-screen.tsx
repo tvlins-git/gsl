@@ -40,10 +40,12 @@ export function EnterScreen({ preview }: { preview: boolean }) {
   }
 
   return (
-    <main className="mx-auto flex min-h-full w-full max-w-lg flex-col justify-center gap-5 px-4 py-8">
-      <PipBird className="size-24" />
-      <h1 className="text-4xl font-extrabold text-[#2c2416]">Pip</h1>
-      <div className="grid grid-cols-3 gap-2">
+    <main className="pip-cozy-hero mx-auto flex min-h-full w-full max-w-lg flex-col items-center justify-center gap-5 px-4 py-8 text-center">
+      <p className="pip-brand text-6xl font-black tracking-tight text-[#5c3d24]">
+        Pip
+      </p>
+      <PipBird className="size-36" animate="bob" />
+      <div className="grid w-full grid-cols-3 gap-2">
         {LANGUAGES.map((item) => (
           <button
             key={item}
@@ -51,8 +53,8 @@ export function EnterScreen({ preview }: { preview: boolean }) {
             aria-pressed={ui === item}
             className={`min-h-12 rounded-2xl text-sm font-extrabold ${
               ui === item
-                ? "bg-[#2a9d8f] text-white"
-                : "bg-white text-[#2c2416] ring-2 ring-[#edd9bc]"
+                ? "bg-[#c4894a] text-[#fff8e8]"
+                : "bg-[#fff8e8] text-[#5c3d24] ring-2 ring-[#e8c9a0]"
             }`}
             onClick={() => setUi(item)}
           >
@@ -61,17 +63,17 @@ export function EnterScreen({ preview }: { preview: boolean }) {
         ))}
       </div>
       {preview ? (
-        <p className="rounded-2xl bg-white/80 px-4 py-3 text-sm text-[#6d5c48] ring-1 ring-[#edd9bc]">
+        <p className="w-full rounded-2xl bg-[#fff8e8]/80 px-4 py-3 text-left text-sm text-[#8b6a4a] ring-1 ring-[#e8c9a0]">
           {copy.preview}
         </p>
       ) : null}
-      <p className="text-lg text-[#6d5c48]">{copy.codeHelp}</p>
-      <label className="flex flex-col gap-2 text-lg font-bold text-[#2c2416]">
+      <p className="text-lg text-[#8b6a4a]">{copy.codeHelp}</p>
+      <label className="flex w-full flex-col gap-2 text-left text-lg font-bold text-[#5c3d24]">
         {copy.familyCode}
         <Input
           value={code}
           onChange={(event) => setCode(event.target.value)}
-          className="h-14 rounded-2xl bg-white px-4 text-xl tracking-widest"
+          className="h-14 rounded-2xl bg-[#fff8e8] px-4 text-xl tracking-widest"
           autoCapitalize="none"
           autoCorrect="off"
           spellCheck={false}
@@ -80,7 +82,7 @@ export function EnterScreen({ preview }: { preview: boolean }) {
       </label>
       {error ? <p className="font-bold text-[#c4483a]">{error}</p> : null}
       <Button
-        className="h-14 rounded-full text-lg font-extrabold"
+        className="h-14 w-full rounded-full bg-[#c4894a] text-lg font-extrabold text-[#fff8e8] hover:bg-[#a06d45]"
         disabled={pending}
         onClick={() => void submit()}
       >

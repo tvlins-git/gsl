@@ -25,6 +25,9 @@ const copy = {
       "Databasen är inte kopplad än. Poängen stannar i den här webbläsaren.",
     wrongCode: "Koden stämde inte.",
     tripped: "Pip snubblade. Försök igen.",
+    friends: "Vänner",
+    playMath: "Räkna med Pip",
+    playLanguage: "Läs med Pip",
   },
   da: {
     math: "Matematik",
@@ -48,6 +51,9 @@ const copy = {
       "Databasen er ikke forbundet endnu. Pointene bliver i denne browser.",
     wrongCode: "Koden passede ikke.",
     tripped: "Pip snublede. Prøv igen.",
+    friends: "Venner",
+    playMath: "Regn med Pip",
+    playLanguage: "Læs med Pip",
   },
   en: {
     math: "Math",
@@ -70,6 +76,9 @@ const copy = {
     preview: "The database is not connected yet. Scores stay in this browser.",
     wrongCode: "That code did not match.",
     tripped: "Pip tripped. Try again.",
+    friends: "Friends",
+    playMath: "Count with Pip",
+    playLanguage: "Read with Pip",
   },
 } as const;
 
@@ -85,6 +94,12 @@ export function cheer(language: LearningLanguage, streak: number) {
     return streak === 5 ? "Fem rätt i rad!" : `${streak} rätt i rad!`;
   }
   return streak === 5 ? "Five in a row!" : `${streak} in a row!`;
+}
+
+export function friendUnlockLine(language: LearningLanguage, name: string) {
+  if (language === "da") return `${name} er med nu!`;
+  if (language === "sv") return `${name} är med nu!`;
+  return `${name} joined the party!`;
 }
 
 export function isLearningLanguage(value: string): value is LearningLanguage {

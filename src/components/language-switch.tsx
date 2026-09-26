@@ -25,8 +25,8 @@ export function LanguageSwitch() {
             onClick={() => void setLanguage(item)}
             className={`min-h-14 rounded-2xl text-base font-extrabold sm:text-lg ${
               selected
-                ? "bg-[#2a9d8f] text-white"
-                : "bg-white text-[#2c2416] ring-2 ring-[#edd9bc]"
+                ? "bg-[#c4894a] text-[#fff8e8]"
+                : "bg-[#fff8e8]/90 text-[#5c3d24] ring-2 ring-[#e8c9a0]"
             }`}
           >
             {labels[item]}

@@ -49,24 +49,25 @@
 }
 
 :root {
-  --background: #fff3e0;
-  --foreground: #2c2416;
-  --card: #fffaf3;
-  --card-foreground: #2c2416;
-  --popover: #fffaf3;
-  --popover-foreground: #2c2416;
-  --primary: #e36a5d;
-  --primary-foreground: #fffaf3;
-  --secondary: #d8f3ee;
-  --secondary-foreground: #1d4e48;
-  --muted: #f6e6cf;
-  --muted-foreground: #6d5c48;
-  --accent: #f6d365;
-  --accent-foreground: #2c2416;
+  /* Pudding-cream yellows, caramel browns, soft peach */
+  --background: #fff1d6;
+  --foreground: #5c3d24;
+  --card: #fff8e8;
+  --card-foreground: #5c3d24;
+  --popover: #fff8e8;
+  --popover-foreground: #5c3d24;
+  --primary: #c4894a;
+  --primary-foreground: #fff8e8;
+  --secondary: #ffe0c2;
+  --secondary-foreground: #5c3d24;
+  --muted: #f6e0c4;
+  --muted-foreground: #8b6a4a;
+  --accent: #f6d56a;
+  --accent-foreground: #5c3d24;
   --destructive: #c4483a;
-  --border: #edd9bc;
-  --input: #edd9bc;
-  --ring: #2a9d8f;
+  --border: #e8c9a0;
+  --input: #e8c9a0;
+  --ring: #c4894a;
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -84,24 +85,24 @@
 }
 
 .dark {
-  --background: #fff3e0;
-  --foreground: #2c2416;
-  --card: #fffaf3;
-  --card-foreground: #2c2416;
-  --popover: #fffaf3;
-  --popover-foreground: #2c2416;
-  --primary: #e36a5d;
-  --primary-foreground: #fffaf3;
-  --secondary: #d8f3ee;
-  --secondary-foreground: #1d4e48;
-  --muted: #f6e6cf;
-  --muted-foreground: #6d5c48;
-  --accent: #f6d365;
-  --accent-foreground: #2c2416;
+  --background: #fff1d6;
+  --foreground: #5c3d24;
+  --card: #fff8e8;
+  --card-foreground: #5c3d24;
+  --popover: #fff8e8;
+  --popover-foreground: #5c3d24;
+  --primary: #c4894a;
+  --primary-foreground: #fff8e8;
+  --secondary: #ffe0c2;
+  --secondary-foreground: #5c3d24;
+  --muted: #f6e0c4;
+  --muted-foreground: #8b6a4a;
+  --accent: #f6d56a;
+  --accent-foreground: #5c3d24;
   --destructive: #c4483a;
-  --border: #edd9bc;
-  --input: #edd9bc;
-  --ring: #2a9d8f;
+  --border: #e8c9a0;
+  --input: #e8c9a0;
+  --ring: #c4894a;
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -124,13 +125,44 @@
   body {
     @apply bg-background text-foreground;
     background:
-      radial-gradient(circle at 8% 0%, #ffe7c2 0%, transparent 42%),
-      radial-gradient(circle at 100% 8%, #d8f3ee 0%, transparent 36%),
+      radial-gradient(ellipse at 50% -10%, #ffe9a8 0%, transparent 55%),
+      radial-gradient(circle at 0% 80%, #ffd7b8 0%, transparent 42%),
+      radial-gradient(circle at 100% 70%, #f6d56a 0%, transparent 38%),
       var(--background);
+    min-height: 100%;
   }
   html {
     @apply font-sans;
   }
+}
+
+.pip-cozy-hero {
+  position: relative;
+}
+
+.pip-cozy-hero::before {
+  content: "";
+  position: absolute;
+  inset: 8% 10% auto;
+  height: 55%;
+  border-radius: 50%;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(255, 248, 232, 0.9) 0%,
+    rgba(255, 233, 168, 0.35) 45%,
+    transparent 70%
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+.pip-cozy-hero > * {
+  position: relative;
+  z-index: 1;
+}
+
+.pip-brand {
+  text-shadow: 0 2px 0 rgba(196, 137, 74, 0.2);
 }
 
 @keyframes pip-hop {
@@ -145,4 +177,100 @@
 
 .pip-hop {
   animation: pip-hop 0.45s ease;
+}
+
+@keyframes friend-beret-bob {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  40% {
+    transform: translateY(-4px) rotate(-3deg);
+  }
+  70% {
+    transform: translateY(-1px) rotate(2deg);
+  }
+}
+
+.friend-beret-bob .friend-beret,
+.friend-beret-bob {
+  transform-origin: 60px 72px;
+}
+
+.friend-beret-bob {
+  animation: friend-beret-bob 2.4s ease-in-out infinite;
+}
+
+@keyframes friend-unlock-bounce {
+  0% {
+    opacity: 0;
+    transform: scale(0.4) translateY(24px);
+  }
+  55% {
+    opacity: 1;
+    transform: scale(1.12) translateY(-8px);
+  }
+  75% {
+    transform: scale(0.96) translateY(2px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.friend-unlock-bounce {
+  animation: friend-unlock-bounce 0.85s cubic-bezier(0.22, 1.2, 0.36, 1) both;
+}
+
+@keyframes friend-parade {
+  0%,
+  100% {
+    transform: translateX(0) translateY(0);
+  }
+  25% {
+    transform: translateX(6px) translateY(-8px);
+  }
+  50% {
+    transform: translateX(0) translateY(0);
+  }
+  75% {
+    transform: translateX(-6px) translateY(-8px);
+  }
+}
+
+.friend-parade {
+  animation: friend-parade 0.7s ease-in-out 3;
+}
+
+.reward-parade-stage {
+  background:
+    radial-gradient(circle at 50% 20%, #ffe9a8 0%, transparent 55%),
+    radial-gradient(circle at 20% 80%, #ffd7b8 0%, transparent 40%),
+    #fff8e8;
+  border-radius: 1.5rem;
+}
+
+@keyframes reward-sparkle {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.9);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1.05);
+  }
+}
+
+.reward-sparkles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 18% 28%, #f6d56a 0 4px, transparent 5px),
+    radial-gradient(circle at 82% 22%, #e8895a 0 3px, transparent 4px),
+    radial-gradient(circle at 70% 70%, #f6d56a 0 5px, transparent 6px),
+    radial-gradient(circle at 28% 75%, #c4894a 0 3px, transparent 4px);
+  animation: reward-sparkle 1.4s ease-in-out infinite;
 }

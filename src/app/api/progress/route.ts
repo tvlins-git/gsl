@@ -1,3 +1,8 @@
+import {
+  friendUnlockedAt,
+  mergeUnlockedFriends,
+  type FriendId,
+} from "@/lib/friends";
 import { isLearningLanguage } from "@/lib/i18n";
 import {
   PREVIEW_COOKIE,
@@ -52,9 +57,17 @@ export async function POST(request: Request) {
         { status: 401 },
       );
     }
-    const next = applyPreview(preview, activity, correct);
-    const response = NextResponse.json(toPayload(next));
-    response.cookies.set(PREVIEW_COOKIE, JSON.stringify(next), previewCookieOptions());
+    const { profile: next, unlockedFriend } = applyPreview(
+      preview,
+      activity,
+      correct,
+    );
+    const response = NextResponse.json(toPayload(next, unlockedFriend));
+    response.cookies.set(
+      PREVIEW_COOKIE,
+      JSON.stringify(next),
+      previewCookieOptions(),
+    );
     return response;
   }
 
@@ -83,19 +96,37 @@ export async function POST(request: Request) {
     );
   }
 
-  return NextResponse.json(data);
+  const stars = Number(data.stars ?? 0);
+  const unlockedFriend =
+    correct && data.milestone ? friendUnlockedAt(stars)?.id ?? null : null;
+
+  return NextResponse.json({
+    ...data,
+    unlockedFriends: mergeUnlockedFriends(undefined, stars),
+    unlockedFriend,
+  });
 }
 
 function applyPreview(
   profile: PreviewProfile,
   activity: string,
   correct: boolean,
-): PreviewProfile {
+): { profile: PreviewProfile; unlockedFriend: FriendId | null } {
   const next = { ...profile };
+  let unlockedFriend: FriendId | null = null;
   if (correct) {
     next.currentStreak += 1;
     next.bestStreak = Math.max(next.bestStreak, next.currentStreak);
-    if (next.currentStreak % 5 === 0) next.stars += 1;
+    if (next.currentStreak % 5 === 0) {
+      next.stars += 1;
+      const friend = friendUnlockedAt(next.stars);
+      if (friend && !next.unlockedFriends.includes(friend.id)) {
+        next.unlockedFriends = [...next.unlockedFriends, friend.id];
+        unlockedFriend = friend.id;
+      } else if (friend) {
+        unlockedFriend = friend.id;
+      }
+    }
     if (activity === "math") {
       next.mathCorrect += 1;
       if (next.mathLevel === 1 && next.mathCorrect >= 15) next.mathLevel = 2;
@@ -103,10 +134,17 @@ function applyPreview(
   } else {
     next.currentStreak = 0;
   }
-  return next;
+  next.unlockedFriends = mergeUnlockedFriends(
+    next.unlockedFriends,
+    next.stars,
+  );
+  return { profile: next, unlockedFriend };
 }
 
-function toPayload(profile: PreviewProfile) {
+function toPayload(
+  profile: PreviewProfile,
+  unlockedFriend: FriendId | null,
+) {
   const milestone =
     profile.currentStreak > 0 && profile.currentStreak % 5 === 0
       ? profile.currentStreak
@@ -118,5 +156,7 @@ function toPayload(profile: PreviewProfile) {
     mathLevel: profile.mathLevel,
     mathCorrect: profile.mathCorrect,
     milestone,
+    unlockedFriends: profile.unlockedFriends,
+    unlockedFriend: milestone ? unlockedFriend : null,
   };
 }

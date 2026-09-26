@@ -1,4 +1,9 @@
 import type { LearningLanguage } from "@/games/types";
+import {
+  friendIdsForStars,
+  mergeUnlockedFriends,
+  type FriendId,
+} from "@/lib/friends";
 import { isLearningLanguage } from "@/lib/i18n";
 import { emptyPreview, readPreview } from "@/lib/preview";
 import { hasGate } from "@/lib/require-gate";
@@ -14,11 +19,17 @@ export type ShellProfile = {
   bestStreak: number;
   mathLevel: number;
   mathCorrect: number;
+  unlockedFriends: FriendId[];
   preview: boolean;
 };
 
 function localProfile(preview: Awaited<ReturnType<typeof readPreview>>) {
-  return { ...(preview ?? emptyPreview("Pip")), preview: true as const };
+  const base = preview ?? emptyPreview("Pip");
+  return {
+    ...base,
+    unlockedFriends: mergeUnlockedFriends(base.unlockedFriends, base.stars),
+    preview: true as const,
+  };
 }
 
 export async function requireProfile(): Promise<ShellProfile> {
@@ -55,6 +66,7 @@ export async function requireProfile(): Promise<ShellProfile> {
     bestStreak: data.best_streak,
     mathLevel: data.math_level,
     mathCorrect: data.math_correct,
+    unlockedFriends: friendIdsForStars(data.stars),
     preview: false,
   };
 }
