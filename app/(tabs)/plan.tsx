@@ -1,4 +1,4 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -118,6 +118,13 @@ export default function PlanScreen() {
   useEffect(() => {
     loadPolls();
   }, [loadPolls]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!member) return;
+      void getGroupMembers(member.group_id).then(setMembers);
+    }, [member])
+  );
 
   useEffect(() => {
     if (!pollId || polls.length === 0 || selectedPoll?.id === pollId) return;
