@@ -108,7 +108,7 @@ export async function uploadJpegToPhotos(
   const body = await buildJpegUploadBody(compressed, filename);
   const { error } = await supabase.storage.from('photos').upload(storagePath, body, {
     contentType: JPEG_TYPE,
-    upsert: upsert === true,
+    ...(upsert ? { upsert: true } : {}),
   });
   if (error) throw error;
   return storagePath;

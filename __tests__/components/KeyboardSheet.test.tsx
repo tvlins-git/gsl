@@ -68,6 +68,7 @@ describe('KeyboardSheet', () => {
 
     const sheet = screen.getByTestId('new-thread-sheet');
     expect(sheet.props.keyboardShouldPersistTaps).toBe('handled');
+    expect(sheet.props.keyboardDismissMode).toBe('interactive');
   });
 
   it('pins an optional footer outside the scroll body', () => {

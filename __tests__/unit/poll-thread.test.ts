@@ -260,6 +260,7 @@ describe('startPollThread', () => {
         group_id: 'g1',
         exclude_user_ids: ['u1'],
         user_ids: ['u2'],
+        tag_notification: false,
         title: 'GSL',
         body: 'Hr. Lins: Please answer "Test"',
         data: { threadId: 'thread-9', pollId: 'poll-1' },
@@ -269,6 +270,7 @@ describe('startPollThread', () => {
       body: expect.objectContaining({
         type: 'chat',
         user_ids: ['u3'],
+        tag_notification: false,
         data: { threadId: 'thread-9', pollId: 'poll-1' },
       }),
     });

@@ -339,6 +339,7 @@ export default function SettingsScreen() {
       <ScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}
       >

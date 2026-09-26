@@ -2,6 +2,7 @@ import { router, useFocusEffect, useLocalSearchParams, type ErrorBoundaryProps }
 import { Component, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   FlatList,
+  Keyboard,
   Platform,
   Pressable,
   StyleSheet,
@@ -138,6 +139,7 @@ export default function ThreadScreen() {
     if (!member || !id || !mention.body.trim()) return;
     const text = mention.body.trim();
     mention.setBody('');
+    Keyboard.dismiss();
 
     const optimistic = createOptimisticMessage(id, member.user_id, text);
     setMessages((prev) => mergeMessages(prev, [optimistic]));
@@ -193,6 +195,8 @@ export default function ThreadScreen() {
             data={messages}
             keyExtractor={(item) => item.id}
             contentContainerStyle={styles.list}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
             onContentSizeChange={() => listRef.current?.scrollToEnd()}
             renderItem={({ item }) => (
               <MessageBubble
