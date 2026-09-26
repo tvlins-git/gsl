@@ -9,6 +9,22 @@ export interface PushMessage {
   data?: Record<string, string>;
 }
 
+export type NotificationPreference = 'off' | 'tagged' | 'all';
+
+export function parseNotificationPreference(value: unknown): NotificationPreference {
+  if (value === 'off' || value === 'tagged' || value === 'all') return value;
+  return 'all';
+}
+
+export function shouldReceivePushForPreference(
+  preference: NotificationPreference,
+  tagNotification: boolean
+): boolean {
+  if (preference === 'off') return false;
+  if (preference === 'all') return true;
+  return tagNotification;
+}
+
 export function filterRecipients(
   tokens: PushRecipient[],
   excludeUserIds: string[] = [],
@@ -24,6 +40,19 @@ export function filterRecipients(
     seen.add(t.token);
     return true;
   });
+}
+
+export function filterRecipientsByPreference(
+  recipients: PushRecipient[],
+  preferenceByUserId: Map<string, NotificationPreference>,
+  tagNotification: boolean
+): PushRecipient[] {
+  return recipients.filter((recipient) =>
+    shouldReceivePushForPreference(
+      preferenceByUserId.get(recipient.userId) ?? 'all',
+      tagNotification
+    )
+  );
 }
 
 export function buildExpoPushPayload(recipients: PushRecipient[], message: PushMessage) {

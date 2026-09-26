@@ -1,6 +1,7 @@
 import type { Thread } from './database.types';
 import { parseFeedMentions, type FeedMentionMember } from './feed-posts';
 import { isLocalMode, localStore } from './local-store';
+import { isChatTagNotification } from './thread-messages';
 import { supabase } from './supabase';
 
 export interface PollThreadPerson {
@@ -187,17 +188,19 @@ export async function startPollThread(input: StartPollThreadInput): Promise<{
   const message = input.message.trim();
   if (!message) throw new Error('Message is empty');
 
+  const mentionMembers = input.members.map((member) => ({
+    user_id: member.user_id,
+    display_name: member.display_name,
+  }));
   const audience = planPollThreadAudience({
     members: input.members.map((member) => ({ id: member.id, userId: member.user_id })),
     unansweredMemberIds: input.unanswered.map((member) => member.id),
     senderUserId: input.senderUserId,
     pushUnanswered: input.pushUnanswered,
     message,
-    mentionMembers: input.members.map((member) => ({
-      user_id: member.user_id,
-      display_name: member.display_name,
-    })),
+    mentionMembers,
   });
+  const notifyIsTag = isChatTagNotification(message, mentionMembers, input.senderUserId);
   const nudgeNames = input.unanswered
     .filter((member) => audience.nudgeUserIds.includes(member.user_id))
     .map((member) => member.display_name);
@@ -262,6 +265,7 @@ export async function startPollThread(input: StartPollThreadInput): Promise<{
       body: unansweredPushBody(input.senderName, input.pollTitle),
       threadId: thread.id,
       pollId: input.pollId,
+      tagNotification: false,
     }));
 
   if (audience.notifyUserIds.length > 0) {
@@ -272,6 +276,7 @@ export async function startPollThread(input: StartPollThreadInput): Promise<{
       body: threadPushBody(input.senderName, message),
       threadId: thread.id,
       pollId: input.pollId,
+      tagNotification: notifyIsTag,
     });
   }
 
@@ -304,6 +309,7 @@ async function sendThreadPush(input: {
   body: string;
   threadId: string;
   pollId: string;
+  tagNotification: boolean;
 }): Promise<boolean> {
   try {
     const { error } = await supabase.functions.invoke('send-push', {
@@ -312,6 +318,7 @@ async function sendThreadPush(input: {
         group_id: input.groupId,
         exclude_user_ids: [input.excludeUserId],
         user_ids: input.userIds,
+        tag_notification: input.tagNotification,
         title: 'GSL',
         body: input.body,
         data: { threadId: input.threadId, pollId: input.pollId },

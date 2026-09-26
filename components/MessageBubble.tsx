@@ -6,17 +6,24 @@ import { formatMessageTime } from '@/lib/messages';
 interface MessageBubbleProps {
   body: string;
   senderName: string;
+  senderAvatarUrl?: string | null;
   createdAt: string;
   isOwn: boolean;
 }
 
-export function MessageBubble({ body, senderName, createdAt, isOwn }: MessageBubbleProps) {
+export function MessageBubble({
+  body,
+  senderName,
+  senderAvatarUrl,
+  createdAt,
+  isOwn,
+}: MessageBubbleProps) {
   return (
     <View
       style={[styles.row, isOwn ? styles.ownRow : styles.otherRow]}
       testID="message-bubble"
     >
-      {!isOwn ? <UserAvatar name={senderName} size={28} /> : null}
+      {!isOwn ? <UserAvatar name={senderName} size={28} imageUri={senderAvatarUrl} /> : null}
       <View style={[styles.bubble, isOwn ? styles.ownBubble : styles.otherBubble]}>
         {!isOwn ? <Text style={styles.senderName}>{senderName}</Text> : null}
         <Text style={[styles.body, isOwn && styles.ownBody]}>{body}</Text>

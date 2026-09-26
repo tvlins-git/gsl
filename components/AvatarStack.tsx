@@ -2,23 +2,31 @@ import { StyleSheet, View } from 'react-native';
 import { UserAvatar } from '@/components/UserAvatar';
 import { theme } from '@/constants/theme';
 
+export type AvatarStackPerson = {
+  name: string;
+  imageUri?: string | null;
+};
+
 interface AvatarStackProps {
-  names: string[];
+  names?: string[];
+  people?: AvatarStackPerson[];
   size?: number;
   max?: number;
 }
 
-export function AvatarStack({ names, size = 28, max = 3 }: AvatarStackProps) {
-  const shown = names.filter(Boolean).slice(0, max);
+export function AvatarStack({ names, people, size = 28, max = 3 }: AvatarStackProps) {
+  const shown = (people ?? (names ?? []).map((name) => ({ name }))).filter(
+    (person) => Boolean(person.name)
+  ).slice(0, max);
   if (shown.length === 0) return null;
 
   const overlap = Math.round(size * 0.36);
 
   return (
     <View style={[styles.row, { height: size }]} testID="avatar-stack">
-      {shown.map((name, index) => (
+      {shown.map((person, index) => (
         <View
-          key={`${name}-${index}`}
+          key={`${person.name}-${index}`}
           style={[
             styles.item,
             {
@@ -28,7 +36,7 @@ export function AvatarStack({ names, size = 28, max = 3 }: AvatarStackProps) {
             },
           ]}
         >
-          <UserAvatar name={name} size={size} />
+          <UserAvatar name={person.name} size={size} imageUri={person.imageUri} />
         </View>
       ))}
     </View>

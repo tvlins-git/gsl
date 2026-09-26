@@ -108,7 +108,7 @@ export default function ChatScreen() {
   return (
     <Screen>
       <Pressable style={styles.compose} onPress={() => setShowCreate(true)} testID="create-thread-btn">
-        <UserAvatar name={member?.display_name ?? 'You'} size={36} />
+        <UserAvatar name={member?.display_name ?? 'You'} size={36} imageUri={member?.avatar_url} />
         <Text style={styles.composeText}>New conversation…</Text>
         <View style={styles.composePlus}>
           <Text style={styles.composePlusText}>+</Text>
@@ -130,7 +130,13 @@ export default function ChatScreen() {
                   testID={`thread-${item.id}`}
                 >
                   {members.length > 1 ? (
-                    <AvatarStack names={members.map((m) => m.display_name)} size={48} />
+                    <AvatarStack
+                      people={members.map((m) => ({
+                        name: m.display_name,
+                        imageUri: m.avatar_url,
+                      }))}
+                      size={48}
+                    />
                   ) : (
                     <UserAvatar name={item.name} size={52} />
                   )}

@@ -1,4 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { UserAvatar } from '@/components/UserAvatar';
 import { theme } from '@/constants/theme';
 import type { FeedMentionSuggestion } from '@/lib/feed-posts';
 
@@ -26,10 +27,15 @@ export function MentionSuggestions({ suggestions, onSelect, testIDPrefix }: Ment
           accessibilityRole="button"
           accessibilityLabel={`Mention ${suggestion.label}`}
         >
-          <Text style={styles.suggestionText}>@{suggestion.insert}</Text>
-          <Text style={styles.suggestionMeta}>
-            {suggestion.id === 'everyone' ? 'Notify the whole group' : suggestion.label}
-          </Text>
+          {suggestion.id !== 'everyone' ? (
+            <UserAvatar name={suggestion.label} size={28} imageUri={suggestion.imageUri} />
+          ) : null}
+          <View style={styles.suggestionTextWrap}>
+            <Text style={styles.suggestionText}>@{suggestion.insert}</Text>
+            <Text style={styles.suggestionMeta}>
+              {suggestion.id === 'everyone' ? 'Notify the whole group' : suggestion.label}
+            </Text>
+          </View>
         </Pressable>
       ))}
     </View>
@@ -45,8 +51,14 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   suggestion: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
     paddingHorizontal: theme.spacing.md,
     paddingVertical: 10,
+  },
+  suggestionTextWrap: {
+    flex: 1,
     gap: 2,
   },
   suggestionText: {

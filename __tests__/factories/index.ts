@@ -11,6 +11,7 @@ export function buildMember(overrides: Partial<Member> = {}): Member {
     display_name: 'Test User',
     avatar_url: null,
     contact_email: null,
+    notification_preference: 'all',
     role: 'member',
     created_at: new Date().toISOString(),
     ...overrides,

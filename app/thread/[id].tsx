@@ -96,6 +96,7 @@ export default function ThreadScreen() {
   const listRef = useRef<FlatList>(null);
 
   const memberMap = Object.fromEntries(members.map((m) => [m.user_id, m.display_name]));
+  const avatarMap = Object.fromEntries(members.map((m) => [m.user_id, m.avatar_url]));
 
   const loadMessages = useCallback(async () => {
     if (!id || !member) return;
@@ -197,6 +198,7 @@ export default function ThreadScreen() {
               <MessageBubble
                 body={item.body}
                 senderName={memberMap[item.sender_id] ?? 'Unknown'}
+                senderAvatarUrl={avatarMap[item.sender_id]}
                 createdAt={item.created_at}
                 isOwn={item.sender_id === member?.user_id}
               />

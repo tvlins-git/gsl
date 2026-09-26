@@ -16,9 +16,39 @@ export interface Database {
         { id?: string; name?: string; created_by?: string | null; created_at?: string }
       >;
       members: TableDef<
-        { id: string; group_id: string; user_id: string; display_name: string; avatar_url: string | null; contact_email: string | null; role: 'admin' | 'member'; created_at: string },
-        { id?: string; group_id: string; user_id: string; display_name: string; avatar_url?: string | null; contact_email?: string | null; role?: 'admin' | 'member'; created_at?: string },
-        { id?: string; group_id?: string; user_id?: string; display_name?: string; avatar_url?: string | null; contact_email?: string | null; role?: 'admin' | 'member'; created_at?: string }
+        {
+          id: string;
+          group_id: string;
+          user_id: string;
+          display_name: string;
+          avatar_url: string | null;
+          contact_email: string | null;
+          notification_preference: 'off' | 'tagged' | 'all';
+          role: 'admin' | 'member';
+          created_at: string;
+        },
+        {
+          id?: string;
+          group_id: string;
+          user_id: string;
+          display_name: string;
+          avatar_url?: string | null;
+          contact_email?: string | null;
+          notification_preference?: 'off' | 'tagged' | 'all';
+          role?: 'admin' | 'member';
+          created_at?: string;
+        },
+        {
+          id?: string;
+          group_id?: string;
+          user_id?: string;
+          display_name?: string;
+          avatar_url?: string | null;
+          contact_email?: string | null;
+          notification_preference?: 'off' | 'tagged' | 'all';
+          role?: 'admin' | 'member';
+          created_at?: string;
+        }
       >;
       invite_codes: TableDef<
         { id: string; group_id: string; code: string; used_by: string | null; used_at: string | null; expires_at: string; created_at: string },

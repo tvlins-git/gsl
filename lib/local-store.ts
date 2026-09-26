@@ -2,6 +2,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DEFAULT_HARDCODED_USER, type AppUser } from '@/constants/hardcoded-user';
 import { selectAlbumPreviewPhotos } from './album-previews';
 import { getAppUsersSync } from './app-users';
+import {
+  NOTIFICATION_PREFERENCE_DEFAULT,
+  parseNotificationPreference,
+  type NotificationPreference,
+} from './notification-prefs';
 import { summarizePollAcceptance } from './polls';
 import type {
   FeedPost,
@@ -24,6 +29,8 @@ const STORAGE_KEY = 'gsl_local_data_v1';
 let localModeActive = false;
 let activeLocalUser: AppUser = DEFAULT_HARDCODED_USER;
 let memberEmailCache: Record<string, string> = {};
+let memberAvatarCache: Record<string, string> = {};
+let memberNotifyCache: Record<string, NotificationPreference> = {};
 
 function memberFromAppUser(user: AppUser): Member {
   return {
@@ -31,8 +38,9 @@ function memberFromAppUser(user: AppUser): Member {
     group_id: LOCAL_GROUP_ID,
     user_id: user.localUserId,
     display_name: user.displayName,
-    avatar_url: null,
+    avatar_url: avatarFor(user.localMemberId),
     contact_email: contactEmailFor(user.localMemberId),
+    notification_preference: notifyPrefFor(user.localMemberId),
     role: user.role,
     created_at: new Date().toISOString(),
   };
@@ -59,6 +67,17 @@ function contactEmailFor(memberId: string): string | null {
   return email || null;
 }
 
+function avatarFor(memberId: string): string | null {
+  const uri = memberAvatarCache[memberId]?.trim();
+  return uri || null;
+}
+
+function notifyPrefFor(memberId: string): NotificationPreference {
+  return parseNotificationPreference(
+    memberNotifyCache[memberId] ?? NOTIFICATION_PREFERENCE_DEFAULT
+  );
+}
+
 export function createLocalMember(): Member {
   const live = getAppUsersSync().find((user) => user.id === activeLocalUser.id) ?? activeLocalUser;
   return memberFromAppUser(live);
@@ -80,6 +99,8 @@ interface LocalData {
   feed_posts: FeedPost[];
   feed_post_tags: FeedPostTag[];
   member_emails: Record<string, string>;
+  member_avatars: Record<string, string>;
+  member_notification_prefs: Record<string, NotificationPreference>;
 }
 
 const emptyData = (): LocalData => ({
@@ -94,6 +115,8 @@ const emptyData = (): LocalData => ({
   feed_posts: [],
   feed_post_tags: [],
   member_emails: {},
+  member_avatars: {},
+  member_notification_prefs: {},
 });
 
 async function readData(): Promise<LocalData> {
@@ -102,12 +125,16 @@ async function readData(): Promise<LocalData> {
   try {
     const parsed = JSON.parse(raw) as Partial<LocalData>;
     memberEmailCache = parsed.member_emails ?? {};
+    memberAvatarCache = parsed.member_avatars ?? {};
+    memberNotifyCache = parsed.member_notification_prefs ?? {};
     return {
       ...emptyData(),
       ...parsed,
       feed_posts: parsed.feed_posts ?? [],
       feed_post_tags: parsed.feed_post_tags ?? [],
       member_emails: parsed.member_emails ?? {},
+      member_avatars: parsed.member_avatars ?? {},
+      member_notification_prefs: parsed.member_notification_prefs ?? {},
     };
   } catch {
     return emptyData();
@@ -268,6 +295,35 @@ export const localStore = {
       delete data.member_emails[memberId];
     }
     memberEmailCache = { ...data.member_emails };
+    await writeData(data);
+    return createLocalMember();
+  },
+
+  async updateMemberAvatar(memberId: string, avatarUrl: string | null): Promise<string | null> {
+    const data = await readData();
+    const trimmed = avatarUrl?.trim() ?? '';
+    if (trimmed) {
+      data.member_avatars[memberId] = trimmed;
+    } else {
+      delete data.member_avatars[memberId];
+    }
+    memberAvatarCache = { ...data.member_avatars };
+    await writeData(data);
+    return trimmed || null;
+  },
+
+  async updateMemberNotificationPreference(
+    memberId: string,
+    preference: NotificationPreference
+  ): Promise<Member> {
+    const data = await readData();
+    const next = parseNotificationPreference(preference);
+    if (next === NOTIFICATION_PREFERENCE_DEFAULT) {
+      delete data.member_notification_prefs[memberId];
+    } else {
+      data.member_notification_prefs[memberId] = next;
+    }
+    memberNotifyCache = { ...data.member_notification_prefs };
     await writeData(data);
     return createLocalMember();
   },

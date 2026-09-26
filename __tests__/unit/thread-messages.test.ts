@@ -57,24 +57,44 @@ describe('chat mention notifications', () => {
 
   it('notifies the whole group when a message has no mention', () => {
     expect(resolveChatNotifyUserIds('See you Friday', members, 'user-1')).toBeNull();
+    const payload = buildChatPushPayload({
+      groupId: 'group-1',
+      senderId: 'user-1',
+      senderName: 'Hr. Lins',
+      text: 'See you Friday',
+      threadId: 'thread-1',
+      members,
+    });
+    expect(payload.user_ids).toBeUndefined();
+    expect(payload.tag_notification).toBe(false);
+  });
+
+  it('notifies only the tagged member', () => {
+    expect(resolveChatNotifyUserIds('hi @Thomas', members, 'user-1')).toEqual(['user-2']);
     expect(
       buildChatPushPayload({
         groupId: 'group-1',
         senderId: 'user-1',
         senderName: 'Hr. Lins',
-        text: 'See you Friday',
+        text: 'hi @Thomas',
         threadId: 'thread-1',
         members,
-      }).user_ids
-    ).toBeUndefined();
-  });
-
-  it('notifies only the tagged member', () => {
-    expect(resolveChatNotifyUserIds('hi @Thomas', members, 'user-1')).toEqual(['user-2']);
+      }).tag_notification
+    ).toBe(true);
   });
 
   it('notifies the whole group for @everyone', () => {
     expect(resolveChatNotifyUserIds('hi @everyone', members, 'user-1')).toBeNull();
+    expect(
+      buildChatPushPayload({
+        groupId: 'group-1',
+        senderId: 'user-1',
+        senderName: 'Hr. Lins',
+        text: 'hi @everyone',
+        threadId: 'thread-1',
+        members,
+      }).tag_notification
+    ).toBe(true);
   });
 });
 

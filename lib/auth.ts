@@ -18,6 +18,11 @@ import { supabase } from './supabase';
 import { passwordForAuth } from './auth-password';
 import { getEffectivePassword, validateUserPassword } from './user-passwords';
 import type { Member } from './database.types';
+import {
+  NOTIFICATION_PREFERENCE_DEFAULT,
+  parseNotificationPreference,
+  type NotificationPreference,
+} from './notification-prefs';
 
 const LOGGED_OUT_KEY = 'gsl_logged_out';
 const SELECTED_USER_KEY = 'gsl_selected_user_id';
@@ -183,6 +188,9 @@ export async function getGroupMembers(groupId: string): Promise<Member[]> {
 export async function updateMemberProfile(memberId: string, displayName: string, avatarUrl?: string) {
   if (isLocalMode()) {
     await localStore.hydrate();
+    if (avatarUrl !== undefined) {
+      await localStore.updateMemberAvatar(memberId, avatarUrl ?? null);
+    }
     return createLocalMember();
   }
   const { data, error } = await supabase
@@ -208,6 +216,30 @@ export async function updateMemberContactEmail(memberId: string, email: string |
     .single();
   if (error) throw error;
   return data;
+}
+
+export async function updateMemberNotificationPreference(
+  memberId: string,
+  preference: NotificationPreference
+) {
+  const next = parseNotificationPreference(preference);
+  if (isLocalMode()) {
+    return localStore.updateMemberNotificationPreference(memberId, next);
+  }
+  const { data, error } = await supabase
+    .from('members')
+    .update({ notification_preference: next })
+    .eq('id', memberId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export function memberNotificationPreference(member: Member | null | undefined): NotificationPreference {
+  return parseNotificationPreference(
+    member?.notification_preference ?? NOTIFICATION_PREFERENCE_DEFAULT
+  );
 }
 
 export function activateLocalMode(user: AppUser) {
