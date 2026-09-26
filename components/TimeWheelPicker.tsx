@@ -43,7 +43,16 @@ function WheelColumn({
 }) {
   const ref = useRef<ScrollView>(null);
   const dragging = useRef(false);
+  const momentumTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [active, setActive] = useState(value);
+
+  const clearMomentumTimer = () => {
+    if (!momentumTimer.current) return;
+    clearTimeout(momentumTimer.current);
+    momentumTimer.current = null;
+  };
+
+  useEffect(() => clearMomentumTimer, []);
 
   const scrollToValue = useCallback(
     (next: number, animated: boolean) => {
@@ -60,26 +69,16 @@ function WheelColumn({
     scrollToValue(value, false);
   }, [scrollToValue, value]);
 
-  const commitOffset = (y: number) => {
-    const index = indexFromOffset(y, items.length);
-    const next = items[index];
-    setActive(next);
-    if (next !== value) onChange(next);
-    ref.current?.scrollTo({ y: index * TIME_WHEEL_ITEM_HEIGHT, animated: true });
-  };
-
-  const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const index = indexFromOffset(e.nativeEvent.contentOffset.y, items.length);
-    const next = items[index];
-    setActive(next);
-    if (next !== value) onChange(next);
-  };
-
-  const endInteraction = (y: number) => {
-    commitOffset(y);
+  const finish = (y: number) => {
     if (!dragging.current) return;
     dragging.current = false;
     onInteractionChange?.(false);
+    const index = indexFromOffset(y, items.length);
+    const next = items[index];
+    const target = index * TIME_WHEEL_ITEM_HEIGHT;
+    setActive(next);
+    if (Math.abs(y - target) > 0.5) scrollToValue(next, false);
+    if (next !== value) onChange(next);
   };
 
   return (
@@ -94,22 +93,38 @@ function WheelColumn({
       decelerationRate="fast"
       nestedScrollEnabled
       disableIntervalMomentum
+      bounces={false}
       scrollEventThrottle={16}
       accessibilityRole="adjustable"
       accessibilityLabel={accessibilityLabel}
       accessibilityValue={{ text: pad2(value) }}
-      onLayout={() => scrollToValue(value, false)}
-      onScroll={onScroll}
+      onLayout={() => {
+        if (dragging.current) return;
+        scrollToValue(value, false);
+      }}
+      onScroll={(e: NativeSyntheticEvent<NativeScrollEvent>) => {
+        if (!dragging.current) return;
+        const index = indexFromOffset(e.nativeEvent.contentOffset.y, items.length);
+        setActive(items[index]);
+      }}
       onScrollBeginDrag={() => {
+        clearMomentumTimer();
         dragging.current = true;
         onInteractionChange?.(true);
       }}
-      onMomentumScrollEnd={(e) => endInteraction(e.nativeEvent.contentOffset.y)}
+      onMomentumScrollEnd={(e) => {
+        clearMomentumTimer();
+        finish(e.nativeEvent.contentOffset.y);
+      }}
       onScrollEndDrag={(e) => {
-        const velocity = e.nativeEvent.velocity?.y ?? 0;
-        if (Math.abs(velocity) < 0.05) {
-          endInteraction(e.nativeEvent.contentOffset.y);
+        const velocity = Math.abs(e.nativeEvent.velocity?.y ?? 0);
+        const y = e.nativeEvent.contentOffset.y;
+        if (velocity < 0.05) {
+          finish(y);
+          return;
         }
+        clearMomentumTimer();
+        momentumTimer.current = setTimeout(() => finish(y), 350);
       }}
       {...(Platform.OS === 'web'
         ? {
@@ -134,18 +149,6 @@ interface TimeWheelPickerProps {
 }
 
 export function TimeWheelPicker({ value, onChange, onInteractionChange }: TimeWheelPickerProps) {
-  const holdCount = useRef(0);
-
-  const beginInteraction = () => {
-    holdCount.current += 1;
-    onInteractionChange?.(true);
-  };
-
-  const endInteraction = () => {
-    holdCount.current = Math.max(0, holdCount.current - 1);
-    if (holdCount.current === 0) onInteractionChange?.(false);
-  };
-
   const setPart = (hours: number, minutes: number) => {
     const next = new Date(value);
     next.setHours(hours, minutes, 0, 0);
@@ -153,19 +156,13 @@ export function TimeWheelPicker({ value, onChange, onInteractionChange }: TimeWh
   };
 
   return (
-    <View
-      style={styles.wrap}
-      testID="time-wheel-picker"
-      onTouchStart={beginInteraction}
-      onTouchEnd={endInteraction}
-      onTouchCancel={endInteraction}
-    >
+    <View style={styles.wrap} testID="time-wheel-picker">
       <View style={styles.selection} pointerEvents="none" />
       <WheelColumn
         items={HOURS}
         value={value.getHours()}
         onChange={(hours) => setPart(hours, value.getMinutes())}
-        onInteractionChange={(active) => (active ? beginInteraction() : endInteraction())}
+        onInteractionChange={onInteractionChange}
         testID="time-wheel-hours"
         accessibilityLabel="Start hour"
       />
@@ -176,7 +173,7 @@ export function TimeWheelPicker({ value, onChange, onInteractionChange }: TimeWh
         items={MINUTES}
         value={value.getMinutes()}
         onChange={(minutes) => setPart(value.getHours(), minutes)}
-        onInteractionChange={(active) => (active ? beginInteraction() : endInteraction())}
+        onInteractionChange={onInteractionChange}
         testID="time-wheel-minutes"
         accessibilityLabel="Start minute"
       />

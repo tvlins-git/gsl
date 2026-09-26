@@ -18,10 +18,15 @@ describe('TimeWheelPicker', () => {
     expect(screen.getAllByText('00').length).toBeGreaterThan(0);
   });
 
-  it('commits a new hour while the hour wheel is scrolling', () => {
+  it('does not move the value until the hour wheel settles', () => {
     const onChange = jest.fn();
     render(<TimeWheelPicker value={timeAt(17, 0)} onChange={onChange} />);
+    fireEvent(screen.getByTestId('time-wheel-hours'), 'scrollBeginDrag');
     fireEvent.scroll(screen.getByTestId('time-wheel-hours'), {
+      nativeEvent: { contentOffset: { y: 19 * TIME_WHEEL_ITEM_HEIGHT } },
+    });
+    expect(onChange).not.toHaveBeenCalled();
+    fireEvent(screen.getByTestId('time-wheel-hours'), 'momentumScrollEnd', {
       nativeEvent: { contentOffset: { y: 19 * TIME_WHEEL_ITEM_HEIGHT } },
     });
     expect(onChange).toHaveBeenCalled();
@@ -31,6 +36,7 @@ describe('TimeWheelPicker', () => {
   it('commits a new hour when the hour wheel settles', () => {
     const onChange = jest.fn();
     render(<TimeWheelPicker value={timeAt(17, 0)} onChange={onChange} />);
+    fireEvent(screen.getByTestId('time-wheel-hours'), 'scrollBeginDrag');
     fireEvent(screen.getByTestId('time-wheel-hours'), 'momentumScrollEnd', {
       nativeEvent: { contentOffset: { y: 18 * TIME_WHEEL_ITEM_HEIGHT } },
     });
@@ -43,6 +49,7 @@ describe('TimeWheelPicker', () => {
   it('commits a new minute when the minute wheel settles', () => {
     const onChange = jest.fn();
     render(<TimeWheelPicker value={timeAt(17, 0)} onChange={onChange} />);
+    fireEvent(screen.getByTestId('time-wheel-minutes'), 'scrollBeginDrag');
     fireEvent(screen.getByTestId('time-wheel-minutes'), 'momentumScrollEnd', {
       nativeEvent: { contentOffset: { y: 30 * TIME_WHEEL_ITEM_HEIGHT } },
     });

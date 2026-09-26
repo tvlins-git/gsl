@@ -1,6 +1,7 @@
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { MonthCalendar, startOfDay } from '@/components/MonthCalendar';
 import { TimeWheelPicker } from '@/components/TimeWheelPicker';
 import { theme } from '@/constants/theme';
 import { formatSlotTime, buildPollSlotFromDates, type PollSlotTimes } from '@/lib/polls';
@@ -56,13 +57,9 @@ export function PollSlotEditor({
   onSlotError,
   onPickerInteractionChange,
 }: PollSlotEditorProps) {
-  const [selectedDate, setSelectedDate] = useState(() => {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    return d;
-  });
+  const [selectedDate, setSelectedDate] = useState(() => startOfDay(new Date()));
   const [startTime, setStartTime] = useState(defaultStartTime);
-  const [showDatePicker, setShowDatePicker] = useState(Platform.OS === 'ios');
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   const addSlot = () => {
     onSlotError?.('');
@@ -98,20 +95,21 @@ export function PollSlotEditor({
       <Text style={styles.fieldLabel}>Date</Text>
       {Platform.OS === 'web' ? (
         <WebDateInput value={selectedDate} onChange={setSelectedDate} />
+      ) : Platform.OS === 'ios' ? (
+        <MonthCalendar value={selectedDate} onChange={setSelectedDate} minimumDate={startOfDay(new Date())} />
       ) : (
         <>
-          {Platform.OS === 'android' && (
-            <Pressable style={styles.pickerBtn} onPress={() => setShowDatePicker(true)}>
-              <Text style={styles.pickerBtnText}>{dateLabel}</Text>
-            </Pressable>
-          )}
-          {(showDatePicker || Platform.OS === 'ios') && (
+          <Pressable style={styles.pickerBtn} onPress={() => setShowDatePicker(true)}>
+            <Text style={styles.pickerBtnText}>{dateLabel}</Text>
+          </Pressable>
+          {showDatePicker && (
             <DateTimePicker
               value={selectedDate}
               mode="date"
-              display={Platform.OS === 'ios' ? 'inline' : 'default'}
+              display="default"
+              themeVariant="light"
               onChange={onDateChange}
-              minimumDate={new Date()}
+              minimumDate={startOfDay(new Date())}
             />
           )}
         </>
