@@ -10,8 +10,10 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { MentionSuggestions } from '@/components/MentionSuggestions';
 import { MessageBubble } from '@/components/MessageBubble';
 import { PollThreadLink } from '@/components/PollThreadLink';
+import { useMentionField } from '@/components/useMentionField';
 import { Screen } from '@/components/ui/Screen';
 import { useAuth } from '@/contexts/AuthContext';
 import { getGroupMembers } from '@/lib/auth';
@@ -23,7 +25,7 @@ import {
 } from '@/lib/messages';
 import { getPollLinkTarget } from '@/lib/poll-thread';
 import { getThread } from '@/lib/thread-list';
-import { listThreadMessages, sendThreadMessage } from '@/lib/thread-messages';
+import { buildChatPushPayload, listThreadMessages, sendThreadMessage } from '@/lib/thread-messages';
 import { isLocalMode } from '@/lib/local-store';
 import { supabase } from '@/lib/supabase';
 import { sharedStyles, theme } from '@/constants/theme';
@@ -33,7 +35,7 @@ export default function ThreadScreen() {
   const { member } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
-  const [body, setBody] = useState('');
+  const mention = useMentionField(members);
   const [loading, setLoading] = useState(true);
   const [pollLink, setPollLink] = useState<{ id: string; title: string } | null>(null);
   const listRef = useRef<FlatList>(null);
@@ -83,9 +85,9 @@ export default function ThreadScreen() {
   }, [id, loadMessages]);
 
   const sendMessage = async () => {
-    if (!member || !id || !body.trim()) return;
-    const text = body.trim();
-    setBody('');
+    if (!member || !id || !mention.body.trim()) return;
+    const text = mention.body.trim();
+    mention.setBody('');
 
     const optimistic = createOptimisticMessage(id, member.user_id, text);
     setMessages((prev) => mergeMessages(prev, [optimistic]));
@@ -102,14 +104,14 @@ export default function ThreadScreen() {
 
     try {
       await supabase.functions.invoke('send-push', {
-        body: {
-          type: 'chat',
-          group_id: member.group_id,
-          exclude_user_ids: [member.user_id],
-          title: 'GSL',
-          body: `${member.display_name}: ${text}`,
-          data: { threadId: id },
-        },
+        body: buildChatPushPayload({
+          groupId: member.group_id,
+          senderId: member.user_id,
+          senderName: member.display_name,
+          text,
+          threadId: id,
+          members,
+        }),
       });
     } catch {
       // Push is best-effort; the message is already persisted and shown.
@@ -147,18 +149,24 @@ export default function ThreadScreen() {
           />
         )}
       />
-      <View style={styles.inputRow}>
-        <TextInput
-          style={styles.input}
-          placeholder="Message..."
-          placeholderTextColor={theme.colors.textMuted}
-          value={body}
-          onChangeText={setBody}
-          testID="message-input"
+      <View style={styles.composer}>
+        <MentionSuggestions
+          suggestions={mention.suggestions}
+          onSelect={mention.insertMention}
+          testIDPrefix="message"
         />
-        <Pressable style={styles.sendBtn} onPress={sendMessage} testID="send-message">
-          <Text style={styles.sendText}>Send</Text>
-        </Pressable>
+        <View style={styles.inputRow}>
+          <TextInput
+            style={styles.input}
+            placeholder="Message… use @name to notify"
+            placeholderTextColor={theme.colors.textMuted}
+            {...mention.inputProps}
+            testID="message-input"
+          />
+          <Pressable style={styles.sendBtn} onPress={sendMessage} testID="send-message">
+            <Text style={styles.sendText}>Send</Text>
+          </Pressable>
+        </View>
       </View>
     </KeyboardAvoidingView>
   );
@@ -166,13 +174,16 @@ export default function ThreadScreen() {
 
 const styles = StyleSheet.create({
   list: { paddingVertical: theme.spacing.md },
-  inputRow: {
-    flexDirection: 'row',
-    padding: theme.spacing.md,
-    paddingBottom: Platform.OS === 'ios' ? theme.spacing.lg : theme.spacing.md,
+  composer: {
     backgroundColor: theme.colors.surface,
     borderTopWidth: 1,
     borderTopColor: theme.colors.border,
+    padding: theme.spacing.md,
+    paddingBottom: Platform.OS === 'ios' ? theme.spacing.lg : theme.spacing.md,
+    gap: theme.spacing.sm,
+  },
+  inputRow: {
+    flexDirection: 'row',
     gap: theme.spacing.sm,
     alignItems: 'flex-end',
   },

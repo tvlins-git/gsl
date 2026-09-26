@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import ThreadScreen from '@/app/thread/[id]';
 import { supabase } from '@/lib/supabase';
 import { router } from 'expo-router';
@@ -86,10 +86,14 @@ jest.mock('@/lib/local-store', () => ({
   },
 }));
 
-jest.mock('@/lib/thread-messages', () => ({
-  listThreadMessages: jest.fn(),
-  sendThreadMessage: jest.fn(),
-}));
+jest.mock('@/lib/thread-messages', () => {
+  const actual = jest.requireActual('@/lib/thread-messages');
+  return {
+    ...actual,
+    listThreadMessages: jest.fn(),
+    sendThreadMessage: jest.fn(),
+  };
+});
 
 describe('ThreadScreen send', () => {
   beforeEach(() => {
@@ -126,5 +130,25 @@ describe('ThreadScreen send', () => {
     expect(await screen.findByText('Test')).toBeTruthy();
     fireEvent.press(screen.getByTestId('poll-thread-link'));
     expect(router.push).toHaveBeenCalledWith('/plan?pollId=poll-1');
+  });
+
+  it('suggests members while typing @ and notifies only the tagged person', async () => {
+    render(<ThreadScreen />);
+    expect(await screen.findByText('Already in the thread')).toBeTruthy();
+
+    fireEvent.changeText(screen.getByTestId('message-input'), 'hi @');
+    expect(screen.getByTestId('message-mention-suggestions')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('message-mention-member-user-2'));
+    fireEvent.press(screen.getByTestId('send-message'));
+
+    expect(await screen.findByText('hi @Thomas')).toBeTruthy();
+    await waitFor(() => expect(supabase.functions.invoke).toHaveBeenCalled());
+    expect(supabase.functions.invoke).toHaveBeenCalledWith('send-push', {
+      body: expect.objectContaining({
+        type: 'chat',
+        user_ids: ['user-2'],
+        body: 'Hr. Lins: hi @Thomas',
+      }),
+    });
   });
 });

@@ -1,4 +1,5 @@
 import type { Thread } from './database.types';
+import { parseFeedMentions, type FeedMentionMember } from './feed-posts';
 import { isLocalMode, localStore } from './local-store';
 import { supabase } from './supabase';
 
@@ -79,6 +80,8 @@ export function planPollThreadAudience(input: {
   unansweredMemberIds: string[];
   senderUserId: string;
   pushUnanswered: boolean;
+  message?: string;
+  mentionMembers?: FeedMentionMember[];
 }): PollThreadAudience {
   const memberIds = [...new Set(input.members.map((member) => member.id))];
   const unansweredIds = new Set(input.unansweredMemberIds);
@@ -92,13 +95,20 @@ export function planPollThreadAudience(input: {
       ]
     : [];
   const nudgeSet = new Set(nudgeUserIds);
-  const notifyUserIds = [
+  let notifyUserIds = [
     ...new Set(
       input.members
         .map((member) => member.userId)
         .filter((userId) => userId !== input.senderUserId && !nudgeSet.has(userId))
     ),
   ];
+  if (input.message && input.mentionMembers) {
+    const tags = parseFeedMentions(input.message, input.mentionMembers);
+    if (!tags.tagAll && tags.userIds.length > 0) {
+      const mentioned = new Set(tags.userIds);
+      notifyUserIds = notifyUserIds.filter((userId) => mentioned.has(userId));
+    }
+  }
   return { memberIds, nudgeUserIds, notifyUserIds };
 }
 
@@ -182,6 +192,11 @@ export async function startPollThread(input: StartPollThreadInput): Promise<{
     unansweredMemberIds: input.unanswered.map((member) => member.id),
     senderUserId: input.senderUserId,
     pushUnanswered: input.pushUnanswered,
+    message,
+    mentionMembers: input.members.map((member) => ({
+      user_id: member.user_id,
+      display_name: member.display_name,
+    })),
   });
   const nudgeNames = input.unanswered
     .filter((member) => audience.nudgeUserIds.includes(member.user_id))

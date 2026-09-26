@@ -89,6 +89,39 @@ describe('poll thread helpers', () => {
     expect(audience.notifyUserIds).toEqual(['u3']);
   });
 
+  it('limits the chat push to people tagged in the message', () => {
+    const audience = planPollThreadAudience({
+      members,
+      unansweredMemberIds: ['m2'],
+      senderUserId: 'u1',
+      pushUnanswered: false,
+      message: 'hi @Bea',
+      mentionMembers: [
+        { user_id: 'u1', display_name: 'Hr. Lins' },
+        { user_id: 'u2', display_name: 'Ada' },
+        { user_id: 'u3', display_name: 'Bea' },
+      ],
+    });
+    expect(audience.notifyUserIds).toEqual(['u3']);
+    expect(audience.nudgeUserIds).toEqual([]);
+  });
+
+  it('keeps the unanswered reminder when the message also tags someone else', () => {
+    const audience = planPollThreadAudience({
+      members,
+      unansweredMemberIds: ['m2'],
+      senderUserId: 'u1',
+      pushUnanswered: true,
+      message: '@Bea can you check with Ada?',
+      mentionMembers: [
+        { user_id: 'u2', display_name: 'Ada' },
+        { user_id: 'u3', display_name: 'Bea' },
+      ],
+    });
+    expect(audience.nudgeUserIds).toEqual(['u2']);
+    expect(audience.notifyUserIds).toEqual(['u3']);
+  });
+
   it('sends a normal chat push to everyone else when the reminder is off', () => {
     const audience = planPollThreadAudience({
       members,

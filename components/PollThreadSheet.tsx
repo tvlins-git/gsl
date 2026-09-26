@@ -8,7 +8,10 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { MentionSuggestions } from '@/components/MentionSuggestions';
+import { useMentionField } from '@/components/useMentionField';
 import { sharedStyles, theme } from '@/constants/theme';
+import type { FeedMentionMember } from '@/lib/feed-posts';
 import { defaultPollThreadMessage } from '@/lib/poll-thread';
 
 export interface PollThreadDraft {
@@ -19,6 +22,7 @@ export interface PollThreadDraft {
 interface PollThreadSheetProps {
   visible: boolean;
   pollTitle: string;
+  members: FeedMentionMember[];
   unansweredNames: string[];
   statusLine: string;
   existingThread: boolean;
@@ -30,6 +34,7 @@ interface PollThreadSheetProps {
 export function PollThreadSheet({
   visible,
   pollTitle,
+  members,
   unansweredNames,
   statusLine,
   existingThread,
@@ -37,17 +42,17 @@ export function PollThreadSheet({
   onClose,
   onSubmit,
 }: PollThreadSheetProps) {
-  const [message, setMessage] = useState('');
+  const mention = useMentionField(members);
   const [pushUnanswered, setPushUnanswered] = useState(true);
   const wasVisible = useRef(false);
 
   useEffect(() => {
     if (visible && !wasVisible.current) {
-      setMessage(defaultPollThreadMessage(pollTitle, unansweredNames));
+      mention.setBody(defaultPollThreadMessage(pollTitle, unansweredNames));
       setPushUnanswered(unansweredNames.length > 0);
     }
     wasVisible.current = visible;
-  }, [visible, pollTitle, unansweredNames]);
+  }, [visible, pollTitle, unansweredNames, mention.setBody]);
 
   const canPush = unansweredNames.length > 0;
   const willPush = canPush && pushUnanswered;
@@ -70,15 +75,20 @@ export function PollThreadSheet({
           <Text style={styles.hint}>
             Includes everyone. The thread links back to this poll and shows up in Chat.
           </Text>
+          <Text style={styles.hint}>Use @everyone or @name to notify.</Text>
           <Text style={styles.status}>{statusLine}</Text>
           <TextInput
             style={[sharedStyles.input, styles.message]}
-            placeholder="Message"
+            placeholder="Use @everyone or @name to notify"
             placeholderTextColor={theme.colors.textMuted}
-            value={message}
-            onChangeText={setMessage}
+            {...mention.inputProps}
             multiline
             testID="poll-thread-message"
+          />
+          <MentionSuggestions
+            suggestions={mention.suggestions}
+            onSelect={mention.insertMention}
+            testIDPrefix="poll"
           />
           {canPush ? (
             <Pressable
@@ -98,9 +108,9 @@ export function PollThreadSheet({
             </Pressable>
           ) : null}
           <Pressable
-            style={[sharedStyles.primaryBtn, (!message.trim() || submitting) && styles.disabled]}
-            onPress={() => onSubmit({ message: message.trim(), pushUnanswered: willPush })}
-            disabled={!message.trim() || submitting}
+            style={[sharedStyles.primaryBtn, (!mention.body.trim() || submitting) && styles.disabled]}
+            onPress={() => onSubmit({ message: mention.body.trim(), pushUnanswered: willPush })}
+            disabled={!mention.body.trim() || submitting}
             testID="poll-thread-submit"
           >
             {submitting ? (

@@ -37,8 +37,8 @@ function createId() {
   });
 }
 
-const MENTION_TOKEN_RE = /@([A-Za-z][A-Za-z0-9._-]*)/g;
-const ACTIVE_MENTION_RE = /(^|[\s])@([A-Za-z0-9._-]*)$/;
+const MENTION_TOKEN_RE = /@([\p{L}][\p{L}\p{N}._-]*)/gu;
+const ACTIVE_MENTION_RE = /(^|[\s])@([\p{L}\p{N}._-]*)$/u;
 
 export type FeedMentionMember = Pick<Member, 'user_id' | 'display_name'> & {
   contact_email?: string | null;
@@ -72,13 +72,13 @@ export function isValidFeedTagSelection(selection: FeedTagSelection) {
 }
 
 function normalizeMentionKey(value: string) {
-  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
+  return value.trim().toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
 }
 
 function displayNameTokens(displayName: string) {
   return displayName
     .split(/[\s._-]+/)
-    .map((token) => token.replace(/[^A-Za-z0-9]/g, ''))
+    .map((token) => token.replace(/[^\p{L}\p{N}]/gu, ''))
     .filter(Boolean);
 }
 
@@ -106,7 +106,7 @@ function mentionInsertToken(member: FeedMentionMember) {
 
 export function extractMentionTokens(body: string): string[] {
   const tokens: string[] = [];
-  const matcher = new RegExp(MENTION_TOKEN_RE.source, 'g');
+  const matcher = new RegExp(MENTION_TOKEN_RE.source, 'gu');
   let match: RegExpExecArray | null;
   while ((match = matcher.exec(body)) !== null) {
     const token = match[1].replace(/[._-]+$/g, '');

@@ -1,26 +1,12 @@
-import { useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-  type NativeSyntheticEvent,
-  type TextInputSelectionChangeEventData,
-} from 'react-native';
+import { useState } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { FeedPhoto } from '@/components/FeedPhoto';
+import { MentionSuggestions } from '@/components/MentionSuggestions';
+import { useMentionField } from '@/components/useMentionField';
 import { UserAvatar } from '@/components/UserAvatar';
 import { theme } from '@/constants/theme';
 import type { Member } from '@/lib/database.types';
-import {
-  applyFeedMention,
-  canSubmitFeedPost,
-  createFeedPost,
-  getActiveFeedMention,
-  listFeedMentionSuggestions,
-  parseFeedMentions,
-} from '@/lib/feed-posts';
+import { canSubmitFeedPost, createFeedPost, parseFeedMentions } from '@/lib/feed-posts';
 import { isCameraPickerAvailable, pickImageUri, type ImagePickSource } from '@/lib/pick-image';
 import { formatUserFacingError } from '@/lib/user-error';
 
@@ -31,23 +17,12 @@ interface FeedComposerProps {
 }
 
 export function FeedComposer({ members, author, onPosted }: FeedComposerProps) {
-  const [body, setBody] = useState('');
-  const [cursor, setCursor] = useState(0);
-  const [selection, setSelection] = useState<{ start: number; end: number } | undefined>();
+  const mention = useMentionField(members);
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState('');
 
-  const canPost = canSubmitFeedPost(body, imageUri) && !posting;
-  const mentionCursor = cursor === 0 && body.length > 0 ? body.length : cursor;
-  const activeMention = useMemo(
-    () => getActiveFeedMention(body, mentionCursor),
-    [body, mentionCursor]
-  );
-  const suggestions = useMemo(
-    () => (activeMention ? listFeedMentionSuggestions(activeMention.query, members) : []),
-    [activeMention, members]
-  );
+  const canPost = canSubmitFeedPost(mention.body, imageUri) && !posting;
 
   const attachImage = async (source: ImagePickSource) => {
     setError('');
@@ -57,44 +32,28 @@ export function FeedComposer({ members, author, onPosted }: FeedComposerProps) {
     }
   };
 
-  const handleSelectionChange = (event: NativeSyntheticEvent<TextInputSelectionChangeEventData>) => {
-    const next = event.nativeEvent.selection;
-    setCursor(next.end);
-    setSelection(undefined);
-  };
-
   const handleChangeText = (next: string) => {
-    setBody(next);
-    setSelection(undefined);
+    mention.inputProps.onChangeText(next);
     setError('');
-  };
-
-  const insertMention = (insert: string) => {
-    if (!activeMention) return;
-    const next = applyFeedMention(body, activeMention, insert);
-    setBody(next.body);
-    setCursor(next.cursor);
-    setSelection({ start: next.cursor, end: next.cursor });
   };
 
   const handlePost = async () => {
     if (!canPost) return;
     setPosting(true);
     setError('');
-    const tags = parseFeedMentions(body, members);
+    const tags = parseFeedMentions(mention.body, members);
     try {
       await createFeedPost({
         groupId: author.group_id,
         authorId: author.user_id,
         authorName: author.display_name,
-        body,
+        body: mention.body,
         imageUri,
         tagAll: tags.tagAll,
         taggedUserIds: tags.tagAll ? [] : tags.userIds,
         groupUserIds: members.map((member) => member.user_id),
       });
-      setBody('');
-      setCursor(0);
+      mention.setBody('');
       setImageUri(null);
       await onPosted();
     } catch (err) {
@@ -113,39 +72,19 @@ export function FeedComposer({ members, author, onPosted }: FeedComposerProps) {
             style={styles.input}
             placeholder="Use @everyone or @name to notify"
             placeholderTextColor={theme.colors.textMuted}
-            value={body}
+            value={mention.inputProps.value}
             onChangeText={handleChangeText}
-            onSelectionChange={handleSelectionChange}
-            selection={selection}
+            onSelectionChange={mention.inputProps.onSelectionChange}
+            selection={mention.inputProps.selection}
             multiline
             testID="feed-composer-input"
           />
         </View>
-        {suggestions.length > 0 ? (
-          <View style={styles.suggestions} testID="feed-mention-suggestions">
-            {suggestions.map((suggestion) => (
-              <Pressable
-                key={suggestion.id}
-                style={styles.suggestion}
-                onPress={() => insertMention(suggestion.insert)}
-                testID={
-                  suggestion.id === 'everyone'
-                    ? 'feed-mention-everyone'
-                    : `feed-mention-member-${suggestion.id}`
-                }
-                accessibilityRole="button"
-                accessibilityLabel={`Mention ${suggestion.label}`}
-              >
-                <Text style={styles.suggestionText}>@{suggestion.insert}</Text>
-                {suggestion.id !== 'everyone' ? (
-                  <Text style={styles.suggestionMeta}>{suggestion.label}</Text>
-                ) : (
-                  <Text style={styles.suggestionMeta}>Notify the whole group</Text>
-                )}
-              </Pressable>
-            ))}
-          </View>
-        ) : null}
+        <MentionSuggestions
+          suggestions={mention.suggestions}
+          onSelect={mention.insertMention}
+          testIDPrefix="feed"
+        />
         {imageUri ? (
           <View style={styles.previewWrap}>
             <FeedPhoto uri={imageUri} style={styles.preview} testID="feed-composer-preview-photo" />
@@ -223,27 +162,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: theme.colors.text,
     paddingTop: 8,
-  },
-  suggestions: {
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.bg,
-    overflow: 'hidden',
-  },
-  suggestion: {
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: 10,
-    gap: 2,
-  },
-  suggestionText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: theme.colors.text,
-  },
-  suggestionMeta: {
-    fontSize: 12,
-    color: theme.colors.textSecondary,
   },
   previewWrap: {
     gap: 6,
