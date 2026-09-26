@@ -21,7 +21,7 @@ function roll(random: () => number, maxInclusive: number): number {
 function shuffle(values: number[], random: () => number): number[] {
   const copy = [...values];
   for (let index = copy.length - 1; index > 0; index -= 1) {
-    const swapIndex = Math.floor(random() * (index + 1));
+    const swapIndex = roll(random, index);
     const current = copy[index];
     copy[index] = copy[swapIndex] ?? current;
     copy[swapIndex] = current;

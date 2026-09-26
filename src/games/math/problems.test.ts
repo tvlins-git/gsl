@@ -1,3 +1,4 @@
+import { describe, expect, it } from "@jest/globals";
 import { makeAddition, makeChoices, makeProblem, makeSubtraction } from "./problems";
 
 function rng(seed: number): () => number {

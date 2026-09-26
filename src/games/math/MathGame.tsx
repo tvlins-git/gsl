@@ -26,6 +26,11 @@ type Cheer = {
   correct: boolean;
 };
 
+function cheerColor(cheer: Cheer | null): string {
+  if (cheer === null) return "transparent";
+  return cheer.correct ? "#17803D" : "#C56A00";
+}
+
 function deal(avoidId?: string): Round {
   let problem = makeProblem();
   for (let attempt = 0; attempt < 8 && problem.promptId === avoidId; attempt += 1) {
@@ -53,14 +58,11 @@ export default function MathGame({ language, onResult }: GameProps) {
   return (
     <div style={styles.screen}>
       <p
-        style={{
-          ...styles.cheer,
-          color: cheer == null ? "transparent" : cheer.correct ? "#17803D" : "#C56A00",
-        }}
+        style={{ ...styles.cheer, color: cheerColor(cheer) }}
         role="status"
         aria-live="polite"
       >
-        {cheer?.text ?? "·"}
+        {cheer?.text ?? ""}
       </p>
       <p style={styles.problem} aria-label={`${problem.left} ${spokenOp} ${problem.right}`}>
         {problem.left} {symbol} {problem.right} = ?
