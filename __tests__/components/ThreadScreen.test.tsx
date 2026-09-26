@@ -28,7 +28,7 @@ jest.mock('expo-router', () => {
   const { useEffect } = require('react');
   return {
     useLocalSearchParams: () => ({ id: 'thread-1' }),
-    router: { push: jest.fn() },
+    router: { push: jest.fn(), navigate: jest.fn() },
     useFocusEffect: (effect: () => void) => {
       useEffect(() => {
         const cleanup = effect();
@@ -111,7 +111,7 @@ describe('ThreadScreen send', () => {
     (getThread as jest.Mock).mockResolvedValue(null);
     (getPollLinkTarget as jest.Mock).mockResolvedValue(null);
     (supabase.functions.invoke as jest.Mock).mockResolvedValue({ data: null, error: null });
-    (router.push as jest.Mock).mockClear();
+    (router.navigate as jest.Mock).mockClear();
   });
 
   it('shows a sent message in the open thread without waiting for realtime', async () => {
@@ -138,7 +138,7 @@ describe('ThreadScreen send', () => {
 
     expect(await screen.findByText('Test')).toBeTruthy();
     fireEvent.press(screen.getByTestId('poll-thread-link'));
-    expect(router.push).toHaveBeenCalledWith('/plan?pollId=poll-1');
+    expect(router.navigate).toHaveBeenCalledWith('/plan?pollId=poll-1');
   });
 
   it('suggests members while typing @ and notifies only the tagged person', async () => {

@@ -191,7 +191,7 @@ export default function PlanScreen() {
       setLinkedThread(result.thread);
       setThreadNotice(result.notice);
       setShowThreadComposer(false);
-      router.push(`/thread/${result.thread.id}`);
+      router.navigate(`/thread/${result.thread.id}`);
     } catch {
       setThreadNotice('Could not start the thread. Try again.');
     } finally {
@@ -465,7 +465,7 @@ export default function PlanScreen() {
           {linkedThread ? (
             <Pressable
               style={sharedStyles.secondaryBtn}
-              onPress={() => router.push(`/thread/${linkedThread.id}`)}
+              onPress={() => router.navigate(`/thread/${linkedThread.id}`)}
               testID="open-poll-thread"
             >
               <Text style={sharedStyles.secondaryBtnText}>Open chat</Text>

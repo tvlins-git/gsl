@@ -25,6 +25,7 @@ import {
 } from '@/lib/messages';
 import { getPollLinkTarget } from '@/lib/poll-thread';
 import { getThread } from '@/lib/thread-list';
+import { subscribeToThreadInserts } from '@/lib/thread-realtime';
 import { buildChatPushPayload, listThreadMessages, sendThreadMessage } from '@/lib/thread-messages';
 import { isLocalMode } from '@/lib/local-store';
 import { supabase } from '@/lib/supabase';
@@ -73,22 +74,11 @@ export default function ThreadScreen() {
   useEffect(() => {
     loadMessages();
 
-    if (isLocalMode()) return;
+    if (isLocalMode() || !id) return;
 
-    const channel = supabase
-      .channel(`thread-${id}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'messages', filter: `thread_id=eq.${id}` },
-        (payload) => {
-          setMessages((prev) => mergeMessages(prev, [payload.new as Message]));
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return subscribeToThreadInserts(id, (message) => {
+      setMessages((prev) => mergeMessages(prev, [message]));
+    });
   }, [id, loadMessages]);
 
   const sendMessage = async () => {
@@ -138,7 +128,7 @@ export default function ThreadScreen() {
       {pollLink ? (
         <PollThreadLink
           title={pollLink.title}
-          onPress={() => router.push(`/plan?pollId=${pollLink.id}`)}
+          onPress={() => router.navigate(`/plan?pollId=${pollLink.id}`)}
         />
       ) : null}
       <FlatList
