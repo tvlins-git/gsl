@@ -2,7 +2,7 @@
 
 Pip is a picture-first reading and math game for one child. She can switch between Danish, Swedish, and English. Mathematics and Language are the two sections. A streak across the games celebrates every 5 correct answers in a row.
 
-Mathematics uses the single-digit addition and subtraction game. The alphabet, word, and story games are still placeholders, each marked `STUB: replaced by the game PR`.
+Mathematics uses the single-digit addition and subtraction game. Language has three games: match a spoken letter, say a pictured word, and read a short story aloud.
 
 ## Run it
 
