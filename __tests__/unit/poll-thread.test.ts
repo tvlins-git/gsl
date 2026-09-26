@@ -174,4 +174,70 @@ describe('startPollThread', () => {
     expect(again.created).toBe(false);
     expect(again.thread.id).toBe('thread-1');
   });
+
+  it('pushes unanswered people separately from everyone else', async () => {
+    (isLocalMode as jest.Mock).mockReturnValue(false);
+    const thread = {
+      id: 'thread-9',
+      group_id: 'g1',
+      name: 'Test',
+      created_by: 'u1',
+      poll_id: 'poll-1',
+      created_at: '2026-09-26T00:00:00.000Z',
+    };
+    (supabase.from as jest.Mock).mockImplementation((table: string) => {
+      if (table === 'threads') {
+        const query = {
+          select: () => query,
+          insert: () => query,
+          eq: () => query,
+          order: () => query,
+          limit: () => Promise.resolve({ data: [], error: null }),
+          single: () => Promise.resolve({ data: thread, error: null }),
+        };
+        return query;
+      }
+      if (table === 'thread_members') {
+        return { upsert: () => Promise.resolve({ error: null }) };
+      }
+      return { insert: () => Promise.resolve({ error: null }) };
+    });
+    (supabase.functions.invoke as jest.Mock).mockResolvedValue({ error: null });
+
+    const result = await startPollThread({
+      groupId: 'g1',
+      pollId: 'poll-1',
+      pollTitle: 'Test',
+      senderUserId: 'u1',
+      senderName: 'Hr. Lins',
+      members: [
+        { id: 'm1', user_id: 'u1', display_name: 'Hr. Lins' },
+        { id: 'm2', user_id: 'u2', display_name: 'Ada' },
+        { id: 'm3', user_id: 'u3', display_name: 'Bea' },
+      ],
+      unanswered: [{ id: 'm2', user_id: 'u2', display_name: 'Ada' }],
+      message: 'Still waiting on Ada to answer "Test".',
+      pushUnanswered: true,
+    });
+
+    expect(result.notice).toBe('Thread is in Chat. Pushed Ada to answer.');
+    expect(supabase.functions.invoke).toHaveBeenNthCalledWith(1, 'send-push', {
+      body: {
+        type: 'chat',
+        group_id: 'g1',
+        exclude_user_ids: ['u1'],
+        user_ids: ['u2'],
+        title: 'GSL',
+        body: 'Hr. Lins: Please answer "Test"',
+        data: { threadId: 'thread-9', pollId: 'poll-1' },
+      },
+    });
+    expect(supabase.functions.invoke).toHaveBeenNthCalledWith(2, 'send-push', {
+      body: expect.objectContaining({
+        type: 'chat',
+        user_ids: ['u3'],
+        data: { threadId: 'thread-9', pollId: 'poll-1' },
+      }),
+    });
+  });
 });
