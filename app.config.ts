@@ -26,6 +26,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   android: {
     package: APPLICATION_ID,
+    // Pan keeps the focused field visible without pushing the tab bar up.
+    // iOS lifts inputs itself (see useKeyboardInset / KeyboardSheet).
+    softwareKeyboardLayoutMode: 'pan',
     adaptiveIcon: {
       backgroundColor: '#ffffff',
       foregroundImage: './assets/images/android-icon-foreground.png',
