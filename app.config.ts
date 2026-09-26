@@ -1,8 +1,9 @@
-import { ExpoConfig, ConfigContext } from 'expo/config';
+import type { ExpoConfig, ConfigContext } from 'expo/config';
 
 // Inlined for Expo config load — Node cannot resolve ./constants/brand.ts at config time.
 const APP_NAME = 'GSL';
 const APP_SLUG = 'gsl';
+const APPLICATION_ID = 'com.tvlins.gsl';
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
@@ -15,14 +16,14 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   userInterfaceStyle: 'automatic',
   ios: {
     supportsTablet: true,
-    bundleIdentifier: 'com.gsl.app',
+    bundleIdentifier: APPLICATION_ID,
     infoPlist: {
       NSCameraUsageDescription: 'GSL needs camera access to upload event photos.',
       NSPhotoLibraryUsageDescription: 'GSL needs photo library access to upload event photos.',
     },
   },
   android: {
-    package: 'com.gsl.app',
+    package: APPLICATION_ID,
     adaptiveIcon: {
       backgroundColor: '#ffffff',
       foregroundImage: './assets/images/android-icon-foreground.png',
