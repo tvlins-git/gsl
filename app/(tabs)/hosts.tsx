@@ -1,3 +1,4 @@
+import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text } from 'react-native';
 import { HostMonthRow } from '@/components/HostMonthRow';
@@ -8,6 +9,8 @@ import { generateMonthList } from '@/lib/hosts';
 import { isLocalMode, localStore } from '@/lib/local-store';
 import type { HostAssignment, Member } from '@/lib/database.types';
 import { supabase } from '@/lib/supabase';
+import { shouldRefreshHostsOnNotification } from '@/lib/notification-refresh';
+import { useNotificationRefresh } from '@/lib/use-notification-refresh';
 import { feedColumn, sharedStyles, theme } from '@/constants/theme';
 
 export default function HostsScreen() {
@@ -46,6 +49,14 @@ export default function HostsScreen() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadData();
+    }, [loadData])
+  );
+
+  useNotificationRefresh(shouldRefreshHostsOnNotification, loadData);
 
   const getAssignment = (year: number, month: number) => {
     return assignments.find((a) => a.year === year && a.month === month)?.assigned_member_id ?? null;

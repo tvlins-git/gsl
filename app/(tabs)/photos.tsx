@@ -1,4 +1,4 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -32,6 +32,9 @@ import { albumBackAction, albumBackButtonText, albumBackLabel, firstSearchParam 
 import { isCameraPickerAvailable, pickImageUris } from '@/lib/pick-image';
 import { deletePhoto } from '@/lib/photo-list';
 import { formatRelativeTime } from '@/lib/time';
+import { subscribeNotificationOpen, shouldRefreshPhotosOnNotification } from '@/lib/notification-refresh';
+import { subscribeToAlbumPhotoInserts } from '@/lib/photo-realtime';
+import { useNotificationRefresh } from '@/lib/use-notification-refresh';
 import { supabase } from '@/lib/supabase';
 import { feedColumn, sharedStyles, theme } from '@/constants/theme';
 
@@ -64,6 +67,16 @@ export default function PhotosScreen() {
     setLoading(false);
   }, [member]);
 
+  const mergeAlbumPhotos = useCallback((existing: Photo[], incoming: Photo[]) => {
+    const byId = new Map(existing.map((photo) => [photo.id, photo]));
+    for (const photo of incoming) {
+      byId.set(photo.id, photo);
+    }
+    return [...byId.values()].sort(
+      (a, b) => (b.ai_score ?? 0) - (a.ai_score ?? 0) || b.created_at.localeCompare(a.created_at)
+    );
+  }, []);
+
   const loadPhotos = useCallback(async (eventId: string) => {
     const data = isLocalMode()
       ? await localStore.getPhotos(eventId)
@@ -75,9 +88,56 @@ export default function PhotosScreen() {
     loadSummaries();
   }, [loadSummaries]);
 
+  useFocusEffect(
+    useCallback(() => {
+      void loadSummaries();
+    }, [loadSummaries])
+  );
+
+  useNotificationRefresh(shouldRefreshPhotosOnNotification, loadSummaries);
+
+  useEffect(() => {
+    if (!member) return undefined;
+    return subscribeNotificationOpen((link) => {
+      if (link.type !== 'photos') return;
+      void (async () => {
+        const [data, groupMembers] = await Promise.all([
+          loadPhotoEventSummaries(member.group_id),
+          getGroupMembers(member.group_id),
+        ]);
+        setSummaries(data);
+        setMembers(groupMembers);
+        if (!link.eventId) return;
+        const match = data.find((item) => item.event.id === link.eventId);
+        if (!match) return;
+        openedEventId.current = link.eventId;
+        setOpenedFromLink(true);
+        setSelectedEvent(match.event);
+        await loadPhotos(match.event.id);
+      })();
+    });
+  }, [member, loadPhotos]);
+
   useEffect(() => {
     if (selectedEvent) loadPhotos(selectedEvent.id);
   }, [selectedEvent, loadPhotos]);
+
+  useEffect(() => {
+    if (!selectedEvent || isLocalMode()) return undefined;
+    return subscribeToAlbumPhotoInserts(selectedEvent.id, (photo) => {
+      setPhotos((prev) => mergeAlbumPhotos(prev, [photo]));
+    });
+  }, [selectedEvent, mergeAlbumPhotos]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!selectedEvent || isLocalMode()) return undefined;
+      const interval = setInterval(() => {
+        void loadPhotos(selectedEvent.id);
+      }, 8000);
+      return () => clearInterval(interval);
+    }, [selectedEvent, loadPhotos])
+  );
 
   useEffect(() => {
     if (!eventId || openedEventId.current === eventId) return;

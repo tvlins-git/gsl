@@ -14,6 +14,10 @@ interface PollSlotEditorProps {
   slotError?: string;
   onSlotError?: (message: string) => void;
   onPickerInteractionChange?: (active: boolean) => void;
+  /** When set, Add slot commits a single slot to the parent instead of appending to `slots`. */
+  onCommitSlot?: (slot: DraftSlot) => void;
+  commitLabel?: string;
+  testIDPrefix?: string;
 }
 
 function defaultStartTime() {
@@ -28,6 +32,9 @@ export function PollSlotEditor({
   slotError,
   onSlotError,
   onPickerInteractionChange,
+  onCommitSlot,
+  commitLabel,
+  testIDPrefix = 'poll',
 }: PollSlotEditorProps) {
   const [selectedDate, setSelectedDate] = useState(() => startOfDay(new Date()));
   const [startTime, setStartTime] = useState(defaultStartTime);
@@ -40,6 +47,10 @@ export function PollSlotEditor({
     const result = buildPollSlotFromDates(selectedDate, startTime);
     if ('error' in result) {
       onSlotError?.(result.error);
+      return;
+    }
+    if (onCommitSlot) {
+      onCommitSlot(result);
       return;
     }
     onSlotsChange([...slots, result]);
@@ -86,7 +97,7 @@ export function PollSlotEditor({
             onPress={() => setDateExpanded(true)}
             accessibilityRole="button"
             accessibilityLabel={`Selected date ${dateLabel}. Change date.`}
-            testID="expand-poll-date"
+            testID={`expand-${testIDPrefix}-date`}
           >
             <Text style={styles.pickerBtnText}>{dateLabel}</Text>
             <Text style={styles.changeText}>Change</Text>
@@ -119,11 +130,11 @@ export function PollSlotEditor({
 
       {slotError ? <Text style={styles.error}>{slotError}</Text> : null}
 
-      <Pressable style={styles.addBtn} onPress={addSlot} testID="add-poll-slot">
-        <Text style={styles.addBtnText}>+ Add slot</Text>
+      <Pressable style={styles.addBtn} onPress={addSlot} testID={`add-${testIDPrefix}-slot`}>
+        <Text style={styles.addBtnText}>{commitLabel ?? '+ Add slot'}</Text>
       </Pressable>
 
-      {slots.length > 0 && (
+      {!onCommitSlot && slots.length > 0 && (
         <View style={styles.slotList}>
           <Text style={styles.fieldLabel}>{slots.length} slot{slots.length === 1 ? '' : 's'} added</Text>
           {slots.map((s, i) => (

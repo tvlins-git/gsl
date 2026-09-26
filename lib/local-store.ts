@@ -246,6 +246,40 @@ export const localStore = {
     return poll;
   },
 
+  async appendPollSlots(pollId: string, slots: { startsAt: string; endsAt: string }[]) {
+    const data = await readData();
+    const created: PollSlot[] = [];
+    for (const s of slots) {
+      const slot: PollSlot = {
+        id: uuid(),
+        poll_id: pollId,
+        starts_at: s.startsAt,
+        ends_at: s.endsAt,
+      };
+      data.poll_slots.push(slot);
+      created.push(slot);
+    }
+    await writeData(data);
+    return created;
+  },
+
+  async updatePollSlotTimes(slotId: string, times: { startsAt: string; endsAt: string }) {
+    const data = await readData();
+    const slot = data.poll_slots.find((item) => item.id === slotId);
+    if (!slot) throw new Error('Slot not found');
+    slot.starts_at = times.startsAt;
+    slot.ends_at = times.endsAt;
+    await writeData(data);
+    return slot;
+  },
+
+  async removePollSlot(slotId: string) {
+    const data = await readData();
+    data.poll_slots = data.poll_slots.filter((slot) => slot.id !== slotId);
+    data.poll_responses = data.poll_responses.filter((response) => response.slot_id !== slotId);
+    await writeData(data);
+  },
+
   async upsertPollResponse(slotId: string, memberId: string, response: 'yes' | 'maybe' | 'no') {
     const data = await readData();
     const idx = data.poll_responses.findIndex((r) => r.slot_id === slotId && r.member_id === memberId);

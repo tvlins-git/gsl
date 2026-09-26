@@ -26,8 +26,15 @@ import {
 } from '@/lib/messages';
 import { getPollLinkTarget } from '@/lib/poll-thread';
 import { getThread } from '@/lib/thread-list';
+import { shouldRefreshThreadOnNotification } from '@/lib/notification-refresh';
 import { subscribeToThreadInserts } from '@/lib/thread-realtime';
-import { buildChatPushPayload, listThreadMessages, sendThreadMessage } from '@/lib/thread-messages';
+import { useNotificationRefresh } from '@/lib/use-notification-refresh';
+import {
+  buildChatPushPayload,
+  listThreadMessages,
+  sendThreadMessage,
+  shouldSendChatPush,
+} from '@/lib/thread-messages';
 import { isLocalMode } from '@/lib/local-store';
 import { supabase } from '@/lib/supabase';
 import { sharedStyles, theme } from '@/constants/theme';
@@ -127,9 +134,31 @@ export default function ThreadScreen() {
     }, [member])
   );
 
-  useEffect(() => {
-    void loadMessages();
-  }, [loadMessages]);
+  useFocusEffect(
+    useCallback(() => {
+      void loadMessages();
+    }, [loadMessages])
+  );
+
+  useNotificationRefresh(
+    useCallback(
+      (link) => typeof id === 'string' && shouldRefreshThreadOnNotification(link, id),
+      [id]
+    ),
+    loadMessages
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!id || isLocalMode()) return undefined;
+      const interval = setInterval(() => {
+        void listThreadMessages(id).then((msgs) => {
+          setMessages((prev) => mergeMessages(prev, msgs));
+        });
+      }, 8000);
+      return () => clearInterval(interval);
+    }, [id])
+  );
 
   const handleInsert = useCallback((message: Message) => {
     setMessages((prev) => mergeMessages(prev, [message]));
@@ -155,15 +184,22 @@ export default function ThreadScreen() {
     if (isLocalMode()) return;
 
     try {
+      const pushBody = buildChatPushPayload({
+        groupId: member.group_id,
+        senderId: member.user_id,
+        senderName: member.display_name,
+        text,
+        threadId: id,
+        members,
+      });
+      const audience = {
+        userIds: pushBody.user_ids ?? null,
+        tagNotification: pushBody.tag_notification,
+      };
+      if (!shouldSendChatPush(audience)) return;
+
       await supabase.functions.invoke('send-push', {
-        body: buildChatPushPayload({
-          groupId: member.group_id,
-          senderId: member.user_id,
-          senderName: member.display_name,
-          text,
-          threadId: id,
-          members,
-        }),
+        body: pushBody,
       });
     } catch {
       // Push is best-effort; the message is already persisted and shown.

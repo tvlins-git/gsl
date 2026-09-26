@@ -51,11 +51,19 @@ const mockMember = {
 
 jest.mock('expo-router', () => ({
   useLocalSearchParams: jest.fn(() => ({})),
+  useFocusEffect: (callback: () => void | (() => void)) => {
+    const React = require('react');
+    React.useEffect(() => callback(), [callback]);
+  },
   router: {
     canGoBack: jest.fn(() => false),
     back: jest.fn(),
     replace: jest.fn(),
   },
+}));
+
+jest.mock('@/lib/photo-realtime', () => ({
+  subscribeToAlbumPhotoInserts: jest.fn(() => jest.fn()),
 }));
 
 jest.mock('@/contexts/AuthContext', () => ({

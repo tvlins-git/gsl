@@ -27,7 +27,8 @@ import {
   sendCalendarInvites,
 } from '@/lib/calendar-invite';
 import { isLocalMode, localStore } from '@/lib/local-store';
-import { deletePoll, loadPollSummaries, partitionPolls } from '@/lib/poll-list';
+import { appendPollSlots, removePollSlot, updatePollSlotTimes } from '@/lib/poll-slots';
+import { deletePoll, getPollById, loadPollSummaries, partitionPolls } from '@/lib/poll-list';
 import { computeSlotScores, formatSlotTime } from '@/lib/polls';
 import {
   findPollThread,
@@ -39,6 +40,7 @@ import {
 import type { Member, Poll, PollSlot, Thread } from '@/lib/database.types';
 import { supabase } from '@/lib/supabase';
 import type { PollResponseValue } from '@/lib/polls';
+import { subscribeNotificationOpen } from '@/lib/notification-refresh';
 import { feedColumn, sharedStyles, theme } from '@/constants/theme';
 
 export default function PlanScreen() {
@@ -62,6 +64,9 @@ export default function PlanScreen() {
   const [showThreadComposer, setShowThreadComposer] = useState(false);
   const [startingThread, setStartingThread] = useState(false);
   const [threadNotice, setThreadNotice] = useState('');
+  const [detailSlotDrafts, setDetailSlotDrafts] = useState<{ startsAt: string; endsAt: string }[]>([]);
+  const [detailSlotError, setDetailSlotError] = useState('');
+  const [editingSlotId, setEditingSlotId] = useState<string | null>(null);
   const insets = useSafeAreaInsets();
 
   const loadPolls = useCallback(async () => {
@@ -121,8 +126,20 @@ export default function PlanScreen() {
     useCallback(() => {
       if (!member) return;
       void getGroupMembers(member.group_id).then(setMembers);
-    }, [member])
+      void loadPolls();
+    }, [member, loadPolls])
   );
+
+  useEffect(() => {
+    return subscribeNotificationOpen((link) => {
+      if (link.type !== 'plan' || !member) return;
+      void (async () => {
+        await loadPolls();
+        const poll = await getPollById(link.pollId);
+        if (poll) await loadPollDetail(poll);
+      })();
+    });
+  }, [member, loadPolls, loadPollDetail]);
 
   useEffect(() => {
     if (!pollId || polls.length === 0 || selectedPoll?.id === pollId) return;
@@ -149,7 +166,50 @@ export default function PlanScreen() {
     setLinkedThread(null);
     setShowThreadComposer(false);
     setThreadNotice('');
+    setDetailSlotDrafts([]);
+    setDetailSlotError('');
+    setEditingSlotId(null);
     if (pollId) router.setParams({ pollId: '' });
+  };
+
+  const slotHasResponses = (slotId: string) => responses.some((response) => response.slotId === slotId);
+
+  const handleAppendPollSlots = async () => {
+    if (!selectedPoll || detailSlotDrafts.length === 0) return;
+    setDetailSlotError('');
+    try {
+      await appendPollSlots(selectedPoll.id, detailSlotDrafts);
+      setDetailSlotDrafts([]);
+      await loadPollDetail(selectedPoll);
+      await loadPolls();
+    } catch {
+      setDetailSlotError('Could not add slots. Try again.');
+    }
+  };
+
+  const handleSaveEditedSlot = async (slot: { startsAt: string; endsAt: string }) => {
+    if (!selectedPoll || !editingSlotId) return;
+    setDetailSlotError('');
+    try {
+      await updatePollSlotTimes(editingSlotId, slot);
+      setEditingSlotId(null);
+      await loadPollDetail(selectedPoll);
+    } catch {
+      setDetailSlotError('Could not update this slot. Try again.');
+    }
+  };
+
+  const handleRemovePollSlot = async (slotId: string) => {
+    if (!selectedPoll || slotHasResponses(slotId)) return;
+    setDetailSlotError('');
+    try {
+      await removePollSlot(slotId);
+      if (editingSlotId === slotId) setEditingSlotId(null);
+      await loadPollDetail(selectedPoll);
+      await loadPolls();
+    } catch {
+      setDetailSlotError('Could not remove this slot.');
+    }
   };
 
   const handleDeletePoll = async (pollIdToDelete: string) => {
@@ -408,6 +468,71 @@ export default function PlanScreen() {
             readOnly={selectedPoll.status === 'closed'}
           />
         </View>
+        {selectedPoll.status === 'open' ? (
+          <View style={[styles.slotsEditorCard, sharedStyles.card]}>
+            <Text style={styles.resultsTitle}>Add or change time slots</Text>
+            <Text style={styles.threadHint}>
+              Add more options or adjust a slot before anyone votes on it.
+            </Text>
+            {slots.map((slot) => (
+              <View key={slot.id} style={styles.existingSlotRow}>
+                <Text style={styles.resultRowText}>{formatSlotTime(slot.starts_at, slot.ends_at)}</Text>
+                <View style={styles.existingSlotActions}>
+                  <Pressable
+                    onPress={() => {
+                      setEditingSlotId(slot.id);
+                      setDetailSlotError('');
+                    }}
+                    testID={`edit-slot-${slot.id}`}
+                  >
+                    <Text style={styles.editSlotText}>Change</Text>
+                  </Pressable>
+                  {!slotHasResponses(slot.id) ? (
+                    <Pressable onPress={() => void handleRemovePollSlot(slot.id)} testID={`remove-slot-${slot.id}`}>
+                      <Text style={styles.deleteText}>Remove</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              </View>
+            ))}
+            {editingSlotId ? (
+              <View style={styles.editingSlotWrap}>
+                <Text style={styles.fieldLabel}>Update selected slot</Text>
+                <PollSlotEditor
+                  slots={[]}
+                  onSlotsChange={() => undefined}
+                  slotError={detailSlotError}
+                  onSlotError={setDetailSlotError}
+                  onPickerInteractionChange={setSlotPickerActive}
+                  onCommitSlot={(slot) => {
+                    void handleSaveEditedSlot(slot);
+                  }}
+                  commitLabel="Save slot times"
+                  testIDPrefix="edit-poll"
+                />
+                <Pressable onPress={() => setEditingSlotId(null)}>
+                  <Text style={styles.cancelEditText}>Cancel edit</Text>
+                </Pressable>
+              </View>
+            ) : null}
+            <PollSlotEditor
+              slots={detailSlotDrafts}
+              onSlotsChange={setDetailSlotDrafts}
+              slotError={editingSlotId ? '' : detailSlotError}
+              onSlotError={setDetailSlotError}
+              onPickerInteractionChange={setSlotPickerActive}
+            />
+            {detailSlotDrafts.length > 0 ? (
+              <Pressable
+                style={sharedStyles.primaryBtn}
+                onPress={() => void handleAppendPollSlots()}
+                testID="append-poll-slots"
+              >
+                <Text style={sharedStyles.primaryBtnText}>Add {detailSlotDrafts.length} slot(s) to poll</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
         <View style={[styles.results, sharedStyles.card]}>
           <Text style={styles.resultsTitle}>Best slots</Text>
           {slotScores.map((score) => {
@@ -696,6 +821,46 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   gridCard: { marginHorizontal: theme.spacing.lg, marginBottom: theme.spacing.md, overflow: 'hidden' },
+  slotsEditorCard: {
+    marginHorizontal: theme.spacing.lg,
+    marginBottom: theme.spacing.md,
+    padding: theme.spacing.lg,
+    gap: theme.spacing.md,
+  },
+  existingSlotRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: theme.spacing.sm,
+    paddingVertical: theme.spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: theme.colors.borderLight,
+  },
+  existingSlotActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.md,
+  },
+  editSlotText: {
+    color: theme.colors.accent,
+    fontWeight: '600',
+    fontSize: 13,
+  },
+  editingSlotWrap: {
+    gap: theme.spacing.sm,
+    paddingTop: theme.spacing.sm,
+  },
+  fieldLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: theme.colors.textSecondary,
+  },
+  cancelEditText: {
+    textAlign: 'center',
+    color: theme.colors.textSecondary,
+    fontSize: 14,
+    paddingVertical: theme.spacing.sm,
+  },
   results: { marginHorizontal: theme.spacing.lg, padding: theme.spacing.lg },
   threadCard: {
     marginHorizontal: theme.spacing.lg,
