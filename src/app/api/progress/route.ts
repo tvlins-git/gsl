@@ -5,6 +5,7 @@ import {
   readPreview,
   type PreviewProfile,
 } from "@/lib/preview";
+import { hasGate } from "@/lib/require-gate";
 import { createClient, supabaseConfigured } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 
@@ -18,6 +19,13 @@ type ProgressBody = {
 };
 
 export async function POST(request: Request) {
+  if (!(await hasGate())) {
+    return NextResponse.json(
+      { error: "signed_out", message: "Enter the code first." },
+      { status: 401 },
+    );
+  }
+
   const body = (await request.json().catch(() => null)) as ProgressBody | null;
   const activity = body?.activity ?? "";
   const promptId = (body?.promptId ?? "").trim();

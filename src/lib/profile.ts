@@ -1,6 +1,7 @@
 import type { LearningLanguage } from "@/games/types";
 import { isLearningLanguage } from "@/lib/i18n";
-import { readPreview } from "@/lib/preview";
+import { emptyPreview, readPreview } from "@/lib/preview";
+import { hasGate } from "@/lib/require-gate";
 import { createClient, supabaseConfigured } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 
@@ -16,18 +17,22 @@ export type ShellProfile = {
   preview: boolean;
 };
 
+function localProfile(preview: Awaited<ReturnType<typeof readPreview>>) {
+  return { ...(preview ?? emptyPreview("Pip")), preview: true as const };
+}
+
 export async function requireProfile(): Promise<ShellProfile> {
+  if (!(await hasGate())) redirect("/enter");
+
   if (!supabaseConfigured()) {
-    const preview = await readPreview();
-    if (!preview) redirect("/enter");
-    return { ...preview, preview: true };
+    return localProfile(await readPreview());
   }
 
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect("/enter");
+  if (!user) return localProfile(await readPreview());
 
   const { data } = await supabase
     .from("profiles")
@@ -37,7 +42,9 @@ export async function requireProfile(): Promise<ShellProfile> {
     .eq("id", user.id)
     .single();
 
-  if (!data || !isLearningLanguage(data.language)) redirect("/enter");
+  if (!data || !isLearningLanguage(data.language)) {
+    return localProfile(await readPreview());
+  }
 
   return {
     id: data.id,

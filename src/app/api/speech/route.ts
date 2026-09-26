@@ -1,24 +1,12 @@
 import { isLearningLanguage } from "@/lib/i18n";
 import { checkSpeech, speak, SpeechError } from "@/lib/grok";
-import { readPreview } from "@/lib/preview";
-import { createClient, supabaseConfigured } from "@/lib/supabase/server";
+import { hasGate } from "@/lib/require-gate";
 import { NextResponse } from "next/server";
 
-async function hasSession() {
-  if (!supabaseConfigured()) {
-    return Boolean(await readPreview());
-  }
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  return Boolean(user);
-}
-
 export async function POST(request: Request) {
-  if (!(await hasSession())) {
+  if (!(await hasGate())) {
     return NextResponse.json(
-      { error: "signed_out", message: "Sign in with the family code first." },
+      { error: "signed_out", message: "Enter the code first." },
       { status: 401 },
     );
   }

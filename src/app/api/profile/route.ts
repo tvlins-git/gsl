@@ -5,10 +5,18 @@ import {
   readPreview,
 } from "@/lib/preview";
 import { validateName } from "@/lib/family-code";
+import { hasGate } from "@/lib/require-gate";
 import { createClient, supabaseConfigured } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
+  if (!(await hasGate())) {
+    return NextResponse.json(
+      { error: "signed_out", message: "Enter the code first." },
+      { status: 401 },
+    );
+  }
+
   const body = (await request.json().catch(() => null)) as {
     language?: string;
     displayName?: string;
