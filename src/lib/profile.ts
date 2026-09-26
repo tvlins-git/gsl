@@ -1,0 +1,53 @@
+import type { LearningLanguage } from "@/games/types";
+import { isLearningLanguage } from "@/lib/i18n";
+import { readPreview } from "@/lib/preview";
+import { createClient, supabaseConfigured } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
+
+export type ShellProfile = {
+  id: string;
+  displayName: string;
+  language: LearningLanguage;
+  stars: number;
+  currentStreak: number;
+  bestStreak: number;
+  mathLevel: number;
+  mathCorrect: number;
+  preview: boolean;
+};
+
+export async function requireProfile(): Promise<ShellProfile> {
+  if (!supabaseConfigured()) {
+    const preview = await readPreview();
+    if (!preview) redirect("/enter");
+    return { ...preview, preview: true };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/enter");
+
+  const { data } = await supabase
+    .from("profiles")
+    .select(
+      "id, display_name, language, stars, current_streak, best_streak, math_level, math_correct",
+    )
+    .eq("id", user.id)
+    .single();
+
+  if (!data || !isLearningLanguage(data.language)) redirect("/enter");
+
+  return {
+    id: data.id,
+    displayName: data.display_name,
+    language: data.language,
+    stars: data.stars,
+    currentStreak: data.current_streak,
+    bestStreak: data.best_streak,
+    mathLevel: data.math_level,
+    mathCorrect: data.math_correct,
+    preview: false,
+  };
+}
