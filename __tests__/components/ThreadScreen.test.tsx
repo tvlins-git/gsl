@@ -1,12 +1,35 @@
 import React from 'react';
+import { Text } from 'react-native';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
-import ThreadScreen from '@/app/thread/[id]';
+import ThreadScreen, { ErrorBoundary } from '@/app/thread/[id]';
 import { supabase } from '@/lib/supabase';
+import { resetThreadRealtimeForTests } from '@/lib/thread-realtime';
 import { router } from 'expo-router';
 import { getPollLinkTarget } from '@/lib/poll-thread';
 import { getThread } from '@/lib/thread-list';
 import { listThreadMessages, sendThreadMessage } from '@/lib/thread-messages';
 import { buildMessage } from '../factories';
+
+const REFUSED =
+  'cannot add `postgres_changes` callbacks for realtime:thread-thread-1 after `subscribe()`.';
+
+class RootBoundaryProbe extends React.Component<
+  { children: React.ReactNode },
+  { error: Error | null }
+> {
+  state = { error: null as Error | null };
+
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+
+  render() {
+    if (this.state.error) {
+      return <Text testID="root-boundary">{this.state.error.message}</Text>;
+    }
+    return this.props.children;
+  }
+}
 
 const existing = buildMessage({
   id: 'msg-old',
@@ -106,11 +129,19 @@ jest.mock('@/lib/thread-messages', () => {
 
 describe('ThreadScreen send', () => {
   beforeEach(() => {
+    resetThreadRealtimeForTests();
     (listThreadMessages as jest.Mock).mockResolvedValue([existing]);
     (sendThreadMessage as jest.Mock).mockResolvedValue(saved);
     (getThread as jest.Mock).mockResolvedValue(null);
     (getPollLinkTarget as jest.Mock).mockResolvedValue(null);
     (supabase.functions.invoke as jest.Mock).mockResolvedValue({ data: null, error: null });
+    (supabase.channel as jest.Mock).mockClear();
+    (supabase.channel as jest.Mock).mockImplementation(() => ({
+      state: 'closed',
+      on: jest.fn().mockReturnThis(),
+      subscribe: jest.fn().mockReturnThis(),
+    }));
+    (supabase.removeChannel as jest.Mock).mockReset();
     (router.navigate as jest.Mock).mockClear();
   });
 
@@ -159,5 +190,98 @@ describe('ThreadScreen send', () => {
         body: 'Hr. Lins: hi @Thomas',
       }),
     });
+  });
+
+  it('subscribes once when the thread finishes loading', async () => {
+    render(
+      <RootBoundaryProbe>
+        <ThreadScreen />
+      </RootBoundaryProbe>
+    );
+
+    expect(await screen.findByText('Already in the thread')).toBeTruthy();
+    expect(supabase.channel).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId('root-boundary')).toBeNull();
+  });
+
+  it('keeps the thread open when realtime refuses the subscription', async () => {
+    (supabase.channel as jest.Mock).mockImplementation(() => ({
+      state: 'joining',
+      on: () => {
+        throw new Error(REFUSED);
+      },
+      subscribe: jest.fn(),
+    }));
+
+    render(
+      <RootBoundaryProbe>
+        <ThreadScreen />
+      </RootBoundaryProbe>
+    );
+
+    expect(await screen.findByText('Already in the thread')).toBeTruthy();
+    expect(screen.queryByTestId('root-boundary')).toBeNull();
+    expect(screen.queryByText('Something went wrong')).toBeNull();
+  });
+
+  it('keeps both open chats up when a second subscribe would be refused', async () => {
+    let subscribed = false;
+    (supabase.channel as jest.Mock).mockImplementation(() => ({
+      state: subscribed ? 'joining' : 'closed',
+      on: jest.fn(() => {
+        if (subscribed) throw new Error(REFUSED);
+        return {
+          subscribe: () => {
+            subscribed = true;
+          },
+        };
+      }),
+      subscribe: jest.fn(() => {
+        subscribed = true;
+      }),
+    }));
+
+    render(
+      <RootBoundaryProbe>
+        <ThreadScreen />
+        <ThreadScreen />
+      </RootBoundaryProbe>
+    );
+
+    expect(await screen.findAllByText('Already in the thread')).toHaveLength(2);
+    expect(screen.queryByTestId('root-boundary')).toBeNull();
+  });
+
+  it('does not surface a removeChannel failure when the thread closes', async () => {
+    (supabase.removeChannel as jest.Mock).mockImplementation(() => {
+      throw new Error(REFUSED);
+    });
+
+    const view = render(
+      <RootBoundaryProbe>
+        <ThreadScreen />
+      </RootBoundaryProbe>
+    );
+    expect(await screen.findByText('Already in the thread')).toBeTruthy();
+
+    view.rerender(
+      <RootBoundaryProbe>
+        <Text>closed</Text>
+      </RootBoundaryProbe>
+    );
+    expect(screen.getByText('closed')).toBeTruthy();
+    expect(screen.queryByTestId('root-boundary')).toBeNull();
+  });
+});
+
+describe('ThreadScreen error boundary', () => {
+  it('retries from the thread route instead of leaving a dead screen', () => {
+    const retry = jest.fn(async () => undefined);
+    render(<ErrorBoundary error={new Error(REFUSED)} retry={retry} />);
+
+    expect(screen.getByText('This chat hit a connection error.')).toBeTruthy();
+    expect(screen.queryByText('Something went wrong')).toBeNull();
+    fireEvent.press(screen.getByTestId('thread-error-retry'));
+    expect(retry).toHaveBeenCalledTimes(1);
   });
 });
