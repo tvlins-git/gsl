@@ -12,7 +12,7 @@ BEGIN
   WHERE nsp.nspname = 'public'
     AND rel.relname = 'threads'
     AND con.contype = 'f'
-    AND pg_get_constraintdef(con.oid) ILIKE '%REFERENCES polls%';
+    AND pg_get_constraintdef(con.oid) ILIKE '%polls%';
 
   IF constraint_name IS NOT NULL THEN
     EXECUTE format('ALTER TABLE public.threads DROP CONSTRAINT %I', constraint_name);
