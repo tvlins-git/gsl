@@ -59,7 +59,7 @@ export function shouldSendChatPush(audience: { userIds: string[] | null; tagNoti
   if (audience.tagNotification) {
     return audience.userIds == null || audience.userIds.length > 0;
   }
-  return audience.userIds.length > 0;
+  return (audience.userIds ?? []).length > 0;
 }
 
 export function buildChatPushPayload(input: {
