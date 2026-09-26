@@ -1,4 +1,4 @@
-import { listThreadMessages, sendThreadMessage } from '@/lib/thread-messages';
+import { buildChatPushPayload, listThreadMessages, resolveChatNotifyUserIds, sendThreadMessage } from '@/lib/thread-messages';
 import { supabase } from '@/lib/supabase';
 import { buildMessage } from '../factories';
 
@@ -46,6 +46,35 @@ describe('sendThreadMessage', () => {
     await expect(sendThreadMessage('thread-1', 'user-1', 'Nope')).rejects.toThrow(
       'Message insert returned no row'
     );
+  });
+});
+
+describe('chat mention notifications', () => {
+  const members = [
+    { user_id: 'user-1', display_name: 'Hr. Lins' },
+    { user_id: 'user-2', display_name: 'Thomas' },
+  ];
+
+  it('notifies the whole group when a message has no mention', () => {
+    expect(resolveChatNotifyUserIds('See you Friday', members, 'user-1')).toBeNull();
+    expect(
+      buildChatPushPayload({
+        groupId: 'group-1',
+        senderId: 'user-1',
+        senderName: 'Hr. Lins',
+        text: 'See you Friday',
+        threadId: 'thread-1',
+        members,
+      }).user_ids
+    ).toBeUndefined();
+  });
+
+  it('notifies only the tagged member', () => {
+    expect(resolveChatNotifyUserIds('hi @Thomas', members, 'user-1')).toEqual(['user-2']);
+  });
+
+  it('notifies the whole group for @everyone', () => {
+    expect(resolveChatNotifyUserIds('hi @everyone', members, 'user-1')).toBeNull();
   });
 });
 

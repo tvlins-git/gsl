@@ -469,6 +469,7 @@ export default function PlanScreen() {
       <PollThreadSheet
         visible={showThreadComposer}
         pollTitle={selectedPoll.title}
+        members={members}
         unansweredNames={unansweredMembers.map((person) => person.display_name)}
         statusLine={answerStatusLine}
         existingThread={!!linkedThread}

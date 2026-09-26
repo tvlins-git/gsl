@@ -191,6 +191,9 @@ describe('feed mention parsing', () => {
       tagAll: false,
       userIds: ['user-2', 'user-3'],
     });
+    expect(
+      parseFeedMentions('hi @Løg', [{ user_id: 'user-4', display_name: 'Hr. Løg' }])
+    ).toEqual({ tagAll: false, userIds: ['user-4'] });
   });
 
   it('does not tag when there are no member mentions', () => {
@@ -214,6 +217,9 @@ describe('feed mention parsing', () => {
     expect(lins[0].insert).toBe('Lins');
 
     expect(listFeedMentionSuggestions('eve', members)[0].id).toBe('everyone');
+    expect(
+      listFeedMentionSuggestions('lø', [{ user_id: 'user-4', display_name: 'Hr. Løg' }])[0].insert
+    ).toBe('Løg');
   });
 
   it('replaces the active mention with the chosen token', () => {

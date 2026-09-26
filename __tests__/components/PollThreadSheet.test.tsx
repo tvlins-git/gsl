@@ -15,6 +15,7 @@ describe('PollThreadSheet', () => {
       <PollThreadSheet
         visible
         pollTitle="Test"
+        members={[]}
         unansweredNames={['Ada', 'Bea']}
         statusLine="Ada and Bea haven't answered yet."
         existingThread={false}
@@ -42,6 +43,7 @@ describe('PollThreadSheet', () => {
       <PollThreadSheet
         visible
         pollTitle="Test"
+        members={[]}
         unansweredNames={['Ada']}
         statusLine="Ada hasn't answered yet."
         existingThread
@@ -56,6 +58,36 @@ describe('PollThreadSheet', () => {
     fireEvent.press(screen.getByTestId('poll-thread-submit'));
     expect(onSubmit).toHaveBeenCalledWith({
       message: 'Still waiting on Ada to answer "Test".',
+      pushUnanswered: false,
+    });
+  });
+
+  it('inserts an @mention from the suggestion list', () => {
+    const onSubmit = jest.fn();
+    render(
+      <PollThreadSheet
+        visible
+        pollTitle="Test"
+        members={[
+          { user_id: 'user-2', display_name: 'Ada' },
+          { user_id: 'user-3', display_name: 'Bea' },
+        ]}
+        unansweredNames={[]}
+        statusLine="Everyone has answered."
+        existingThread={false}
+        submitting={false}
+        onClose={jest.fn()}
+        onSubmit={onSubmit}
+      />
+    );
+
+    fireEvent.changeText(screen.getByTestId('poll-thread-message'), 'hi @');
+    expect(screen.getByTestId('poll-mention-suggestions')).toBeTruthy();
+    expect(screen.getByTestId('poll-mention-everyone')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('poll-mention-member-user-2'));
+    fireEvent.press(screen.getByTestId('poll-thread-submit'));
+    expect(onSubmit).toHaveBeenCalledWith({
+      message: 'hi @Ada',
       pushUnanswered: false,
     });
   });
