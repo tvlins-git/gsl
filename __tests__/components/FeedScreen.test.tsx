@@ -43,11 +43,6 @@ jest.mock('@/components/FeedPhoto', () => {
   };
 });
 
-jest.mock('@/components/StoriesRow', () => {
-  const { View } = require('react-native');
-  return { StoriesRow: () => <View testID="stories-row" /> };
-});
-
 jest.mock('@/components/FeedComposer', () => {
   const { View } = require('react-native');
   return { FeedComposer: () => <View testID="feed-composer" /> };

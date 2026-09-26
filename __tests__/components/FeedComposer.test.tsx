@@ -1,4 +1,5 @@
 import React from 'react';
+import { Keyboard } from 'react-native';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { FeedComposer } from '@/components/FeedComposer';
 import { createFeedPost } from '@/lib/feed-posts';
@@ -170,6 +171,16 @@ describe('FeedComposer', () => {
         taggedUserIds: ['user-2'],
       })
     );
+  });
+
+  it('dismisses the keyboard after a successful post', async () => {
+    const dismiss = jest.spyOn(Keyboard, 'dismiss').mockImplementation(() => {});
+    render(<FeedComposer members={[author, alice]} author={author} onPosted={() => {}} />);
+    fireEvent.changeText(screen.getByTestId('feed-composer-input'), 'Hello GSL');
+    fireEvent.press(screen.getByTestId('feed-composer-post'));
+    await waitFor(() => expect(createFeedPost).toHaveBeenCalled());
+    await waitFor(() => expect(dismiss).toHaveBeenCalled());
+    dismiss.mockRestore();
   });
 
   it('surfaces a useful error instead of only the generic string', async () => {

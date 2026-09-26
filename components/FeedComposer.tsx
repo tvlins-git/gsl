@@ -1,5 +1,13 @@
-import { useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Keyboard,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { FeedPhoto } from '@/components/FeedPhoto';
 import { MentionSuggestions } from '@/components/MentionSuggestions';
 import { useMentionField } from '@/components/useMentionField';
@@ -18,6 +26,7 @@ interface FeedComposerProps {
 
 export function FeedComposer({ members, author, onPosted }: FeedComposerProps) {
   const mention = useMentionField(members);
+  const inputRef = useRef<TextInput>(null);
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState('');
@@ -55,6 +64,8 @@ export function FeedComposer({ members, author, onPosted }: FeedComposerProps) {
       });
       mention.setBody('');
       setImageUri(null);
+      inputRef.current?.blur();
+      Keyboard.dismiss();
       await onPosted();
     } catch (err) {
       setError(formatUserFacingError(err, 'Could not post. Try again.'));
@@ -69,6 +80,7 @@ export function FeedComposer({ members, author, onPosted }: FeedComposerProps) {
         <View style={styles.inputRow}>
           <UserAvatar name={author.display_name} size={36} imageUri={author.avatar_url} />
           <TextInput
+            ref={inputRef}
             style={styles.input}
             placeholder="Use @everyone or @name to notify"
             placeholderTextColor={theme.colors.textMuted}

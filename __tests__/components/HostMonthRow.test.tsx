@@ -17,8 +17,15 @@ describe('HostMonthRow', () => {
       <HostMonthRow month={month} members={members} assignedMemberId={null} onAssign={() => {}} />
     );
     expect(screen.getByText('Jul 2026')).toBeTruthy();
-    expect(screen.getByText('This month')).toBeTruthy();
+    expect(screen.getByText('Host · This month')).toBeTruthy();
     expect(screen.getByTestId('host-row-2026-7')).toBeTruthy();
+  });
+
+  it('renders assigned host in the subtitle', () => {
+    render(
+      <HostMonthRow month={month} members={members} assignedMemberId="m1" onAssign={() => {}} />
+    );
+    expect(screen.getByText('Host · Alice')).toBeTruthy();
   });
 
   it('hides the remove control when unassigned but keeps layout slot', () => {

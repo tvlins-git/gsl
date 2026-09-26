@@ -12,6 +12,7 @@ interface MemberSelectProps {
   disabled?: boolean;
   placeholder?: string;
   testID?: string;
+  /** Fixed trigger width. Omit to stretch to the parent width. */
   width?: number;
 }
 
@@ -22,7 +23,7 @@ export function MemberSelect({
   disabled = false,
   placeholder = 'Unassigned',
   testID,
-  width = 168,
+  width,
 }: MemberSelectProps) {
   const [open, setOpen] = useState(false);
 
@@ -42,7 +43,7 @@ export function MemberSelect({
         disabled={disabled}
         style={({ pressed }) => [
           styles.trigger,
-          { width },
+          width != null ? { width } : styles.triggerStretch,
           pressed && !disabled && styles.triggerPressed,
           disabled && styles.triggerDisabled,
         ]}
@@ -140,6 +141,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.border,
     borderRadius: theme.radius.pill,
+  },
+  triggerStretch: {
+    alignSelf: 'stretch',
+    width: '100%',
   },
   triggerPressed: {
     backgroundColor: theme.colors.bg,

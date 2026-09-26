@@ -1,6 +1,10 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react-native';
-import { TIME_WHEEL_ITEM_HEIGHT, TimeWheelPicker } from '@/components/TimeWheelPicker';
+import {
+  TIME_WHEEL_HEIGHT,
+  TIME_WHEEL_ITEM_HEIGHT,
+  TimeWheelPicker,
+} from '@/components/TimeWheelPicker';
 
 function timeAt(hours: number, minutes: number) {
   const d = new Date();
@@ -9,6 +13,10 @@ function timeAt(hours: number, minutes: number) {
 }
 
 describe('TimeWheelPicker', () => {
+  it('keeps a compact height so create-poll actions stay reachable', () => {
+    expect(TIME_WHEEL_HEIGHT).toBeLessThanOrEqual(TIME_WHEEL_ITEM_HEIGHT * 3);
+  });
+
   it('renders hour and minute wheels at the current value', () => {
     render(<TimeWheelPicker value={timeAt(17, 0)} onChange={() => {}} />);
     expect(screen.getByTestId('time-wheel-picker')).toBeTruthy();
