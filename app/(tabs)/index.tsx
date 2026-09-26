@@ -93,6 +93,8 @@ export default function FeedScreen() {
         data={items}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
+        keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
         ListHeaderComponent={
           <View>
             <StoriesRow members={members} highlightIds={highlightIds} />
