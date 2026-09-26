@@ -174,7 +174,7 @@ export function buildActivityItems(input: {
       timestamp: host.updated_at,
       path: '/hosts',
       authorName: nameForUser(members, host.updated_by),
-      authorId: host.updated_by,
+      authorId: host.updated_by ?? undefined,
       sourceId: host.id,
     });
   }
