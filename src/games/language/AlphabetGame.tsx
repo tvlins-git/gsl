@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import type { GameProps } from '../types';
+import { useEffect, useState } from 'react';
+import type { GameProps, LearningLanguage } from '../types';
 import { gameCss, icons, languageContent, uiCopy, type LetterCard } from './content';
+import { buildLetterRound } from './letter-round';
 import { playSpeech } from './speech';
 
 type LetterRound = {
@@ -10,23 +11,8 @@ type LetterRound = {
   choices: LetterCard[];
 };
 
-function buildLetterRound(letters: readonly LetterCard[], round: number): LetterRound {
-  const total = letters.length;
-  const target = letters[((round % total) + total) % total];
-  const choices: LetterCard[] = [target];
-  let step = 1;
-  while (choices.length < Math.min(3, total)) {
-    const candidate = letters[(round + step) % total];
-    if (!choices.some((item) => item.id === candidate.id)) {
-      choices.push(candidate);
-    }
-    step += 1;
-  }
-  const shift = round % choices.length;
-  return {
-    target,
-    choices: [...choices.slice(shift), ...choices.slice(0, shift)],
-  };
+function freshRound(language: LearningLanguage, previousIndex: number | null = null): LetterRound {
+  return buildLetterRound(languageContent[language].letters, previousIndex, Math.random);
 }
 
 function Icon({ svg }: { svg: string }) {
@@ -35,39 +21,34 @@ function Icon({ svg }: { svg: string }) {
 
 export default function AlphabetGame({ language, onResult }: GameProps) {
   const copy = uiCopy[language];
-  const [round, setRound] = useState(0);
   const [seenLanguage, setSeenLanguage] = useState(language);
   const [picked, setPicked] = useState<LetterCard | null>(null);
+  const [roundSet, setRoundSet] = useState(() => freshRound(language));
 
   if (seenLanguage !== language) {
     setSeenLanguage(language);
-    setRound(0);
     setPicked(null);
+    setRoundSet(freshRound(language));
   }
-
-  const roundSet = useMemo(
-    () => buildLetterRound(languageContent[language].letters, round),
-    [language, round],
-  );
 
   useEffect(() => {
     let active = true;
-    void playSpeech(roundSet.target.spoken, language).catch(() => {
+    void playSpeech(roundSet.target.spoken, language, { letter: true }).catch(() => {
       if (!active) return;
     });
     return () => {
       active = false;
     };
-  }, [language, round, roundSet.target.spoken]);
+  }, [language, roundSet.target.id, roundSet.target.spoken]);
 
   function replay() {
-    void playSpeech(roundSet.target.spoken, language).catch(() => undefined);
+    void playSpeech(roundSet.target.spoken, language, { letter: true }).catch(() => undefined);
   }
 
   function choose(letter: LetterCard) {
     if (picked) return;
     setPicked(letter);
-    void playSpeech(letter.spoken, language).catch(() => undefined);
+    void playSpeech(letter.spoken, language, { letter: true }).catch(() => undefined);
     onResult({
       correct: letter.id === roundSet.target.id,
       promptId: roundSet.target.id,
@@ -75,8 +56,10 @@ export default function AlphabetGame({ language, onResult }: GameProps) {
   }
 
   function next() {
+    const letters = languageContent[language].letters;
+    const previous = letters.findIndex((letter) => letter.id === roundSet.target.id);
     setPicked(null);
-    setRound((value) => value + 1);
+    setRoundSet(freshRound(language, previous < 0 ? null : previous));
   }
 
   const correct = picked?.id === roundSet.target.id;

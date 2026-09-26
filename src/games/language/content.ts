@@ -331,11 +331,110 @@ const DANISH_LETTERS = 'abcdefghijklmnopqrstuvwxyzæøå';
 const SWEDISH_LETTERS = 'abcdefghijklmnopqrstuvwxyzåäö';
 const ENGLISH_LETTERS = 'abcdefghijklmnopqrstuvwxyz';
 
+const DANISH_LETTER_NAMES: Record<string, string> = {
+  a: 'a',
+  b: 'be',
+  c: 'se',
+  d: 'de',
+  e: 'e',
+  f: 'æf',
+  g: 'ge',
+  h: 'hå',
+  i: 'i',
+  j: 'jåd',
+  k: 'kå',
+  l: 'æl',
+  m: 'æm',
+  n: 'æn',
+  o: 'o',
+  p: 'pe',
+  q: 'ku',
+  r: 'ær',
+  s: 'æs',
+  t: 'te',
+  u: 'u',
+  v: 've',
+  w: 'dobbelt-v',
+  x: 'eks',
+  y: 'y',
+  z: 'sæt',
+  æ: 'æ',
+  ø: 'ø',
+  å: 'å',
+};
+
+const SWEDISH_LETTER_NAMES: Record<string, string> = {
+  a: 'a',
+  b: 'be',
+  c: 'se',
+  d: 'de',
+  e: 'e',
+  f: 'eff',
+  g: 'ge',
+  h: 'hå',
+  i: 'i',
+  j: 'ji',
+  k: 'kå',
+  l: 'ell',
+  m: 'em',
+  n: 'en',
+  o: 'o',
+  p: 'pe',
+  q: 'ku',
+  r: 'ärr',
+  s: 'ess',
+  t: 'te',
+  u: 'u',
+  v: 've',
+  w: 'dubbel-v',
+  x: 'eks',
+  y: 'y',
+  z: 'säta',
+  å: 'å',
+  ä: 'ä',
+  ö: 'ö',
+};
+
+const ENGLISH_LETTER_NAMES: Record<string, string> = {
+  a: 'ay',
+  b: 'bee',
+  c: 'see',
+  d: 'dee',
+  e: 'ee',
+  f: 'ef',
+  g: 'gee',
+  h: 'aitch',
+  i: 'eye',
+  j: 'jay',
+  k: 'kay',
+  l: 'el',
+  m: 'em',
+  n: 'en',
+  o: 'oh',
+  p: 'pee',
+  q: 'cue',
+  r: 'ar',
+  s: 'ess',
+  t: 'tee',
+  u: 'you',
+  v: 'vee',
+  w: 'double you',
+  x: 'ex',
+  y: 'why',
+  z: 'zee',
+};
+
 function lettersFor(language: LearningLanguage, glyphs: string): LetterCard[] {
+  const names =
+    language === 'da'
+      ? DANISH_LETTER_NAMES
+      : language === 'sv'
+        ? SWEDISH_LETTER_NAMES
+        : ENGLISH_LETTER_NAMES;
   return [...glyphs].map((glyph) => ({
     id: `alphabet:${language}:${glyph}`,
     glyph,
-    spoken: glyph,
+    spoken: names[glyph] ?? glyph,
   }));
 }
 

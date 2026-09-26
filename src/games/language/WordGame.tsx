@@ -3,9 +3,9 @@
 import { useEffect, useRef, useState } from 'react';
 import type { GameProps } from '../types';
 import { gameCss, icons, languageContent, uiCopy } from './content';
-import { checkSpokenWord, playSpeech, recordUtterance } from './speech';
+import { checkSpokenWord, recordUtterance } from './speech';
 
-type Phase = 'say' | 'listening' | 'yes' | 'retry' | 'skip' | 'shown';
+type Phase = 'say' | 'listening' | 'yes' | 'retry';
 
 const WORD_MS = 2800;
 
@@ -31,17 +31,12 @@ export default function WordGame({ language, onResult }: GameProps) {
   const [seenLanguage, setSeenLanguage] = useState(language);
   const [phase, setPhase] = useState<Phase>('say');
   const mounted = useRef(true);
-  const revealed = useRef(false);
 
   if (seenLanguage !== language) {
     setSeenLanguage(language);
     setIndex(0);
     setPhase('say');
   }
-
-  useEffect(() => {
-    revealed.current = false;
-  }, [language]);
 
   useEffect(() => {
     mounted.current = true;
@@ -51,14 +46,10 @@ export default function WordGame({ language, onResult }: GameProps) {
   }, []);
 
   const card = words[index % words.length];
-  const pictureVisible = phase === 'yes' || phase === 'shown';
-
-  function hear() {
-    void playSpeech(card.word, language).catch(() => undefined);
-  }
+  const pictureVisible = phase === 'yes';
 
   async function sayWord() {
-    if (phase === 'listening' || phase === 'yes' || phase === 'shown' || phase === 'skip') return;
+    if (phase === 'listening' || phase === 'yes') return;
     setPhase('listening');
     try {
       const audio = await recordUtterance(WORD_MS);
@@ -73,33 +64,17 @@ export default function WordGame({ language, onResult }: GameProps) {
       onResult({ correct: false, promptId: card.id });
     } catch {
       if (!mounted.current) return;
-      setPhase('skip');
+      setPhase('retry');
     }
   }
 
-  function reveal() {
-    if (phase !== 'skip' || revealed.current) return;
-    revealed.current = true;
-    setPhase('shown');
-    onResult({ correct: false, promptId: card.id });
-  }
-
   function next() {
-    revealed.current = false;
     setPhase('say');
     setIndex((value) => value + 1);
   }
 
   const title =
-    phase === 'yes'
-      ? copy.great
-      : phase === 'retry'
-        ? copy.tryAgain
-        : phase === 'shown'
-          ? copy.hereItIs
-          : phase === 'listening'
-            ? copy.listening
-            : copy.sayTheWord;
+    phase === 'yes' ? copy.great : phase === 'retry' ? copy.tryAgain : phase === 'listening' ? copy.listening : copy.sayTheWord;
 
   return (
     <section className="pip-game" lang={language} aria-label={copy.wordTitle}>
@@ -114,33 +89,17 @@ export default function WordGame({ language, onResult }: GameProps) {
       <div className="pip-actions">
         <button
           type="button"
-          className="pip-action is-listen"
-          onClick={hear}
-          disabled={phase === 'listening'}
+          className={phase === 'listening' ? 'pip-action pip-listening' : 'pip-action'}
+          onClick={() => {
+            void sayWord();
+          }}
+          disabled={phase === 'listening' || phase === 'yes'}
         >
-          <Icon svg={icons.speaker} />
-          {copy.hearIt}
+          <Icon svg={icons.mic} />
+          {phase === 'listening' ? copy.listening : copy.sayTheWord}
         </button>
-        {phase === 'skip' ? (
-          <button type="button" className="pip-action" onClick={reveal}>
-            {copy.showPicture}
-          </button>
-        ) : (
-          <button
-            type="button"
-            className={phase === 'listening' ? 'pip-action pip-listening' : 'pip-action'}
-            onClick={() => {
-              void sayWord();
-            }}
-            disabled={phase === 'listening' || phase === 'yes' || phase === 'shown'}
-          >
-            <Icon svg={icons.mic} />
-            {phase === 'listening' ? copy.listening : copy.sayTheWord}
-          </button>
-        )}
       </div>
-      {phase === 'skip' ? <p className="pip-hint">{copy.canSeePicture}</p> : null}
-      {phase === 'yes' || phase === 'shown' || phase === 'retry' ? (
+      {phase === 'yes' || phase === 'retry' ? (
         <button type="button" className="pip-next" onClick={next}>
           {copy.next}
         </button>

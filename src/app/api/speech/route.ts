@@ -29,6 +29,7 @@ export async function POST(request: Request) {
     audioBase64?: string;
     expected?: string;
     language?: string;
+    letter?: boolean;
   } | null;
 
   const language = body?.language ?? "";
@@ -41,7 +42,9 @@ export async function POST(request: Request) {
 
   try {
     if (body?.action === "speak") {
-      const audio = await speak(body.text ?? "", language);
+      const audio = await speak(body.text ?? "", language, {
+        letter: body.letter === true,
+      });
       return new NextResponse(new Uint8Array(audio), {
         headers: {
           "Content-Type": "audio/mpeg",

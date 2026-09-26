@@ -40,7 +40,7 @@ describe('language game content', () => {
     expect(new Set(ids).size).toBe(ids.length);
     for (const letter of letters) {
       expect([...letter.glyph].length).toBe(1);
-      expect(letter.spoken).toBe(letter.glyph);
+      expect(letter.spoken.length).toBeGreaterThan(0);
     }
   });
 

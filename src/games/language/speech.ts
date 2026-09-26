@@ -53,10 +53,48 @@ function playAudioBlob(blob: Blob): Promise<void> {
   });
 }
 
-function speakWithSynthesis(text: string, language: LearningLanguage): Promise<void> {
+const LETTER_LOCALE: Record<LearningLanguage, string> = {
+  da: 'da-DK',
+  sv: 'sv-SE',
+  en: 'en',
+};
+
+function voiceMatchesLanguage(voiceLang: string, language: LearningLanguage): boolean {
+  const lang = voiceLang.toLowerCase();
+  if (language === 'da') return lang.startsWith('da');
+  if (language === 'sv') return lang.startsWith('sv');
+  return lang.startsWith('en');
+}
+
+function browserVoices(): Promise<SpeechSynthesisVoice[]> {
+  const synth = window.speechSynthesis;
+  const ready = synth.getVoices();
+  if (ready.length > 0) return Promise.resolve(ready);
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      synth.removeEventListener('voiceschanged', finish);
+      resolve(synth.getVoices());
+    };
+    synth.addEventListener('voiceschanged', finish);
+    window.setTimeout(finish, 250);
+  });
+}
+
+async function speakWithSynthesis(
+  text: string,
+  language: LearningLanguage,
+  letter: boolean,
+): Promise<void> {
+  const match = letter
+    ? (await browserVoices()).find((voice) => voiceMatchesLanguage(voice.lang, language))
+    : undefined;
   return new Promise((resolve, reject) => {
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = SPEECH_LOCALE[language];
+    utterance.lang = match?.lang ?? (letter ? LETTER_LOCALE[language] : SPEECH_LOCALE[language]);
+    if (match) utterance.voice = match;
     utterance.rate = 0.9;
     let settled = false;
     const finish = (action: () => void) => {
@@ -82,8 +120,13 @@ async function blobToBase64(blob: Blob): Promise<string> {
   return btoa(binary);
 }
 
-export async function playSpeech(text: string, language: LearningLanguage): Promise<void> {
+export async function playSpeech(
+  text: string,
+  language: LearningLanguage,
+  options?: { letter?: boolean },
+): Promise<void> {
   const token = ++playToken;
+  const letter = options?.letter === true;
   stopPlayback();
 
   try {
@@ -94,6 +137,7 @@ export async function playSpeech(text: string, language: LearningLanguage): Prom
         action: 'speak',
         text,
         language,
+        letter,
       }),
     });
     if (token !== playToken) return;
@@ -110,7 +154,7 @@ export async function playSpeech(text: string, language: LearningLanguage): Prom
     if (token !== playToken) return;
     if (hasSpeechSynthesis()) {
       try {
-        await speakWithSynthesis(text, language);
+        await speakWithSynthesis(text, language, letter);
         return;
       } catch {
         // The browser voice could not speak either.
