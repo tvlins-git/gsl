@@ -79,6 +79,8 @@ describe('buildActivityItems', () => {
       title: 'Sep 2026',
       subtitle: 'Alice is hosting',
       path: '/hosts',
+      authorId: 'user-1',
+      sourceId: 'h1',
     });
     expect(items[1]).toMatchObject({
       kind: 'poll',

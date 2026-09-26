@@ -3,6 +3,7 @@ import { StyleSheet } from 'react-native';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import FeedScreen from '@/app/(tabs)/index';
 import { deleteFeedPost } from '@/lib/feed-posts';
+import { deleteHostAssignment } from '@/lib/host-assignments';
 import { loadActivitySources } from '@/lib/activity-feed';
 
 jest.mock('expo-router', () => {
@@ -107,6 +108,14 @@ jest.mock('@/lib/feed-posts', () => {
   };
 });
 
+jest.mock('@/lib/host-assignments', () => {
+  const actual = jest.requireActual('@/lib/host-assignments');
+  return {
+    ...actual,
+    deleteHostAssignment: jest.fn().mockResolvedValue(undefined),
+  };
+});
+
 jest.mock('@/lib/local-store', () => ({
   isLocalMode: jest.fn(() => true),
   localStore: {},
@@ -171,6 +180,53 @@ describe('FeedScreen post delete', () => {
     expect(StyleSheet.flatten(detailPhoto.props.style).height).not.toBe(280);
     fireEvent.press(await screen.findByTestId('feed-post-delete'));
     await waitFor(() => expect(deleteFeedPost).toHaveBeenCalled());
+  });
+});
+
+describe('FeedScreen host delete', () => {
+  beforeEach(() => {
+    (deleteHostAssignment as jest.Mock).mockClear();
+    (loadActivitySources as jest.Mock).mockResolvedValue({
+      photoEvents: [],
+      polls: [],
+      threads: [],
+      hostAssignments: [
+        {
+          id: 'host-mine',
+          group_id: 'group-1',
+          year: 2027,
+          month: 12,
+          assigned_member_id: 'm1',
+          updated_by: 'user-1',
+          updated_at: '2026-09-26T12:00:00.000Z',
+        },
+        {
+          id: 'host-theirs',
+          group_id: 'group-1',
+          year: 2026,
+          month: 11,
+          assigned_member_id: 'm2',
+          updated_by: 'user-2',
+          updated_at: '2026-09-26T11:00:00.000Z',
+        },
+      ],
+      feedPosts: [],
+    });
+  });
+
+  it('lets the updater delete their host feed row and hides Delete on others', async () => {
+    render(<FeedScreen />);
+    expect(await screen.findByText('Dec 2027')).toBeTruthy();
+    expect(screen.getByTestId('delete-feed-item-host-host-mine')).toBeTruthy();
+    expect(screen.queryByTestId('delete-feed-item-host-host-theirs')).toBeNull();
+
+    fireEvent.press(screen.getByTestId('delete-feed-item-host-host-mine'));
+    await waitFor(() => expect(deleteHostAssignment).toHaveBeenCalled());
+    expect(deleteHostAssignment).toHaveBeenCalledWith({
+      assignmentId: 'host-mine',
+      updatedBy: 'user-1',
+      currentUserId: 'user-1',
+    });
   });
 });
 
