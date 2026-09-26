@@ -32,6 +32,7 @@ describe('syncLoginAccountsIntoGroup', () => {
     jest.clearAllMocks();
     (isLocalMode as jest.Mock).mockReturnValue(false);
     (isSupabaseConfigured as jest.Mock).mockReturnValue(true);
+    (getEffectivePassword as jest.Mock).mockResolvedValue('secret');
     (listAppUsers as jest.Mock).mockResolvedValue([
       {
         id: 'hr-lins',
@@ -60,6 +61,18 @@ describe('syncLoginAccountsIntoGroup', () => {
       body: {
         email: 'test@gsl.local',
         password: 'secret',
+        display_name: 'Test',
+      },
+    });
+  });
+
+  it('pads short passwords so Auth will create the member', async () => {
+    (getEffectivePassword as jest.Mock).mockResolvedValue('test');
+    await syncLoginAccountsIntoGroup('group-1');
+    expect(supabase.functions.invoke).toHaveBeenCalledWith('create-group-member', {
+      body: {
+        email: 'test@gsl.local',
+        password: 'testgs',
         display_name: 'Test',
       },
     });

@@ -16,6 +16,7 @@ import {
   setActiveLocalUser,
 } from './local-store';
 import { supabase } from './supabase';
+import { passwordForAuth } from './auth-password';
 import { getEffectivePassword, validateUserPassword } from './user-passwords';
 import type { Member } from './database.types';
 
@@ -49,7 +50,7 @@ export async function signOutUser() {
 /** Sign in with an app user; returns session or null (caller enables local mode). */
 export async function ensureHardcodedSession(user: AppUser) {
   const { email, displayName, role, id } = user;
-  const password = await getEffectivePassword(user);
+  const password = passwordForAuth(await getEffectivePassword(user));
   await setStoredUser(user);
 
   const { data: existing } = await supabase.auth.getSession();

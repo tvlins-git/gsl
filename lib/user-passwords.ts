@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { AppUser } from '@/constants/hardcoded-user';
+import { passwordForAuth } from './auth-password';
 import { isLocalMode } from './local-store';
 import { supabase } from './supabase';
 
@@ -61,7 +62,7 @@ export async function resetUserPassword(
   await writeOverrides(overrides);
 
   if (!isLocalMode()) {
-    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    const { error } = await supabase.auth.updateUser({ password: passwordForAuth(newPassword) });
     if (error) {
       return { ok: false, error: error.message };
     }

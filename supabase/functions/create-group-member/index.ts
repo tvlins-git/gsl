@@ -13,6 +13,12 @@ function alreadyRegistered(message: string | undefined) {
   return text.includes('already') && (text.includes('registered') || text.includes('exists'));
 }
 
+/** Keep in sync with lib/auth-password.ts — GoTrue rejects passwords shorter than 6. */
+function passwordForAuth(password: string) {
+  if (password.length >= 6) return password;
+  return `${password}gslgsl`.slice(0, 6);
+}
+
 serve(async (req) => {
   if (req.method !== 'POST') {
     return json({ error: 'Method not allowed' }, 405);
@@ -58,7 +64,7 @@ serve(async (req) => {
   let userId: string | null = null;
   const created = await admin.auth.admin.createUser({
     email,
-    password,
+    password: passwordForAuth(password),
     email_confirm: true,
     user_metadata: { display_name: displayName },
   });
