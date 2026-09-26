@@ -1,5 +1,5 @@
-import { useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -16,6 +16,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PollGrid } from '@/components/PollGrid';
 import { PollSlotEditor } from '@/components/PollSlotEditor';
+import { PollThreadSheet } from '@/components/PollThreadSheet';
 import { Screen } from '@/components/ui/Screen';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { formatRelativeTime } from '@/lib/time';
@@ -29,7 +30,14 @@ import {
 import { isLocalMode, localStore } from '@/lib/local-store';
 import { deletePoll, loadPollSummaries, partitionPolls } from '@/lib/poll-list';
 import { computeSlotScores, formatSlotTime } from '@/lib/polls';
-import type { Member, Poll, PollSlot } from '@/lib/database.types';
+import {
+  findPollThread,
+  membersWithNoPollResponse,
+  pollAnswerStatusLine,
+  senderHasAnsweredPoll,
+  startPollThread,
+} from '@/lib/poll-thread';
+import type { Member, Poll, PollSlot, Thread } from '@/lib/database.types';
 import { supabase } from '@/lib/supabase';
 import type { PollResponseValue } from '@/lib/polls';
 import { feedColumn, sharedStyles, theme } from '@/constants/theme';
@@ -37,7 +45,6 @@ import { feedColumn, sharedStyles, theme } from '@/constants/theme';
 export default function PlanScreen() {
   const { member } = useAuth();
   const { pollId } = useLocalSearchParams<{ pollId?: string }>();
-  const openedPollId = useRef<string | null>(null);
   const [polls, setPolls] = useState<Poll[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [selectedPoll, setSelectedPoll] = useState<Poll | null>(null);
@@ -52,6 +59,10 @@ export default function PlanScreen() {
   const [lockingSlotId, setLockingSlotId] = useState<string | null>(null);
   const [inviteMessage, setInviteMessage] = useState('');
   const [slotPickerActive, setSlotPickerActive] = useState(false);
+  const [linkedThread, setLinkedThread] = useState<Thread | null>(null);
+  const [showThreadComposer, setShowThreadComposer] = useState(false);
+  const [startingThread, setStartingThread] = useState(false);
+  const [threadNotice, setThreadNotice] = useState('');
   const { height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
 
@@ -70,9 +81,16 @@ export default function PlanScreen() {
   }, [member]);
 
   const loadPollDetail = useCallback(async (poll: Poll) => {
-    const s = isLocalMode()
-      ? await localStore.getPollSlots(poll.id)
-      : (await supabase.from('poll_slots').select('*').eq('poll_id', poll.id)).data ?? [];
+    const [s, linked] = await Promise.all([
+      isLocalMode()
+        ? localStore.getPollSlots(poll.id)
+        : supabase
+            .from('poll_slots')
+            .select('*')
+            .eq('poll_id', poll.id)
+            .then(({ data }) => data ?? []),
+      findPollThread(poll.id).catch(() => null),
+    ]);
     const slotIds = s.map((x) => x.id);
     let r: { slot_id: string; member_id: string; response: string }[] = [];
     if (slotIds.length > 0) {
@@ -93,6 +111,8 @@ export default function PlanScreen() {
       }))
     );
     setSelectedPoll(poll);
+    setThreadNotice('');
+    setLinkedThread(linked);
   }, []);
 
   useEffect(() => {
@@ -100,13 +120,10 @@ export default function PlanScreen() {
   }, [loadPolls]);
 
   useEffect(() => {
-    if (!pollId || openedPollId.current === pollId || polls.length === 0) return;
+    if (!pollId || polls.length === 0 || selectedPoll?.id === pollId) return;
     const match = polls.find((poll) => poll.id === pollId);
-    if (match) {
-      openedPollId.current = pollId;
-      void loadPollDetail(match);
-    }
-  }, [pollId, polls, loadPollDetail]);
+    if (match) void loadPollDetail(match);
+  }, [pollId, polls, loadPollDetail, selectedPoll?.id]);
 
   const handleVote = async (slotId: string, response: PollResponseValue) => {
     if (!member) return;
@@ -122,12 +139,57 @@ export default function PlanScreen() {
     if (!selectedPoll) await loadPolls();
   };
 
-  const handleDeletePoll = async (pollId: string) => {
-    await deletePoll(pollId);
-    if (selectedPoll?.id === pollId) {
-      setSelectedPoll(null);
+  const closePollDetail = () => {
+    setSelectedPoll(null);
+    setLinkedThread(null);
+    setShowThreadComposer(false);
+    setThreadNotice('');
+    if (pollId) router.setParams({ pollId: '' });
+  };
+
+  const handleDeletePoll = async (pollIdToDelete: string) => {
+    await deletePoll(pollIdToDelete);
+    if (selectedPoll?.id === pollIdToDelete) {
+      closePollDetail();
     }
     await loadPolls();
+  };
+
+  const unansweredMembers = membersWithNoPollResponse(
+    members,
+    responses,
+    member ? [member.id] : []
+  );
+  const answerStatusLine = pollAnswerStatusLine({
+    memberCount: members.length,
+    unansweredNames: unansweredMembers.map((person) => person.display_name),
+    senderHasAnswered: member ? senderHasAnsweredPoll(member.id, responses) : true,
+  });
+
+  const handleStartThread = async (draft: { message: string; pushUnanswered: boolean }) => {
+    if (!member || !selectedPoll) return;
+    setStartingThread(true);
+    try {
+      const result = await startPollThread({
+        groupId: member.group_id,
+        pollId: selectedPoll.id,
+        pollTitle: selectedPoll.title,
+        senderUserId: member.user_id,
+        senderName: member.display_name,
+        members,
+        unanswered: unansweredMembers,
+        message: draft.message,
+        pushUnanswered: draft.pushUnanswered,
+      });
+      setLinkedThread(result.thread);
+      setThreadNotice(result.notice);
+      setShowThreadComposer(false);
+      router.push(`/thread/${result.thread.id}`);
+    } catch {
+      setThreadNotice('Could not start the thread. Try again.');
+    } finally {
+      setStartingThread(false);
+    }
   };
 
   const handleCreatePoll = async () => {
@@ -301,8 +363,9 @@ export default function PlanScreen() {
 
   if (selectedPoll) {
     return (
+      <View style={sharedStyles.screen}>
       <ScrollView style={sharedStyles.screen} contentContainerStyle={styles.detailContent}>
-        <Pressable onPress={() => setSelectedPoll(null)} style={styles.backBtn}>
+        <Pressable onPress={closePollDetail} style={styles.backBtn}>
           <Text style={styles.back}>← Back to polls</Text>
         </Pressable>
         <View style={styles.detailHeader}>
@@ -376,7 +439,46 @@ export default function PlanScreen() {
             );
           })}
         </View>
+        <View style={[styles.threadCard, sharedStyles.card]}>
+          <Text style={styles.resultsTitle}>Group chat</Text>
+          <Text style={styles.threadStatus}>{answerStatusLine}</Text>
+          <Text style={styles.threadHint}>
+            Includes everyone. The thread links back to this poll and shows up in Chat.
+          </Text>
+          {threadNotice ? <Text style={styles.threadNotice}>{threadNotice}</Text> : null}
+          <Pressable
+            style={sharedStyles.primaryBtn}
+            onPress={() => setShowThreadComposer(true)}
+            testID="start-poll-thread"
+          >
+            <Text style={sharedStyles.primaryBtnText}>
+              {linkedThread ? 'Message the thread' : 'Message the group'}
+            </Text>
+          </Pressable>
+          {linkedThread ? (
+            <Pressable
+              style={sharedStyles.secondaryBtn}
+              onPress={() => router.push(`/thread/${linkedThread.id}`)}
+              testID="open-poll-thread"
+            >
+              <Text style={sharedStyles.secondaryBtnText}>Open chat</Text>
+            </Pressable>
+          ) : null}
+        </View>
       </ScrollView>
+      <PollThreadSheet
+        visible={showThreadComposer}
+        pollTitle={selectedPoll.title}
+        unansweredNames={unansweredMembers.map((person) => person.display_name)}
+        statusLine={answerStatusLine}
+        existingThread={!!linkedThread}
+        submitting={startingThread}
+        onClose={() => setShowThreadComposer(false)}
+        onSubmit={(draft) => {
+          void handleStartThread(draft);
+        }}
+      />
+      </View>
     );
   }
 
@@ -588,6 +690,15 @@ const styles = StyleSheet.create({
   },
   gridCard: { marginHorizontal: theme.spacing.lg, marginBottom: theme.spacing.md, overflow: 'hidden' },
   results: { marginHorizontal: theme.spacing.lg, padding: theme.spacing.lg },
+  threadCard: {
+    marginHorizontal: theme.spacing.lg,
+    marginTop: theme.spacing.md,
+    padding: theme.spacing.lg,
+    gap: theme.spacing.sm,
+  },
+  threadStatus: { fontSize: 14, fontWeight: '600', color: theme.colors.text },
+  threadHint: { fontSize: 13, lineHeight: 18, color: theme.colors.textSecondary },
+  threadNotice: { fontSize: 13, lineHeight: 18, color: theme.colors.text },
   resultsTitle: { fontWeight: '700', fontSize: 15, color: theme.colors.text, marginBottom: theme.spacing.md },
   resultRow: {
     paddingVertical: theme.spacing.sm,

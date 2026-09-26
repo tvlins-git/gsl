@@ -118,6 +118,10 @@ async function writeData(data: LocalData) {
   await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 }
 
+function normalizeThread(thread: Thread): Thread {
+  return { ...thread, poll_id: thread.poll_id ?? null };
+}
+
 function uuid() {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
     const r = (Math.random() * 16) | 0;
@@ -246,6 +250,9 @@ export const localStore = {
     const slotIds = data.poll_slots.filter((s) => s.poll_id === pollId).map((s) => s.id);
     data.polls = data.polls.filter((p) => p.id !== pollId);
     data.poll_slots = data.poll_slots.filter((s) => s.poll_id !== pollId);
+    for (const thread of data.threads) {
+      if (thread.poll_id === pollId) thread.poll_id = null;
+    }
     data.poll_responses = data.poll_responses.filter((r) => !slotIds.includes(r.slot_id));
     await writeData(data);
   },
@@ -277,16 +284,39 @@ export const localStore = {
 
   async getThreads(groupId: string) {
     const data = await readData();
-    return data.threads.filter((t) => t.group_id === groupId).sort((a, b) => b.created_at.localeCompare(a.created_at));
+    return data.threads
+      .filter((t) => t.group_id === groupId)
+      .map(normalizeThread)
+      .sort((a, b) => b.created_at.localeCompare(a.created_at));
   },
 
-  async createThread(groupId: string, name: string, userId: string) {
+  async getThread(threadId: string) {
+    const data = await readData();
+    const thread = data.threads.find((t) => t.id === threadId);
+    return thread ? normalizeThread(thread) : null;
+  },
+
+  async findThreadByPoll(pollId: string) {
+    const data = await readData();
+    const match = data.threads
+      .filter((t) => t.poll_id === pollId)
+      .sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
+    return match ? normalizeThread(match) : null;
+  },
+
+  async getPoll(pollId: string) {
+    const data = await readData();
+    return data.polls.find((p) => p.id === pollId) ?? null;
+  },
+
+  async createThread(groupId: string, name: string, userId: string, pollId: string | null = null) {
     const data = await readData();
     const thread: Thread = {
       id: uuid(),
       group_id: groupId,
       name,
       created_by: userId,
+      poll_id: pollId,
       created_at: new Date().toISOString(),
     };
     data.threads.push(thread);

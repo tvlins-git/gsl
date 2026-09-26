@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { AvatarStack } from '@/components/AvatarStack';
+import { PollThreadLink } from '@/components/PollThreadLink';
 import { UserAvatar } from '@/components/UserAvatar';
 import { Screen } from '@/components/ui/Screen';
 import { useAuth } from '@/contexts/AuthContext';
@@ -17,6 +18,7 @@ import { getGroupMembers } from '@/lib/auth';
 import type { Member, Thread } from '@/lib/database.types';
 import { formatRelativeTime } from '@/lib/time';
 import { isLocalMode, localStore } from '@/lib/local-store';
+import { loadPollTitles } from '@/lib/poll-thread';
 import { deleteThread } from '@/lib/thread-list';
 import { supabase } from '@/lib/supabase';
 import { feedColumn, sharedStyles, theme } from '@/constants/theme';
@@ -31,6 +33,7 @@ export default function ChatScreen() {
   const [lastMessages, setLastMessages] = useState<
     Record<string, { body: string; created_at: string; sender_id: string }>
   >({});
+  const [pollTitles, setPollTitles] = useState<Record<string, string>>({});
 
   const loadThreads = useCallback(async () => {
     if (!member) return;
@@ -38,6 +41,10 @@ export default function ChatScreen() {
       ? await localStore.getThreads(member.group_id)
       : (await supabase.from('threads').select('*').eq('group_id', member.group_id).order('created_at', { ascending: false })).data ?? [];
     setThreads(data);
+    const titlesPromise = loadPollTitles(
+      data.map((thread) => thread.poll_id).filter((pollId): pollId is string => !!pollId),
+      member.group_id
+    );
     setMembers(await getGroupMembers(member.group_id));
 
     const msgs: Record<string, { body: string; created_at: string; sender_id: string }> = {};
@@ -49,6 +56,7 @@ export default function ChatScreen() {
       if (m) msgs[t.id] = { body: m.body, created_at: m.created_at, sender_id: m.sender_id };
     }
     setLastMessages(msgs);
+    setPollTitles(await titlesPromise);
     setLoading(false);
   }, [member]);
 
@@ -115,30 +123,42 @@ export default function ChatScreen() {
           const sender = last ? nameForUser(last.sender_id) : nameForUser(item.created_by);
           return (
             <View style={styles.threadRow}>
-              <Pressable
-                style={styles.threadCardMain}
-                onPress={() => router.push(`/thread/${item.id}`)}
-                testID={`thread-${item.id}`}
-              >
-                {members.length > 1 ? (
-                  <AvatarStack names={members.map((m) => m.display_name)} size={48} />
-                ) : (
-                  <UserAvatar name={item.name} size={52} />
-                )}
-                <View style={styles.threadText}>
-                  <View style={styles.threadTop}>
-                    <Text style={styles.threadName} numberOfLines={1}>
-                      {item.name}
+              <View style={styles.threadCardMain}>
+                <Pressable
+                  style={styles.threadOpen}
+                  onPress={() => router.push(`/thread/${item.id}`)}
+                  testID={`thread-${item.id}`}
+                >
+                  {members.length > 1 ? (
+                    <AvatarStack names={members.map((m) => m.display_name)} size={48} />
+                  ) : (
+                    <UserAvatar name={item.name} size={52} />
+                  )}
+                  <View style={styles.threadText}>
+                    <View style={styles.threadTop}>
+                      <Text style={styles.threadName} numberOfLines={1}>
+                        {item.name}
+                      </Text>
+                      {last ? (
+                        <Text style={styles.threadTime}>{formatRelativeTime(last.created_at)}</Text>
+                      ) : null}
+                    </View>
+                    <Text style={styles.preview} numberOfLines={1}>
+                      {last ? `${sender}: ${last.body}` : 'No messages yet'}
                     </Text>
-                    {last ? (
-                      <Text style={styles.threadTime}>{formatRelativeTime(last.created_at)}</Text>
-                    ) : null}
                   </View>
-                  <Text style={styles.preview} numberOfLines={1}>
-                    {last ? `${sender}: ${last.body}` : 'No messages yet'}
-                  </Text>
-                </View>
-              </Pressable>
+                </Pressable>
+                {item.poll_id ? (
+                  <View style={styles.pollLinkRow}>
+                    <PollThreadLink
+                      variant="inline"
+                      title={pollTitles[item.poll_id] ?? 'Open poll'}
+                      onPress={() => router.push(`/plan?pollId=${item.poll_id}`)}
+                      testID={`thread-poll-link-${item.id}`}
+                    />
+                  </View>
+                ) : null}
+              </View>
               <Pressable
                 style={styles.deleteBtn}
                 onPress={() => handleDeleteThread(item.id)}
@@ -226,11 +246,17 @@ const styles = StyleSheet.create({
   },
   threadCardMain: {
     flex: 1,
+    paddingVertical: theme.spacing.md,
+    paddingRight: theme.spacing.sm,
+    gap: theme.spacing.xs,
+  },
+  threadOpen: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: theme.spacing.md,
-    paddingVertical: theme.spacing.md,
-    paddingRight: theme.spacing.sm,
+  },
+  pollLinkRow: {
+    paddingLeft: 64,
   },
   threadText: {
     flex: 1,

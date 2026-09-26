@@ -2,6 +2,9 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import ThreadScreen from '@/app/thread/[id]';
 import { supabase } from '@/lib/supabase';
+import { router } from 'expo-router';
+import { getPollLinkTarget } from '@/lib/poll-thread';
+import { getThread } from '@/lib/thread-list';
 import { listThreadMessages, sendThreadMessage } from '@/lib/thread-messages';
 import { buildMessage } from '../factories';
 
@@ -23,6 +26,15 @@ const saved = buildMessage({
 
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => ({ id: 'thread-1' }),
+  router: { push: jest.fn() },
+}));
+
+jest.mock('@/lib/thread-list', () => ({
+  getThread: jest.fn(async () => null),
+}));
+
+jest.mock('@/lib/poll-thread', () => ({
+  getPollLinkTarget: jest.fn(async () => null),
 }));
 
 jest.mock('@/contexts/AuthContext', () => {
@@ -83,7 +95,10 @@ describe('ThreadScreen send', () => {
   beforeEach(() => {
     (listThreadMessages as jest.Mock).mockResolvedValue([existing]);
     (sendThreadMessage as jest.Mock).mockResolvedValue(saved);
+    (getThread as jest.Mock).mockResolvedValue(null);
+    (getPollLinkTarget as jest.Mock).mockResolvedValue(null);
     (supabase.functions.invoke as jest.Mock).mockResolvedValue({ data: null, error: null });
+    (router.push as jest.Mock).mockClear();
   });
 
   it('shows a sent message in the open thread without waiting for realtime', async () => {
@@ -97,5 +112,19 @@ describe('ThreadScreen send', () => {
     expect(await screen.findByText('Just sent this')).toBeTruthy();
     expect(screen.getByText('Already in the thread')).toBeTruthy();
     expect(sendThreadMessage).toHaveBeenCalledWith('thread-1', 'user-1', 'Just sent this');
+  });
+
+  it('shows a link back to the poll', async () => {
+    (getThread as jest.Mock).mockResolvedValue({
+      id: 'thread-1',
+      poll_id: 'poll-1',
+    });
+    (getPollLinkTarget as jest.Mock).mockResolvedValue({ id: 'poll-1', title: 'Test' });
+
+    render(<ThreadScreen />);
+
+    expect(await screen.findByText('Test')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('poll-thread-link'));
+    expect(router.push).toHaveBeenCalledWith('/plan?pollId=poll-1');
   });
 });

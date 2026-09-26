@@ -106,8 +106,11 @@ CREATE TABLE threads (
   group_id UUID NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   created_by UUID NOT NULL REFERENCES auth.users(id),
+  poll_id UUID REFERENCES polls(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+CREATE INDEX threads_poll_id_idx ON threads (poll_id);
 
 CREATE TABLE thread_members (
   thread_id UUID NOT NULL REFERENCES threads(id) ON DELETE CASCADE,

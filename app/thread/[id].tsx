@@ -1,4 +1,4 @@
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   FlatList,
@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { MessageBubble } from '@/components/MessageBubble';
+import { PollThreadLink } from '@/components/PollThreadLink';
 import { Screen } from '@/components/ui/Screen';
 import { useAuth } from '@/contexts/AuthContext';
 import { getGroupMembers } from '@/lib/auth';
@@ -20,6 +21,8 @@ import {
   mergeMessages,
   sortMessagesChronologically,
 } from '@/lib/messages';
+import { getPollLinkTarget } from '@/lib/poll-thread';
+import { getThread } from '@/lib/thread-list';
 import { listThreadMessages, sendThreadMessage } from '@/lib/thread-messages';
 import { isLocalMode } from '@/lib/local-store';
 import { supabase } from '@/lib/supabase';
@@ -32,6 +35,7 @@ export default function ThreadScreen() {
   const [members, setMembers] = useState<Member[]>([]);
   const [body, setBody] = useState('');
   const [loading, setLoading] = useState(true);
+  const [pollLink, setPollLink] = useState<{ id: string; title: string } | null>(null);
   const listRef = useRef<FlatList>(null);
 
   const memberMap = Object.fromEntries(members.map((m) => [m.user_id, m.display_name]));
@@ -39,10 +43,19 @@ export default function ThreadScreen() {
   const loadMessages = useCallback(async () => {
     if (!id || !member) return;
     try {
-      const m = await getGroupMembers(member.group_id);
-      const msgs = await listThreadMessages(id);
+      const [m, msgs, thread] = await Promise.all([
+        getGroupMembers(member.group_id),
+        listThreadMessages(id),
+        getThread(id),
+      ]);
       setMessages(sortMessagesChronologically(msgs));
       setMembers(m);
+      if (thread?.poll_id) {
+        const poll = await getPollLinkTarget(thread.poll_id);
+        setPollLink(poll ?? { id: thread.poll_id, title: 'Poll' });
+      } else {
+        setPollLink(null);
+      }
     } finally {
       setLoading(false);
     }
@@ -113,6 +126,12 @@ export default function ThreadScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={90}
     >
+      {pollLink ? (
+        <PollThreadLink
+          title={pollLink.title}
+          onPress={() => router.push(`/plan?pollId=${pollLink.id}`)}
+        />
+      ) : null}
       <FlatList
         ref={listRef}
         data={messages}

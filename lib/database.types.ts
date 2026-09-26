@@ -61,9 +61,9 @@ export interface Database {
         { id?: string; event_id?: string; uploaded_by?: string; storage_path?: string; thumb_path?: string | null; ai_score?: number | null; width?: number | null; height?: number | null; created_at?: string }
       >;
       threads: TableDef<
-        { id: string; group_id: string; name: string; created_by: string; created_at: string },
-        { id?: string; group_id: string; name: string; created_by: string; created_at?: string },
-        { id?: string; group_id?: string; name?: string; created_by?: string; created_at?: string }
+        { id: string; group_id: string; name: string; created_by: string; poll_id: string | null; created_at: string },
+        { id?: string; group_id: string; name: string; created_by: string; poll_id?: string | null; created_at?: string },
+        { id?: string; group_id?: string; name?: string; created_by?: string; poll_id?: string | null; created_at?: string }
       >;
       thread_members: TableDef<
         { thread_id: string; member_id: string },

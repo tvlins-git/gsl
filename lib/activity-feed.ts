@@ -155,7 +155,7 @@ export function buildActivityItems(input: {
       id: `thread-${thread.id}`,
       kind: 'thread',
       title: thread.name,
-      subtitle: 'New chat',
+      subtitle: thread.poll_id ? 'Linked to a poll' : 'New chat',
       timestamp: thread.created_at,
       path: `/thread/${thread.id}`,
       authorName: nameForUser(members, thread.created_by),

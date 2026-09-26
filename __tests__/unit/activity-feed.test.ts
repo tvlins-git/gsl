@@ -43,6 +43,7 @@ function buildThread(overrides: Partial<Thread> = {}): Thread {
     group_id: 'group-1',
     name: 'Weekend plans',
     created_by: 'user-1',
+    poll_id: null,
     created_at: '2026-09-02T10:00:00.000Z',
     ...overrides,
   };
@@ -89,6 +90,7 @@ describe('buildActivityItems', () => {
     expect(items[2]).toMatchObject({
       kind: 'thread',
       title: 'Weekend plans',
+      subtitle: 'New chat',
       path: '/thread/thread-1',
     });
     expect(items[3]).toMatchObject({
@@ -98,6 +100,22 @@ describe('buildActivityItems', () => {
       path: '/photos?eventId=event-1&from=feed',
       authorName: 'Hr. Lins',
       thumbUris: [],
+    });
+  });
+
+  it('marks a poll-linked thread in the feed', () => {
+    const items = buildActivityItems({
+      members,
+      photoEvents: [],
+      polls: [],
+      threads: [buildThread({ poll_id: 'p1', name: 'Dinner' })],
+    });
+
+    expect(items[0]).toMatchObject({
+      kind: 'thread',
+      title: 'Dinner',
+      subtitle: 'Linked to a poll',
+      path: '/thread/thread-1',
     });
   });
 
