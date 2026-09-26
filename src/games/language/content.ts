@@ -43,6 +43,9 @@ export type UiCopy = {
   readAloud: string;
   iReadIt: string;
   niceReading: string;
+  easy: string;
+  medium: string;
+  hard: string;
 };
 
 function picture(body: string): string {
@@ -124,6 +127,66 @@ const pictures = {
     <path d="M132 40 H80 V128 H132 Q118 116 132 40 Z" fill="#F78C6B"/>
     <path d="M80 40 V128" stroke="#243047" stroke-width="3"/>
     <path d="M40 58 H70 M40 72 H66 M92 58 H120 M94 72 H120" stroke="#ffffff" stroke-width="4" stroke-linecap="round"/>
+  `),
+  banana: picture(`
+    <path d="M48 36 C70 20 118 28 128 70 C136 108 96 140 58 132 C40 128 36 112 48 108 C62 102 78 112 86 96 C96 76 78 52 48 36 Z" fill="#FFE66D"/>
+    <path d="M56 44 C74 36 104 42 112 68" fill="none" stroke="#F4D35E" stroke-width="6" stroke-linecap="round"/>
+    <path d="M46 40 C40 28 52 22 58 30" fill="none" stroke="#7BD389" stroke-width="6" stroke-linecap="round"/>
+  `),
+  radio: picture(`
+    <rect x="28" y="48" width="104" height="72" rx="16" fill="#EF476F"/>
+    <circle cx="58" cy="84" r="18" fill="#F8F4EC"/>
+    <circle cx="58" cy="84" r="8" fill="#243047"/>
+    <rect x="86" y="66" width="32" height="10" rx="5" fill="#FFE66D"/>
+    <rect x="86" y="84" width="24" height="8" rx="4" fill="#F8F4EC"/>
+    <path d="M108 48 L124 28" stroke="#243047" stroke-width="6" stroke-linecap="round"/>
+    <circle cx="126" cy="26" r="5" fill="#243047"/>
+  `),
+  piano: picture(`
+    <rect x="24" y="58" width="112" height="64" rx="10" fill="#243047"/>
+    <rect x="32" y="66" width="96" height="48" fill="#F8F4EC"/>
+    <path d="M48 66 V92 M64 66 V92 M80 66 V92 M96 66 V92 M112 66 V92" stroke="#243047" stroke-width="8"/>
+  `),
+  elephant: picture(`
+    <ellipse cx="78" cy="96" rx="40" ry="28" fill="#9AA5B1"/>
+    <circle cx="96" cy="70" r="28" fill="#B0B8C1"/>
+    <ellipse cx="70" cy="78" rx="16" ry="22" fill="#D5DCE3"/>
+    <path d="M112 84 C132 96 128 128 108 124" fill="none" stroke="#9AA5B1" stroke-width="12" stroke-linecap="round"/>
+    <circle cx="104" cy="64" r="4" fill="#243047"/>
+    <path d="M86 46 L80 24 L104 48 Z" fill="#9AA5B1"/>
+  `),
+  camera: picture(`
+    <rect x="28" y="52" width="104" height="70" rx="16" fill="#3D5A80"/>
+    <rect x="58" y="40" width="36" height="18" rx="6" fill="#3D5A80"/>
+    <circle cx="80" cy="88" r="22" fill="#E7F6FF"/>
+    <circle cx="80" cy="88" r="12" fill="#243047"/>
+    <circle cx="114" cy="68" r="6" fill="#FF7A59"/>
+  `),
+  helicopter: picture(`
+    <ellipse cx="78" cy="96" rx="36" ry="22" fill="#4CC9F0"/>
+    <circle cx="108" cy="84" r="16" fill="#D7F3FF"/>
+    <circle cx="112" cy="82" r="4" fill="#243047"/>
+    <path d="M78 74 V48" stroke="#243047" stroke-width="6"/>
+    <path d="M36 48 H124" stroke="#243047" stroke-width="6" stroke-linecap="round"/>
+    <path d="M46 96 H24 L36 108" fill="none" stroke="#4895EF" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M62 118 H96" stroke="#243047" stroke-width="6" stroke-linecap="round"/>
+  `),
+  alligator: picture(`
+    <ellipse cx="86" cy="96" rx="48" ry="22" fill="#7BD389"/>
+    <path d="M40 96 L18 84 L40 108 Z" fill="#5EBE74"/>
+    <path d="M128 90 H150 L136 102 Z" fill="#5EBE74"/>
+    <path d="M70 96 H120" stroke="#243047" stroke-width="3"/>
+    <path d="M74 92 L80 86 M86 92 L92 86 M98 92 L104 86" stroke="#F8F4EC" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="132" cy="86" r="4" fill="#243047"/>
+    <path d="M60 112 H70 M80 116 H90 M100 112 H110" stroke="#5EBE74" stroke-width="4" stroke-linecap="round"/>
+  `),
+  parrot: picture(`
+    <ellipse cx="78" cy="96" rx="28" ry="34" fill="#EF476F"/>
+    <circle cx="96" cy="62" r="20" fill="#FF7A59"/>
+    <path d="M108 64 L132 58 L112 76 Z" fill="#FFE66D"/>
+    <circle cx="102" cy="58" r="4" fill="#243047"/>
+    <path d="M58 70 C40 50 48 36 70 48" fill="none" stroke="#3D8BFD" stroke-width="8" stroke-linecap="round"/>
+    <path d="M70 124 L62 140 M86 126 L94 142" stroke="#F4A261" stroke-width="6" stroke-linecap="round"/>
   `),
 };
 
@@ -246,7 +309,28 @@ export const gameCss = `
   gap: 16px;
   width: 100%;
 }
-.pip-letter, .pip-action, .pip-next {
+.pip-levels {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+}
+.pip-level {
+  min-height: 64px;
+  padding: 10px 22px;
+  border-radius: 999px;
+  background: #ffffff;
+  font-size: 24px;
+  box-shadow: 0 6px 0 #d7ecff;
+}
+.pip-level.is-on {
+  background: #3d8bfd;
+  color: #ffffff;
+  box-shadow: 0 6px 0 #2468d4;
+}
+.pip-level:active { transform: translateY(3px); }
+.pip-letter, .pip-action, .pip-next, .pip-level {
   border: 0;
   cursor: pointer;
   font: inherit;
@@ -470,6 +554,14 @@ const wordRows: readonly (readonly [string, string, string, string])[] = [
   ['træ', 'träd', 'tree', pictures.tree],
   ['bi', 'bi', 'bee', pictures.bee],
   ['bog', 'bok', 'book', pictures.book],
+  ['radio', 'radio', 'radio', pictures.radio],
+  ['piano', 'piano', 'piano', pictures.piano],
+  ['elefant', 'elefant', 'elephant', pictures.elephant],
+  ['kamera', 'kamera', 'camera', pictures.camera],
+  ['ananas', 'ananas', 'banana', pictures.banana],
+  ['helikopter', 'helikopter', 'helicopter', pictures.helicopter],
+  ['alligator', 'alligator', 'alligator', pictures.alligator],
+  ['papegøje', 'papegoja', 'parakeet', pictures.parrot],
 ];
 
 function wordsFor(language: LearningLanguage): WordCard[] {
@@ -497,6 +589,9 @@ export const uiCopy: Record<LearningLanguage, UiCopy> = {
     readAloud: 'Læs op',
     iReadIt: 'Jeg læste',
     niceReading: 'Så fint læst!',
+    easy: 'Let',
+    medium: 'Mellem',
+    hard: 'Svær',
   },
   sv: {
     alphabetTitle: 'Bokstäver',
@@ -517,6 +612,9 @@ export const uiCopy: Record<LearningLanguage, UiCopy> = {
     readAloud: 'Läs högt',
     iReadIt: 'Jag läste',
     niceReading: 'Så fint läst!',
+    easy: 'Lätt',
+    medium: 'Medel',
+    hard: 'Svår',
   },
   en: {
     alphabetTitle: 'Letters',
@@ -537,6 +635,9 @@ export const uiCopy: Record<LearningLanguage, UiCopy> = {
     readAloud: 'Read aloud',
     iReadIt: 'I read it',
     niceReading: 'Nice reading!',
+    easy: 'Easy',
+    medium: 'Medium',
+    hard: 'Hard',
   },
 };
 

@@ -4,8 +4,11 @@ import { useEffect, useRef, useState } from 'react';
 import type { GameProps } from '../types';
 import { gameCss, icons, languageContent, uiCopy } from './content';
 import { checkSpokenWord, recordUtterance } from './speech';
+import { wordsForLevel, type WordLevel } from './vowels';
 
 type Phase = 'say' | 'listening' | 'yes' | 'retry';
+
+const LEVELS: readonly WordLevel[] = ['easy', 'medium', 'hard'];
 
 const WORD_MS = 2800;
 
@@ -26,7 +29,8 @@ function Picture({ svg, label }: { svg: string; label: string }) {
 
 export default function WordGame({ language, onResult }: GameProps) {
   const copy = uiCopy[language];
-  const words = languageContent[language].words;
+  const [level, setLevel] = useState<WordLevel>('easy');
+  const words = wordsForLevel(languageContent[language].words, language, level);
   const [index, setIndex] = useState(0);
   const [seenLanguage, setSeenLanguage] = useState(language);
   const [phase, setPhase] = useState<Phase>('say');
@@ -38,6 +42,13 @@ export default function WordGame({ language, onResult }: GameProps) {
     setPhase('say');
   }
 
+  function chooseLevel(next: WordLevel) {
+    if (next === level) return;
+    setLevel(next);
+    setIndex(0);
+    setPhase('say');
+  }
+
   useEffect(() => {
     mounted.current = true;
     return () => {
@@ -45,11 +56,11 @@ export default function WordGame({ language, onResult }: GameProps) {
     };
   }, []);
 
-  const card = words[index % words.length];
+  const card = words.length > 0 ? words[index % words.length] : null;
   const pictureVisible = phase === 'yes';
 
   async function sayWord() {
-    if (phase === 'listening' || phase === 'yes') return;
+    if (!card || phase === 'listening' || phase === 'yes') return;
     setPhase('listening');
     try {
       const audio = await recordUtterance(WORD_MS);
@@ -80,11 +91,28 @@ export default function WordGame({ language, onResult }: GameProps) {
     <section className="pip-game" lang={language} aria-label={copy.wordTitle}>
       <style>{gameCss}</style>
       <p className="pip-kicker">{copy.wordTitle}</p>
+      <div className="pip-levels" role="group" aria-label={copy.wordTitle}>
+        {LEVELS.map((item) => (
+          <button
+            key={item}
+            type="button"
+            className={item === level ? 'pip-level is-on' : 'pip-level'}
+            aria-pressed={item === level}
+            onClick={() => chooseLevel(item)}
+          >
+            {copy[item]}
+          </button>
+        ))}
+      </div>
       {phase === 'yes' ? <p className="pip-stars" aria-hidden="true">★ ★ ★</p> : null}
       <h1 className="pip-title">{title}</h1>
-      <p className="pip-word">{card.word}</p>
+      {card ? <p className="pip-word">{card.word}</p> : null}
       <div className="pip-stage">
-        {pictureVisible ? <Picture svg={card.picture} label={card.word} /> : <p className="pip-mystery">?</p>}
+        {card && pictureVisible ? (
+          <Picture svg={card.picture} label={card.word} />
+        ) : (
+          <p className="pip-mystery">?</p>
+        )}
       </div>
       <div className="pip-actions">
         <button
@@ -93,7 +121,7 @@ export default function WordGame({ language, onResult }: GameProps) {
           onClick={() => {
             void sayWord();
           }}
-          disabled={phase === 'listening' || phase === 'yes'}
+          disabled={!card || phase === 'listening' || phase === 'yes'}
         >
           <Icon svg={icons.mic} />
           {phase === 'listening' ? copy.listening : copy.sayTheWord}

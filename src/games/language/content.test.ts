@@ -4,7 +4,7 @@ import { languageContent, type StoryCard } from './content';
 import type { LearningLanguage } from '../types';
 
 const languages: LearningLanguage[] = ['da', 'sv', 'en'];
-const SHORT_WORD_MAX = 4;
+const WORD_MAX = 12;
 
 function glyphs(language: LearningLanguage): string[] {
   return languageContent[language].letters.map((letter) => letter.glyph);
@@ -50,7 +50,7 @@ describe('language game content', () => {
     for (const card of words) {
       expect(card.word).toMatch(/^\S+$/);
       expect([...card.word].length).toBeGreaterThan(0);
-      expect([...card.word].length).toBeLessThanOrEqual(SHORT_WORD_MAX);
+      expect([...card.word].length).toBeLessThanOrEqual(WORD_MAX);
       expect(card.word).not.toMatch(/[.!?,]/);
       expectInlineSvg(card.picture);
     }
