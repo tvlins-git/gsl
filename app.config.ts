@@ -13,7 +13,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   orientation: 'portrait',
   icon: './assets/images/icon.png',
   scheme: APP_SLUG,
-  userInterfaceStyle: 'automatic',
+  // The UI is a light theme. Automatic dark mode paints native controls and
+  // the selected tab white on those light surfaces.
+  userInterfaceStyle: 'light',
   ios: {
     supportsTablet: true,
     bundleIdentifier: APPLICATION_ID,
