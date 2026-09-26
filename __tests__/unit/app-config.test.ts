@@ -16,4 +16,8 @@ describe('native application ids', () => {
     expect(config.slug).toBe('gsl');
     expect(config.scheme).toBe('gsl');
   });
+
+  it('pans the Android window so the keyboard does not cover inputs', () => {
+    expect(config.android?.softwareKeyboardLayoutMode).toBe('pan');
+  });
 });

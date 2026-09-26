@@ -2,7 +2,6 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
   FlatList,
-  Modal,
   Pressable,
   StyleSheet,
   Text,
@@ -10,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import { AvatarStack } from '@/components/AvatarStack';
+import { KeyboardSheet } from '@/components/KeyboardSheet';
 import { PollThreadLink } from '@/components/PollThreadLink';
 import { UserAvatar } from '@/components/UserAvatar';
 import { Screen } from '@/components/ui/Screen';
@@ -174,27 +174,28 @@ export default function ChatScreen() {
         }
       />
 
-      <Modal visible={showCreate} transparent animationType="slide">
-        <View style={sharedStyles.modalOverlay}>
-          <View style={sharedStyles.modalSheet}>
-            <View style={styles.modalHandle} />
-            <Text style={sharedStyles.modalTitle}>New thread</Text>
-            <TextInput
-              style={sharedStyles.input}
-              placeholder="Thread name"
-              placeholderTextColor={theme.colors.textMuted}
-              value={newName}
-              onChangeText={setNewName}
-            />
-            <Pressable style={sharedStyles.primaryBtn} onPress={handleCreateThread}>
-              <Text style={sharedStyles.primaryBtnText}>Create</Text>
-            </Pressable>
-            <Pressable onPress={() => setShowCreate(false)} style={styles.cancelBtn}>
-              <Text style={styles.cancel}>Cancel</Text>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
+      <KeyboardSheet
+        visible={showCreate}
+        onRequestClose={() => setShowCreate(false)}
+        testID="new-thread-sheet"
+      >
+        <View style={styles.modalHandle} />
+        <Text style={sharedStyles.modalTitle}>New thread</Text>
+        <TextInput
+          style={sharedStyles.input}
+          placeholder="Thread name"
+          placeholderTextColor={theme.colors.textMuted}
+          value={newName}
+          onChangeText={setNewName}
+          testID="new-thread-name"
+        />
+        <Pressable style={sharedStyles.primaryBtn} onPress={handleCreateThread}>
+          <Text style={sharedStyles.primaryBtnText}>Create</Text>
+        </Pressable>
+        <Pressable onPress={() => setShowCreate(false)} style={styles.cancelBtn}>
+          <Text style={styles.cancel}>Cancel</Text>
+        </Pressable>
+      </KeyboardSheet>
     </Screen>
   );
 }

@@ -2,7 +2,6 @@ import { router, useFocusEffect, useLocalSearchParams, type ErrorBoundaryProps }
 import { Component, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   FlatList,
-  KeyboardAvoidingView,
   Platform,
   Pressable,
   StyleSheet,
@@ -11,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { MentionSuggestions } from '@/components/MentionSuggestions';
+import { useKeyboardInset } from '@/components/useKeyboardInset';
 import { MessageBubble } from '@/components/MessageBubble';
 import { PollThreadLink } from '@/components/PollThreadLink';
 import { useMentionField } from '@/components/useMentionField';
@@ -87,6 +87,7 @@ export function ErrorBoundary({ retry }: ErrorBoundaryProps) {
 export default function ThreadScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { member } = useAuth();
+  const keyboardInset = useKeyboardInset();
   const [messages, setMessages] = useState<Message[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const mention = useMentionField(members);
@@ -179,11 +180,7 @@ export default function ThreadScreen() {
       {loading ? (
         <Screen loading />
       ) : (
-        <KeyboardAvoidingView
-          style={sharedStyles.screen}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          keyboardVerticalOffset={90}
-        >
+        <View style={[sharedStyles.screen, keyboardInset > 0 && { paddingBottom: keyboardInset }]}>
           {pollLink ? (
             <PollThreadLink
               title={pollLink.title}
@@ -205,7 +202,7 @@ export default function ThreadScreen() {
               />
             )}
           />
-          <View style={styles.composer}>
+          <View style={[styles.composer, keyboardInset > 0 && styles.composerAboveKeyboard]}>
             <MentionSuggestions
               suggestions={mention.suggestions}
               onSelect={mention.insertMention}
@@ -224,7 +221,7 @@ export default function ThreadScreen() {
               </Pressable>
             </View>
           </View>
-        </KeyboardAvoidingView>
+        </View>
       )}
     </>
   );
@@ -253,6 +250,9 @@ const styles = StyleSheet.create({
     padding: theme.spacing.md,
     paddingBottom: Platform.OS === 'ios' ? theme.spacing.lg : theme.spacing.md,
     gap: theme.spacing.sm,
+  },
+  composerAboveKeyboard: {
+    paddingBottom: theme.spacing.sm,
   },
   inputRow: {
     flexDirection: 'row',

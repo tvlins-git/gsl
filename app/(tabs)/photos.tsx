@@ -3,13 +3,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  Modal,
   Pressable,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import { KeyboardSheet } from '@/components/KeyboardSheet';
 import { PhotoEventRow } from '@/components/PhotoEventRow';
 import { PhotoGrid } from '@/components/PhotoGrid';
 import { PhotoViewer } from '@/components/PhotoViewer';
@@ -343,27 +343,28 @@ export default function PhotosScreen() {
         }
       />
 
-      <Modal visible={showCreate} transparent animationType="slide">
-        <View style={sharedStyles.modalOverlay}>
-          <View style={sharedStyles.modalSheet}>
-            <View style={styles.modalHandle} />
-            <Text style={sharedStyles.modalTitle}>New photo event</Text>
-            <TextInput
-              style={sharedStyles.input}
-              placeholder="e.g. July 2026, Ski trip"
-              placeholderTextColor={theme.colors.textMuted}
-              value={newTitle}
-              onChangeText={setNewTitle}
-            />
-            <Pressable style={sharedStyles.primaryBtn} onPress={handleCreateEvent}>
-              <Text style={sharedStyles.primaryBtnText}>Create</Text>
-            </Pressable>
-            <Pressable onPress={() => setShowCreate(false)} style={styles.cancelBtn}>
-              <Text style={styles.cancel}>Cancel</Text>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
+      <KeyboardSheet
+        visible={showCreate}
+        onRequestClose={() => setShowCreate(false)}
+        testID="new-album-sheet"
+      >
+        <View style={styles.modalHandle} />
+        <Text style={sharedStyles.modalTitle}>New photo event</Text>
+        <TextInput
+          style={sharedStyles.input}
+          placeholder="e.g. July 2026, Ski trip"
+          placeholderTextColor={theme.colors.textMuted}
+          value={newTitle}
+          onChangeText={setNewTitle}
+          testID="new-album-title"
+        />
+        <Pressable style={sharedStyles.primaryBtn} onPress={handleCreateEvent}>
+          <Text style={sharedStyles.primaryBtnText}>Create</Text>
+        </Pressable>
+        <Pressable onPress={() => setShowCreate(false)} style={styles.cancelBtn}>
+          <Text style={styles.cancel}>Cancel</Text>
+        </Pressable>
+      </KeyboardSheet>
     </Screen>
   );
 }

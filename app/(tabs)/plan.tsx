@@ -3,17 +3,16 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
-  useWindowDimensions,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { KeyboardSheet } from '@/components/KeyboardSheet';
 import { PollGrid } from '@/components/PollGrid';
 import { PollSlotEditor } from '@/components/PollSlotEditor';
 import { PollThreadSheet } from '@/components/PollThreadSheet';
@@ -63,7 +62,6 @@ export default function PlanScreen() {
   const [showThreadComposer, setShowThreadComposer] = useState(false);
   const [startingThread, setStartingThread] = useState(false);
   const [threadNotice, setThreadNotice] = useState('');
-  const { height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
 
   const loadPolls = useCallback(async () => {
@@ -545,54 +543,52 @@ export default function PlanScreen() {
         ) : null}
       </ScrollView>
 
-      <Modal visible={showCreate} animationType="slide" transparent>
-        <View style={sharedStyles.modalOverlay}>
-          <ScrollView
-            testID="create-poll-scroll"
-            style={[sharedStyles.modalSheet, styles.createSheet, { maxHeight: windowHeight * 0.92 }]}
-            contentContainerStyle={[
-              styles.createSheetContent,
-              { paddingBottom: Math.max(insets.bottom, theme.spacing.lg) + theme.spacing.md },
-            ]}
-            keyboardShouldPersistTaps="handled"
-            nestedScrollEnabled
-            canCancelContentTouches={false}
-            scrollEnabled={!slotPickerActive}
-          >
-            <View style={styles.modalHandle} />
-            <Text style={sharedStyles.modalTitle}>Create poll</Text>
-            <TextInput
-              style={sharedStyles.input}
-              placeholder="Poll title (e.g. September dinner)"
-              placeholderTextColor={theme.colors.textMuted}
-              value={newTitle}
-              onChangeText={setNewTitle}
-            />
-            <PollSlotEditor
-              slots={newSlots}
-              onSlotsChange={setNewSlots}
-              slotError={slotError}
-              onSlotError={setSlotError}
-              onPickerInteractionChange={setSlotPickerActive}
-            />
-            <Pressable
-              style={[
-                sharedStyles.primaryBtn,
-                (newSlots.length === 0 || !newTitle.trim()) && styles.createBtnDisabled,
-              ]}
-              onPress={handleCreatePoll}
-              disabled={newSlots.length === 0 || !newTitle.trim()}
-            >
-              <Text style={sharedStyles.primaryBtnText}>
-                Create poll{newSlots.length > 0 ? ` (${newSlots.length} slots)` : ''}
-              </Text>
-            </Pressable>
-            <Pressable onPress={() => setShowCreate(false)} style={styles.cancelBtn}>
-              <Text style={styles.cancel}>Cancel</Text>
-            </Pressable>
-          </ScrollView>
-        </View>
-      </Modal>
+      <KeyboardSheet
+        visible={showCreate}
+        onRequestClose={() => setShowCreate(false)}
+        testID="create-poll-scroll"
+        sheetStyle={styles.createSheet}
+        contentContainerStyle={[
+          styles.createSheetContent,
+          { paddingBottom: Math.max(insets.bottom, theme.spacing.lg) + theme.spacing.md },
+        ]}
+        nestedScrollEnabled
+        canCancelContentTouches={false}
+        scrollEnabled={!slotPickerActive}
+      >
+        <View style={styles.modalHandle} />
+        <Text style={sharedStyles.modalTitle}>Create poll</Text>
+        <TextInput
+          style={sharedStyles.input}
+          placeholder="Poll title (e.g. September dinner)"
+          placeholderTextColor={theme.colors.textMuted}
+          value={newTitle}
+          onChangeText={setNewTitle}
+          testID="create-poll-title"
+        />
+        <PollSlotEditor
+          slots={newSlots}
+          onSlotsChange={setNewSlots}
+          slotError={slotError}
+          onSlotError={setSlotError}
+          onPickerInteractionChange={setSlotPickerActive}
+        />
+        <Pressable
+          style={[
+            sharedStyles.primaryBtn,
+            (newSlots.length === 0 || !newTitle.trim()) && styles.createBtnDisabled,
+          ]}
+          onPress={handleCreatePoll}
+          disabled={newSlots.length === 0 || !newTitle.trim()}
+        >
+          <Text style={sharedStyles.primaryBtnText}>
+            Create poll{newSlots.length > 0 ? ` (${newSlots.length} slots)` : ''}
+          </Text>
+        </Pressable>
+        <Pressable onPress={() => setShowCreate(false)} style={styles.cancelBtn}>
+          <Text style={styles.cancel}>Cancel</Text>
+        </Pressable>
+      </KeyboardSheet>
     </Screen>
   );
 }
