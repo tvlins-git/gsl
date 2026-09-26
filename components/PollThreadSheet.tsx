@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Modal,
   Pressable,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import { KeyboardSheet } from '@/components/KeyboardSheet';
 import { MentionSuggestions } from '@/components/MentionSuggestions';
 import { useMentionField } from '@/components/useMentionField';
 import { sharedStyles, theme } from '@/constants/theme';
@@ -65,66 +65,62 @@ export function PollThreadSheet({
       : 'Start thread';
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={sharedStyles.modalOverlay}>
-        <View style={sharedStyles.modalSheet}>
-          <View style={styles.handle} />
-          <Text style={sharedStyles.modalTitle}>
-            {existingThread ? 'Message the thread' : 'Message the group'}
-          </Text>
-          <Text style={styles.hint}>
-            Includes everyone. The thread links back to this poll and shows up in Chat.
-          </Text>
-          <Text style={styles.hint}>Use @everyone or @name to notify.</Text>
-          <Text style={styles.status}>{statusLine}</Text>
-          <TextInput
-            style={[sharedStyles.input, styles.message]}
-            placeholder="Use @everyone or @name to notify"
-            placeholderTextColor={theme.colors.textMuted}
-            {...mention.inputProps}
-            multiline
-            testID="poll-thread-message"
-          />
-          <MentionSuggestions
-            suggestions={mention.suggestions}
-            onSelect={mention.insertMention}
-            testIDPrefix="poll"
-          />
-          {canPush ? (
-            <Pressable
-              style={styles.checkRow}
-              onPress={() => setPushUnanswered((value) => !value)}
-              accessibilityRole="checkbox"
-              accessibilityState={{ checked: pushUnanswered }}
-              testID="poll-thread-push-unanswered"
-            >
-              <View style={[styles.box, pushUnanswered && styles.boxOn]}>
-                {pushUnanswered ? <Text style={styles.tick}>✓</Text> : null}
-              </View>
-              <View style={styles.checkText}>
-                <Text style={styles.checkTitle}>{"Push people who haven't answered"}</Text>
-                <Text style={styles.checkMeta}>{unansweredNames.join(', ')}</Text>
-              </View>
-            </Pressable>
-          ) : null}
-          <Pressable
-            style={[sharedStyles.primaryBtn, (!mention.body.trim() || submitting) && styles.disabled]}
-            onPress={() => onSubmit({ message: mention.body.trim(), pushUnanswered: willPush })}
-            disabled={!mention.body.trim() || submitting}
-            testID="poll-thread-submit"
-          >
-            {submitting ? (
-              <ActivityIndicator color={theme.colors.onPrimary} />
-            ) : (
-              <Text style={sharedStyles.primaryBtnText}>{submitLabel}</Text>
-            )}
-          </Pressable>
-          <Pressable onPress={onClose} style={styles.cancelBtn} testID="poll-thread-cancel">
-            <Text style={styles.cancel}>Cancel</Text>
-          </Pressable>
-        </View>
-      </View>
-    </Modal>
+    <KeyboardSheet visible={visible} onRequestClose={onClose} testID="poll-thread-sheet">
+      <View style={styles.handle} />
+      <Text style={sharedStyles.modalTitle}>
+        {existingThread ? 'Message the thread' : 'Message the group'}
+      </Text>
+      <Text style={styles.hint}>
+        Includes everyone. The thread links back to this poll and shows up in Chat.
+      </Text>
+      <Text style={styles.hint}>Use @everyone or @name to notify.</Text>
+      <Text style={styles.status}>{statusLine}</Text>
+      <TextInput
+        style={[sharedStyles.input, styles.message]}
+        placeholder="Use @everyone or @name to notify"
+        placeholderTextColor={theme.colors.textMuted}
+        {...mention.inputProps}
+        multiline
+        testID="poll-thread-message"
+      />
+      <MentionSuggestions
+        suggestions={mention.suggestions}
+        onSelect={mention.insertMention}
+        testIDPrefix="poll"
+      />
+      {canPush ? (
+        <Pressable
+          style={styles.checkRow}
+          onPress={() => setPushUnanswered((value) => !value)}
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: pushUnanswered }}
+          testID="poll-thread-push-unanswered"
+        >
+          <View style={[styles.box, pushUnanswered && styles.boxOn]}>
+            {pushUnanswered ? <Text style={styles.tick}>✓</Text> : null}
+          </View>
+          <View style={styles.checkText}>
+            <Text style={styles.checkTitle}>{"Push people who haven't answered"}</Text>
+            <Text style={styles.checkMeta}>{unansweredNames.join(', ')}</Text>
+          </View>
+        </Pressable>
+      ) : null}
+      <Pressable
+        style={[sharedStyles.primaryBtn, (!mention.body.trim() || submitting) && styles.disabled]}
+        onPress={() => onSubmit({ message: mention.body.trim(), pushUnanswered: willPush })}
+        disabled={!mention.body.trim() || submitting}
+        testID="poll-thread-submit"
+      >
+        {submitting ? (
+          <ActivityIndicator color={theme.colors.onPrimary} />
+        ) : (
+          <Text style={sharedStyles.primaryBtnText}>{submitLabel}</Text>
+        )}
+      </Pressable>
+      <Pressable onPress={onClose} style={styles.cancelBtn} testID="poll-thread-cancel">
+        <Text style={styles.cancel}>Cancel</Text>
+      </Pressable>
+    </KeyboardSheet>
   );
 }
 
