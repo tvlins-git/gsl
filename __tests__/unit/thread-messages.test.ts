@@ -1,4 +1,11 @@
-import { buildChatPushPayload, listThreadMessages, resolveChatNotifyUserIds, sendThreadMessage } from '@/lib/thread-messages';
+import {
+  buildChatPushPayload,
+  listThreadMessages,
+  resolveChatNotifyUserIds,
+  resolveChatPushAudience,
+  sendThreadMessage,
+  shouldSendChatPush,
+} from '@/lib/thread-messages';
 import { supabase } from '@/lib/supabase';
 import { buildMessage } from '../factories';
 
@@ -51,12 +58,15 @@ describe('sendThreadMessage', () => {
 
 describe('chat mention notifications', () => {
   const members = [
-    { user_id: 'user-1', display_name: 'Hr. Lins' },
-    { user_id: 'user-2', display_name: 'Thomas' },
+    { user_id: 'user-1', display_name: 'Hr. Lins', notification_preference: 'all' as const },
+    { user_id: 'user-2', display_name: 'Thomas', notification_preference: 'tagged' as const },
   ];
 
-  it('notifies the whole group when a message has no mention', () => {
+  it('targets only members on all for untagged chat messages', () => {
     expect(resolveChatNotifyUserIds('See you Friday', members, 'user-1')).toBeNull();
+    const audience = resolveChatPushAudience('See you Friday', members, 'user-1');
+    expect(audience).toEqual({ userIds: [], tagNotification: false });
+    expect(shouldSendChatPush(audience)).toBe(false);
     const payload = buildChatPushPayload({
       groupId: 'group-1',
       senderId: 'user-1',
@@ -65,7 +75,7 @@ describe('chat mention notifications', () => {
       threadId: 'thread-1',
       members,
     });
-    expect(payload.user_ids).toBeUndefined();
+    expect(payload.user_ids).toEqual([]);
     expect(payload.tag_notification).toBe(false);
   });
 

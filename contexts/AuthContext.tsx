@@ -7,14 +7,12 @@ import {
   clearLoggedOut,
   ensureHardcodedSession,
   getCurrentMember,
-  getStoredUser,
-  isLoggedOut,
   setStoredUser,
   signInWithPassword,
   signOutUser,
 } from '@/lib/auth';
 import type { Member } from '@/lib/database.types';
-import { isLocalMode } from '@/lib/local-store';
+import { disableLocalMode, isLocalMode } from '@/lib/local-store';
 import { registerForPushNotifications } from '@/lib/push-notifications';
 import { supabase } from '@/lib/supabase';
 
@@ -41,11 +39,6 @@ async function bootstrapSession(
 ) {
   await ensureAppUsersLoaded();
 
-  if (await isLoggedOut()) {
-    setLoggedOut(true);
-    return;
-  }
-
   const s = await ensureHardcodedSession(user);
   if (s) {
     setSession(s);
@@ -65,9 +58,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [member, setMember] = useState<Member | null>(null);
   const [loading, setLoading] = useState(true);
   const [localMode, setLocalMode] = useState(false);
-  const [loggedOut, setLoggedOut] = useState(false);
+  const [loggedOut, setLoggedOut] = useState(true);
   const loggedOutRef = useRef(loggedOut);
   loggedOutRef.current = loggedOut;
+  const sessionUnlockedRef = useRef(false);
 
   const refreshMember = useCallback(async () => {
     const m = await getCurrentMember();
@@ -78,6 +72,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
+    sessionUnlockedRef.current = false;
     await signOutUser();
     setSession(null);
     setMember(null);
@@ -94,6 +89,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // bootstrap a previous user from storage.
     await setStoredUser(user);
     await clearLoggedOut();
+    sessionUnlockedRef.current = true;
     setLoggedOut(false);
     setLocalMode(false);
     try {
@@ -115,28 +111,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let cancelled = false;
 
     ensureAppUsersLoaded()
-      .then(() => getStoredUser())
-      .then(async (user) => {
+      .then(async () => {
         if (cancelled) return;
-        await bootstrapSession(user, setSession, setMember, setLocalMode, setLoggedOut, refreshMember);
+        sessionUnlockedRef.current = false;
+        disableLocalMode();
+        await supabase.auth.signOut().catch(() => undefined);
+        setSession(null);
+        setMember(null);
+        setLocalMode(false);
+        setLoggedOut(true);
       })
-      .catch(() =>
-        ensureAppUsersLoaded()
-          .then(() => getStoredUser())
-          .then((user) => {
-            if (cancelled) return;
-            const localMember = activateLocalMode(user);
-            setLocalMode(true);
-            setMember(localMember);
-            setLoggedOut(false);
-          })
-      )
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
-      if (!isLocalMode() && !loggedOutRef.current) {
+      if (!sessionUnlockedRef.current || loggedOutRef.current) return;
+      if (!isLocalMode()) {
         setSession(s);
         if (s) refreshMember();
       }

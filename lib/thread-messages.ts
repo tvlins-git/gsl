@@ -1,6 +1,7 @@
 import type { Message } from './database.types';
 import { parseFeedMentions, type FeedMentionMember } from './feed-posts';
 import { isLocalMode, localStore } from './local-store';
+import { parseNotificationPreference } from './notification-prefs';
 import { supabase } from './supabase';
 
 /** `null` notifies the whole group. A list notifies only those people. */
@@ -26,21 +27,56 @@ export function isChatTagNotification(
   return tags.userIds.some((userId) => userId !== senderId);
 }
 
+export type ChatPushMember = FeedMentionMember & {
+  notification_preference?: string | null;
+};
+
+export function resolveChatPushAudience(
+  text: string,
+  members: ChatPushMember[],
+  senderId: string
+): { userIds: string[] | null; tagNotification: boolean } {
+  const tagNotification = isChatTagNotification(text, members, senderId);
+  if (tagNotification) {
+    return {
+      userIds: resolveChatNotifyUserIds(text, members, senderId),
+      tagNotification: true,
+    };
+  }
+
+  const userIds = members
+    .filter(
+      (member) =>
+        member.user_id !== senderId &&
+        parseNotificationPreference(member.notification_preference) === 'all'
+    )
+    .map((member) => member.user_id);
+
+  return { userIds, tagNotification: false };
+}
+
+export function shouldSendChatPush(audience: { userIds: string[] | null; tagNotification: boolean }) {
+  if (audience.tagNotification) {
+    return audience.userIds == null || audience.userIds.length > 0;
+  }
+  return audience.userIds.length > 0;
+}
+
 export function buildChatPushPayload(input: {
   groupId: string;
   senderId: string;
   senderName: string;
   text: string;
   threadId: string;
-  members: FeedMentionMember[];
+  members: ChatPushMember[];
 }) {
-  const userIds = resolveChatNotifyUserIds(input.text, input.members, input.senderId);
+  const audience = resolveChatPushAudience(input.text, input.members, input.senderId);
   return {
     type: 'chat' as const,
     group_id: input.groupId,
     exclude_user_ids: [input.senderId],
-    ...(userIds ? { user_ids: userIds } : {}),
-    tag_notification: isChatTagNotification(input.text, input.members, input.senderId),
+    ...(audience.userIds != null ? { user_ids: audience.userIds } : {}),
+    tag_notification: audience.tagNotification,
     title: 'GSL',
     body: `${input.senderName}: ${input.text}`,
     data: { threadId: input.threadId },
