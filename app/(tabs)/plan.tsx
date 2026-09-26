@@ -548,15 +548,31 @@ export default function PlanScreen() {
         onRequestClose={() => setShowCreate(false)}
         testID="create-poll-scroll"
         sheetStyle={styles.createSheet}
-        contentContainerStyle={[
-          styles.createSheetContent,
-          { paddingBottom: Math.max(insets.bottom, theme.spacing.lg) + theme.spacing.md },
-        ]}
+        contentContainerStyle={styles.createSheetContent}
+        footerStyle={{ paddingBottom: Math.max(insets.bottom, theme.spacing.lg) }}
         nestedScrollEnabled
-        canCancelContentTouches={false}
         scrollEnabled={!slotPickerActive}
+        footer={
+          <>
+            <Pressable
+              style={[
+                sharedStyles.primaryBtn,
+                (newSlots.length === 0 || !newTitle.trim()) && styles.createBtnDisabled,
+              ]}
+              onPress={handleCreatePoll}
+              disabled={newSlots.length === 0 || !newTitle.trim()}
+              testID="create-poll-submit"
+            >
+              <Text style={sharedStyles.primaryBtnText}>
+                Create poll{newSlots.length > 0 ? ` (${newSlots.length} slots)` : ''}
+              </Text>
+            </Pressable>
+            <Pressable onPress={() => setShowCreate(false)} style={styles.cancelBtn} testID="create-poll-cancel">
+              <Text style={styles.cancel}>Cancel</Text>
+            </Pressable>
+          </>
+        }
       >
-        <View style={styles.modalHandle} />
         <Text style={sharedStyles.modalTitle}>Create poll</Text>
         <TextInput
           style={sharedStyles.input}
@@ -573,21 +589,6 @@ export default function PlanScreen() {
           onSlotError={setSlotError}
           onPickerInteractionChange={setSlotPickerActive}
         />
-        <Pressable
-          style={[
-            sharedStyles.primaryBtn,
-            (newSlots.length === 0 || !newTitle.trim()) && styles.createBtnDisabled,
-          ]}
-          onPress={handleCreatePoll}
-          disabled={newSlots.length === 0 || !newTitle.trim()}
-        >
-          <Text style={sharedStyles.primaryBtnText}>
-            Create poll{newSlots.length > 0 ? ` (${newSlots.length} slots)` : ''}
-          </Text>
-        </Pressable>
-        <Pressable onPress={() => setShowCreate(false)} style={styles.cancelBtn}>
-          <Text style={styles.cancel}>Cancel</Text>
-        </Pressable>
       </KeyboardSheet>
     </Screen>
   );
@@ -736,21 +737,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   createSheet: {
-    padding: 0,
     width: '100%',
     overflow: 'hidden',
   },
   createSheetContent: {
-    padding: theme.spacing.xxl,
-    gap: theme.spacing.md,
-  },
-  modalHandle: {
-    alignSelf: 'center',
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: theme.colors.border,
-    marginBottom: theme.spacing.sm,
+    // Bottom padding is on the sticky footer (safe area + actions).
+    paddingBottom: theme.spacing.md,
   },
   cancelBtn: { paddingVertical: theme.spacing.sm },
   cancel: { textAlign: 'center', color: theme.colors.textSecondary, fontSize: 15 },

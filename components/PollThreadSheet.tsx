@@ -66,7 +66,6 @@ export function PollThreadSheet({
 
   return (
     <KeyboardSheet visible={visible} onRequestClose={onClose} testID="poll-thread-sheet">
-      <View style={styles.handle} />
       <Text style={sharedStyles.modalTitle}>
         {existingThread ? 'Message the thread' : 'Message the group'}
       </Text>
@@ -125,14 +124,6 @@ export function PollThreadSheet({
 }
 
 const styles = StyleSheet.create({
-  handle: {
-    alignSelf: 'center',
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: theme.colors.border,
-    marginBottom: theme.spacing.sm,
-  },
   hint: {
     color: theme.colors.textSecondary,
     fontSize: 14,
