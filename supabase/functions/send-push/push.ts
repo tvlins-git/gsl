@@ -25,6 +25,63 @@ export function shouldReceivePushForPreference(
   return tagNotification;
 }
 
+/**
+ * Prefer the real message text over a client `tag_notification` flag.
+ * Push bodies are `Display Name: message`. Untagged chat must not count as a
+ * tag event even if a stale client sets `tag_notification: true`.
+ */
+export function inferTagNotification(input: {
+  type?: string;
+  tagNotification?: unknown;
+  body?: unknown;
+}): boolean {
+  const claimed = Boolean(input.tagNotification);
+  if (!claimed) return false;
+  // Feed only invokes send-push when someone is tagged / tag_all.
+  if (input.type === 'feed') return true;
+
+  const text = typeof input.body === 'string' ? input.body : '';
+  const colon = text.indexOf(': ');
+  const message = colon >= 0 ? text.slice(colon + 2) : text;
+  // Match client mention rules: @token with a non-name char before @ (emails safe).
+  if (/(^|[^\p{L}\p{N}])@(everyone|everybody)\b/iu.test(message)) return true;
+  if (/(^|[^\p{L}\p{N}])@[\p{L}][\p{L}\p{N}._-]*/u.test(message)) return true;
+  return false;
+}
+
+/**
+ * Chat audience after exclude, before Expo send.
+ * - untagged: only preference `all` (ignore client user_ids so tagged-only never slips in)
+ * - @name: client user_ids ∪ preference `all`
+ * - @everybody (user_ids omitted): everyone except excluded; preference filter applies next
+ */
+export function resolveChatPushRecipients(
+  tokens: PushRecipient[],
+  preferenceByUserId: Map<string, NotificationPreference>,
+  excludeUserIds: string[],
+  userIds: string[] | null,
+  tagNotification: boolean
+): PushRecipient[] {
+  if (!tagNotification) {
+    const allPrefUserIds = [...preferenceByUserId.entries()]
+      .filter(([, preference]) => preference === 'all')
+      .map(([userId]) => userId);
+    return filterRecipients(tokens, excludeUserIds, allPrefUserIds);
+  }
+
+  let targeted = filterRecipients(tokens, excludeUserIds, userIds);
+  if (Array.isArray(userIds)) {
+    const allPrefUserIds = [...preferenceByUserId.entries()]
+      .filter(([, preference]) => preference === 'all')
+      .map(([userId]) => userId);
+    targeted = mergeRecipients(
+      targeted,
+      filterRecipients(tokens, excludeUserIds, allPrefUserIds)
+    );
+  }
+  return targeted;
+}
+
 export function filterRecipients(
   tokens: PushRecipient[],
   excludeUserIds: string[] = [],

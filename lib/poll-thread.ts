@@ -1,13 +1,17 @@
 import type { Thread } from './database.types';
-import { parseFeedMentions, type FeedMentionMember } from './feed-posts';
 import { isLocalMode, localStore } from './local-store';
-import { isChatTagNotification } from './thread-messages';
+import {
+  isChatTagNotification,
+  resolveChatPushAudience,
+  type ChatPushMember,
+} from './thread-messages';
 import { supabase } from './supabase';
 
 export interface PollThreadPerson {
   id: string;
   user_id: string;
   display_name: string;
+  notification_preference?: string | null;
 }
 
 export function pollThreadName(pollTitle: string): string {
@@ -77,12 +81,12 @@ export interface PollThreadAudience {
 
 /** Everyone is in the thread. Unanswered people get the reminder push when asked; the rest get a normal chat push. */
 export function planPollThreadAudience(input: {
-  members: { id: string; userId: string }[];
+  members: { id: string; userId: string; notification_preference?: string | null }[];
   unansweredMemberIds: string[];
   senderUserId: string;
   pushUnanswered: boolean;
   message?: string;
-  mentionMembers?: FeedMentionMember[];
+  mentionMembers?: ChatPushMember[];
 }): PollThreadAudience {
   const memberIds = [...new Set(input.members.map((member) => member.id))];
   const unansweredIds = new Set(input.unansweredMemberIds);
@@ -96,25 +100,32 @@ export function planPollThreadAudience(input: {
       ]
     : [];
   const nudgeSet = new Set(nudgeUserIds);
-  let notifyUserIds = [
+
+  const mentionMembers: ChatPushMember[] =
+    input.mentionMembers ??
+    input.members.map((member) => ({
+      user_id: member.userId,
+      display_name: member.userId,
+      notification_preference: member.notification_preference,
+    }));
+
+  // When there is a chat body, reuse the same audience rules as ThreadScreen so
+  // tagged-only members are not invited to untagged poll-thread pushes.
+  if (input.message) {
+    const audience = resolveChatPushAudience(input.message, mentionMembers, input.senderUserId);
+    const notifyUserIds = (audience.userIds ?? mentionMembers.map((m) => m.user_id)).filter(
+      (userId) => userId !== input.senderUserId && !nudgeSet.has(userId)
+    );
+    return { memberIds, nudgeUserIds, notifyUserIds };
+  }
+
+  const notifyUserIds = [
     ...new Set(
       input.members
         .map((member) => member.userId)
         .filter((userId) => userId !== input.senderUserId && !nudgeSet.has(userId))
     ),
   ];
-  if (input.message && input.mentionMembers) {
-    const tags = parseFeedMentions(input.message, input.mentionMembers);
-    if (!tags.tagAll && tags.userIds.length > 0) {
-      // Mentioned people always get the chat push; send-push also merges
-      // preference "all" when tag_notification is true. Keep the mention list
-      // (minus the sender) so tagged-only targets stay accurate.
-      const mentioned = new Set(
-        tags.userIds.filter((userId) => userId !== input.senderUserId)
-      );
-      notifyUserIds = notifyUserIds.filter((userId) => mentioned.has(userId));
-    }
-  }
   return { memberIds, nudgeUserIds, notifyUserIds };
 }
 
@@ -193,12 +204,17 @@ export async function startPollThread(input: StartPollThreadInput): Promise<{
   const message = input.message.trim();
   if (!message) throw new Error('Message is empty');
 
-  const mentionMembers = input.members.map((member) => ({
+  const mentionMembers: ChatPushMember[] = input.members.map((member) => ({
     user_id: member.user_id,
     display_name: member.display_name,
+    notification_preference: member.notification_preference,
   }));
   const audience = planPollThreadAudience({
-    members: input.members.map((member) => ({ id: member.id, userId: member.user_id })),
+    members: input.members.map((member) => ({
+      id: member.id,
+      userId: member.user_id,
+      notification_preference: member.notification_preference,
+    })),
     unansweredMemberIds: input.unanswered.map((member) => member.id),
     senderUserId: input.senderUserId,
     pushUnanswered: input.pushUnanswered,

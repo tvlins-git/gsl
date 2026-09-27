@@ -52,7 +52,8 @@ import { APP_VERSION } from '@/constants/brand';
 import { feedColumn, sharedStyles, theme } from '@/constants/theme';
 
 export default function SettingsScreen() {
-  const { member, loggedOut, signOut, signIn, loading, localMode, refreshMember } = useAuth();
+  const { member, loggedOut, signOut, signIn, loading, localMode, refreshMember, applyMember } =
+    useAuth();
   const [busy, setBusy] = useState(false);
   const [users, setUsers] = useState<AppUser[]>([]);
   const [selectedUserId, setSelectedUserId] = useState(DEFAULT_HARDCODED_USER.id);
@@ -365,21 +366,36 @@ export default function SettingsScreen() {
     }
   };
 
-  const handleSaveNotifyPref = async () => {
+  const persistNotifyPref = async (next: NotificationPreference) => {
     if (!member) return;
     setBusy(true);
     setNotifyError('');
     setNotifySuccess('');
     try {
-      const saved = await updateMemberNotificationPreference(member.id, notifyPref);
-      setNotifyPref(memberNotificationPreference(saved));
+      const saved = await updateMemberNotificationPreference(member.id, next);
+      const confirmed = memberNotificationPreference(saved);
+      setNotifyPref(confirmed);
+      applyMember(saved);
+      // Confirm AuthContext reload from public.members matches what we just wrote.
       await refreshMember();
-      setNotifySuccess('Notification preference saved.');
+      setNotifySuccess(
+        confirmed === 'tagged'
+          ? 'Saved: tagged only (@you / @everybody).'
+          : confirmed === 'off'
+            ? 'Saved: no push notifications.'
+            : 'Saved: all messages from others.'
+      );
     } catch (err) {
       setNotifyError(formatUserFacingError(err, 'Could not save preference. Try again.'));
+      // Revert radio to the last known saved value on failure.
+      setNotifyPref(memberNotificationPreference(member));
     } finally {
       setBusy(false);
     }
+  };
+
+  const handleSaveNotifyPref = async () => {
+    await persistNotifyPref(notifyPref);
   };
 
   if (loading) {
@@ -459,7 +475,8 @@ export default function SettingsScreen() {
             <View style={[styles.sectionCard, sharedStyles.card]}>
               <Text style={sharedStyles.sectionTitle}>Notifications</Text>
               <Text style={styles.sectionHint}>
-                Choose when GSL can send you a push. Your preference is stored on your member profile.
+                Choose when GSL can send you a push. Tapping an option saves it to your member profile
+                immediately (also used by live send-push).
               </Text>
               {NOTIFICATION_PREFERENCE_OPTIONS.map((option) => {
                 const selected = notifyPref === option.value;
@@ -468,9 +485,11 @@ export default function SettingsScreen() {
                     key={option.value}
                     style={[styles.notifyOption, selected && styles.notifyOptionSelected]}
                     onPress={() => {
+                      if (option.value === notifyPref || busy) return;
                       setNotifyPref(option.value);
                       setNotifyError('');
                       setNotifySuccess('');
+                      void persistNotifyPref(option.value);
                     }}
                     disabled={busy}
                     testID={`notify-pref-${option.value}`}

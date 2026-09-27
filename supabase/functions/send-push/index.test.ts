@@ -3,7 +3,9 @@ import {
   buildExpoPushPayload,
   filterRecipients,
   filterRecipientsByPreference,
+  inferTagNotification,
   mergeRecipients,
+  resolveChatPushRecipients,
   shouldReceivePushForPreference,
 } from './push.ts';
 
@@ -94,4 +96,71 @@ Deno.test('filterRecipientsByPreference drops muted and untagged users', () => {
     filterRecipientsByPreference(recipients, prefs, true).map((r) => r.userId),
     ['u2', 'u3']
   );
+});
+
+Deno.test('inferTagNotification ignores bare flag without @ in chat body', () => {
+  assertEquals(
+    inferTagNotification({
+      type: 'chat',
+      tagNotification: true,
+      body: 'Diana: Hi',
+    }),
+    false
+  );
+  assertEquals(
+    inferTagNotification({
+      type: 'chat',
+      tagNotification: true,
+      body: 'Diana: hi @Lins',
+    }),
+    true
+  );
+  assertEquals(
+    inferTagNotification({
+      type: 'chat',
+      tagNotification: true,
+      body: 'Diana: hello @everybody',
+    }),
+    true
+  );
+  assertEquals(
+    inferTagNotification({
+      type: 'chat',
+      tagNotification: false,
+      body: 'Diana: hi @Lins',
+    }),
+    false
+  );
+  assertEquals(
+    inferTagNotification({
+      type: 'feed',
+      tagNotification: true,
+      body: 'Diana: photo',
+    }),
+    true
+  );
+});
+
+Deno.test('resolveChatPushRecipients: untagged never targets tagged-only', () => {
+  const diana = 'diana';
+  const lins = 'lins';
+  const tokens = [
+    { userId: diana, token: 'shared' },
+    { userId: lins, token: 'shared' },
+    { userId: lins, token: 'lins-phone' },
+  ];
+  const prefs = new Map([
+    [diana, 'all' as const],
+    [lins, 'tagged' as const],
+  ]);
+
+  // Stale client includes Lins in user_ids with tag_notification false / bare true.
+  const untagged = resolveChatPushRecipients(tokens, prefs, [diana], [lins], false);
+  assertEquals(untagged.map((r) => r.userId), []);
+
+  const tagged = resolveChatPushRecipients(tokens, prefs, [diana], [lins], true);
+  assertEquals(tagged.map((r) => `${r.userId}:${r.token}`), ['lins:lins-phone']);
+
+  const everybody = resolveChatPushRecipients(tokens, prefs, [diana], null, true);
+  assertEquals(everybody.map((r) => `${r.userId}:${r.token}`), ['lins:lins-phone']);
 });
