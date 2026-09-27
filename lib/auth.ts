@@ -230,9 +230,15 @@ export async function updateMemberNotificationPreference(
     .from('members')
     .update({ notification_preference: next })
     .eq('id', memberId)
-    .select()
+    .select('*')
     .single();
   if (error) throw error;
+  if (!data) throw new Error('Could not save notification preference.');
+  // Guard against a silent no-op / stale row so Profile never shows success
+  // while public.members still has the previous value.
+  if (parseNotificationPreference(data.notification_preference) !== next) {
+    throw new Error('Notification preference did not save. Try again.');
+  }
   return data;
 }
 
@@ -242,10 +248,11 @@ export function memberNotificationPreference(member: Member | null | undefined):
   );
 }
 
-export function activateLocalMode(user: AppUser) {
+/** Enable local mode and return the member after AsyncStorage hydrate (prefs/email/avatar). */
+export async function activateLocalMode(user: AppUser) {
   enableLocalMode();
   setActiveLocalUser(user);
-  void localStore.hydrate();
+  await localStore.hydrate();
   return createLocalMember();
 }
 

@@ -121,6 +121,12 @@ describe('app-users', () => {
     expect(HARDCODED_USERS[0].password).toBe('thomas');
   });
 
+  it('treats deleting a missing local user as success (remote-only member)', async () => {
+    await ensureAppUsersLoaded();
+    const result = await deleteAppUser('diana', ADMIN_USER_ID);
+    expect(result).toEqual({ ok: true });
+  });
+
   it('cannot delete own account', async () => {
     await ensureAppUsersLoaded();
     const created = await createAppUser({ displayName: 'Self', password: 'self1' });

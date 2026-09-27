@@ -176,8 +176,9 @@ export async function deleteAppUser(
 
   const users = await ensureAppUsersLoaded();
   const target = users.find((user) => user.id === userId);
+  // Idempotent when the account only existed remotely (other device created them).
   if (!target) {
-    return { ok: false, error: 'User not found.' };
+    return { ok: true };
   }
   if (target.role === 'admin') {
     return { ok: false, error: 'Admin users cannot be deleted.' };

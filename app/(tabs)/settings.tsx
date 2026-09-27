@@ -8,6 +8,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useFocusEffect } from 'expo-router';
 import { Logo } from '@/components/Logo';
 import { Screen } from '@/components/ui/Screen';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -23,10 +24,10 @@ import {
 import {
   createAppUser,
   deleteAppUser,
-  listAppUsers,
   resolveSignedInAppUser,
 } from '@/lib/app-users';
 import {
+  getGroupMembers,
   getStoredUser,
   memberNotificationPreference,
   updateMemberContactEmail,
@@ -34,6 +35,7 @@ import {
 } from '@/lib/auth';
 import { clearMemberAvatar, uploadMemberAvatar } from '@/lib/avatar-upload';
 import { isValidContactEmail } from '@/lib/calendar-invite';
+import { listManagedGroupUsers } from '@/lib/group-managed-users';
 import {
   deleteLoginAccountFromGroup,
   syncLoginAccountsIntoGroup,
@@ -74,14 +76,29 @@ export default function SettingsScreen() {
   const [notifySuccess, setNotifySuccess] = useState('');
 
   const refreshUsers = useCallback(async () => {
-    const list = await listAppUsers();
+    // When signed into Supabase, show live public.members for this group so a
+    // user created on another phone (e.g. Diana) appears here too. Local mode
+    // and the logged-out picker still use the device login roster.
+    const groupId = !localMode && member?.group_id ? member.group_id : null;
+    const list = await listManagedGroupUsers(groupId);
     setUsers(list);
     return list;
-  }, []);
+  }, [localMode, member?.group_id]);
 
   useEffect(() => {
     refreshUsers().catch(() => undefined);
   }, [refreshUsers, member, loggedOut]);
+
+  useFocusEffect(
+    useCallback(() => {
+      // Re-read live members + the signed-in member row so notification
+      // preference and the Users list match public.members after login / other devices.
+      refreshUsers().catch(() => undefined);
+      if (!loggedOut) {
+        refreshMember().catch(() => undefined);
+      }
+    }, [refreshUsers, refreshMember, loggedOut])
+  );
 
   useEffect(() => {
     if (!loggedOut && member) return;
@@ -188,6 +205,19 @@ export default function SettingsScreen() {
     setUserMgmtError('');
     setUserMgmtSuccess('');
     try {
+      const trimmedName = newUserName.trim();
+      if (member && !localMode && trimmedName) {
+        const remote = await getGroupMembers(member.group_id);
+        const existsRemote = remote.some(
+          (row) => row.display_name.trim().toLowerCase() === trimmedName.toLowerCase()
+        );
+        if (existsRemote) {
+          setUserMgmtError('A user with that name already exists.');
+          await refreshUsers();
+          return;
+        }
+      }
+
       const result = await createAppUser({
         displayName: newUserName,
         password: newUserPassword,
@@ -318,7 +348,8 @@ export default function SettingsScreen() {
     setNotifyError('');
     setNotifySuccess('');
     try {
-      await updateMemberNotificationPreference(member.id, notifyPref);
+      const saved = await updateMemberNotificationPreference(member.id, notifyPref);
+      setNotifyPref(memberNotificationPreference(saved));
       await refreshMember();
       setNotifySuccess('Notification preference saved.');
     } catch (err) {
@@ -490,8 +521,8 @@ export default function SettingsScreen() {
               <View style={[styles.sectionCard, sharedStyles.card]} testID="admin-users-section">
                 <Text style={sharedStyles.sectionTitle}>Users</Text>
                 <Text style={styles.sectionHint}>
-                  Create and delete login accounts. Only Hr. Lins is the default admin and cannot be
-                  deleted.
+                  Create and delete login accounts for this group. The list matches live group
+                  members. Only Hr. Lins is the default admin and cannot be deleted.
                 </Text>
 
                 <View style={styles.userMgmtList}>
