@@ -28,4 +28,20 @@ describe('MessageBubble', () => {
     expect(screen.queryByText('Hr. Lins')).toBeNull();
     expect(screen.getByText('My message')).toBeTruthy();
   });
+
+  it('supports compact layout for feed/thread reply rows', () => {
+    const { StyleSheet } = require('react-native');
+    render(
+      <MessageBubble
+        body="There you are"
+        senderName="Hr. Lins"
+        createdAt="2026-07-13T10:00:00Z"
+        isOwn
+        compact
+      />
+    );
+    const row = screen.getByTestId('message-bubble');
+    const style = StyleSheet.flatten(row.props.style);
+    expect(style.paddingHorizontal).toBe(0);
+  });
 });

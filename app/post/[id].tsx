@@ -349,6 +349,7 @@ export default function PostThreadScreen() {
                     senderAvatarUrl={avatarMap[item.reply.author_id]}
                     createdAt={item.reply.created_at}
                     isOwn={isOwn}
+                    compact
                   />
                 </View>
                 {canDeleteReply ? (
@@ -467,14 +468,17 @@ const styles = StyleSheet.create({
   },
   replyRowOwn: {
     justifyContent: 'flex-end',
+    paddingLeft: theme.spacing.md,
     paddingRight: theme.spacing.sm,
   },
   replyRowOther: {
     justifyContent: 'flex-start',
+    paddingLeft: theme.spacing.lg,
+    paddingRight: theme.spacing.md,
   },
   replyBubbleCol: {
     flexShrink: 1,
-    maxWidth: '82%',
+    maxWidth: '90%',
   },
   replyDelete: {
     paddingTop: 10,
