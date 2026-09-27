@@ -139,6 +139,29 @@ export interface Database {
         { post_id: string; user_id: string },
         { post_id?: string; user_id?: string }
       >;
+      feed_post_replies: TableDef<
+        {
+          id: string;
+          post_id: string;
+          author_id: string;
+          body: string;
+          created_at: string;
+        },
+        {
+          id?: string;
+          post_id: string;
+          author_id: string;
+          body: string;
+          created_at?: string;
+        },
+        {
+          id?: string;
+          post_id?: string;
+          author_id?: string;
+          body?: string;
+          created_at?: string;
+        }
+      >;
     };
     Views: { [_ in never]: never };
     Functions: {
@@ -163,3 +186,4 @@ export type Thread = Database['public']['Tables']['threads']['Row'];
 export type Message = Database['public']['Tables']['messages']['Row'];
 export type FeedPost = Database['public']['Tables']['feed_posts']['Row'];
 export type FeedPostTag = Database['public']['Tables']['feed_post_tags']['Row'];
+export type FeedPostReply = Database['public']['Tables']['feed_post_replies']['Row'];

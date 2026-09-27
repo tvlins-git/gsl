@@ -148,6 +148,18 @@ CREATE TABLE feed_post_tags (
   PRIMARY KEY (post_id, user_id)
 );
 
+CREATE TABLE feed_post_replies (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  post_id UUID NOT NULL REFERENCES feed_posts(id) ON DELETE CASCADE,
+  author_id UUID NOT NULL REFERENCES auth.users(id),
+  body TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT feed_post_replies_body_not_blank CHECK (length(btrim(body)) > 0)
+);
+
+CREATE INDEX feed_post_replies_post_id_created_at_idx
+  ON feed_post_replies (post_id, created_at ASC);
+
 -- Helper: get current user's group_id
 CREATE OR REPLACE FUNCTION auth_group_id() RETURNS UUID AS $$
   SELECT group_id FROM members WHERE user_id = auth.uid() LIMIT 1;
@@ -173,6 +185,7 @@ ALTER TABLE thread_members ENABLE ROW LEVEL SECURITY;
 ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE feed_posts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE feed_post_tags ENABLE ROW LEVEL SECURITY;
+ALTER TABLE feed_post_replies ENABLE ROW LEVEL SECURITY;
 
 -- Groups: members can read their group
 CREATE POLICY groups_select ON groups FOR SELECT
@@ -294,6 +307,28 @@ CREATE POLICY feed_post_tags_delete ON feed_post_tags FOR DELETE
     SELECT 1 FROM feed_posts p
     WHERE p.id = post_id AND p.group_id = auth_group_id() AND p.author_id = auth.uid()
   ));
+
+CREATE POLICY feed_post_replies_select ON feed_post_replies FOR SELECT
+  USING (EXISTS (
+    SELECT 1 FROM feed_posts p
+    WHERE p.id = post_id AND p.group_id = auth_group_id()
+  ));
+CREATE POLICY feed_post_replies_insert ON feed_post_replies FOR INSERT
+  WITH CHECK (
+    author_id = auth.uid()
+    AND EXISTS (
+      SELECT 1 FROM feed_posts p
+      WHERE p.id = post_id AND p.group_id = auth_group_id()
+    )
+  );
+CREATE POLICY feed_post_replies_delete ON feed_post_replies FOR DELETE
+  USING (
+    author_id = auth.uid()
+    AND EXISTS (
+      SELECT 1 FROM feed_posts p
+      WHERE p.id = post_id AND p.group_id = auth_group_id()
+    )
+  );
 
 -- Photos storage bucket is created in 007_photos_storage_bucket.sql
 -- Seed default GSL group (run after admin user signs up, or via service role)

@@ -160,6 +160,22 @@ Deno.test('inferTagNotification ignores bare flag without @ in chat body', () =>
     }),
     true
   );
+  assertEquals(
+    inferTagNotification({
+      type: 'feed_reply',
+      tagNotification: true,
+      body: 'Diana: Hi',
+    }),
+    false
+  );
+  assertEquals(
+    inferTagNotification({
+      type: 'feed_reply',
+      tagNotification: true,
+      body: 'Diana: hi @Lins',
+    }),
+    true
+  );
 });
 
 Deno.test('resolveChatPushRecipients: untagged never targets tagged-only', () => {

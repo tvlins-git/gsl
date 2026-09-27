@@ -10,6 +10,7 @@ import {
 import { summarizePollAcceptance } from './polls';
 import type {
   FeedPost,
+  FeedPostReply,
   FeedPostTag,
   HostAssignment,
   Member,
@@ -98,6 +99,7 @@ interface LocalData {
   photos: Photo[];
   feed_posts: FeedPost[];
   feed_post_tags: FeedPostTag[];
+  feed_post_replies: FeedPostReply[];
   member_emails: Record<string, string>;
   member_avatars: Record<string, string>;
   member_notification_prefs: Record<string, NotificationPreference>;
@@ -114,6 +116,7 @@ const emptyData = (): LocalData => ({
   photos: [],
   feed_posts: [],
   feed_post_tags: [],
+  feed_post_replies: [],
   member_emails: {},
   member_avatars: {},
   member_notification_prefs: {},
@@ -132,6 +135,7 @@ async function readData(): Promise<LocalData> {
       ...parsed,
       feed_posts: parsed.feed_posts ?? [],
       feed_post_tags: parsed.feed_post_tags ?? [],
+      feed_post_replies: parsed.feed_post_replies ?? [],
       member_emails: parsed.member_emails ?? {},
       member_avatars: parsed.member_avatars ?? {},
       member_notification_prefs: parsed.member_notification_prefs ?? {},
@@ -529,6 +533,60 @@ export const localStore = {
     const data = await readData();
     data.feed_posts = (data.feed_posts ?? []).filter((post) => post.id !== postId);
     data.feed_post_tags = (data.feed_post_tags ?? []).filter((tag) => tag.post_id !== postId);
+    data.feed_post_replies = (data.feed_post_replies ?? []).filter((reply) => reply.post_id !== postId);
+    await writeData(data);
+  },
+
+  async getFeedPostById(postId: string) {
+    const data = await readData();
+    const post = (data.feed_posts ?? []).find((row) => row.id === postId);
+    if (!post) return null;
+    const taggedUserIds = (data.feed_post_tags ?? [])
+      .filter((tag) => tag.post_id === postId)
+      .map((tag) => tag.user_id);
+    return {
+      ...post,
+      taggedUserIds,
+      imageUri: post.image_path,
+    };
+  },
+
+  async getFeedPostReplies(postId: string) {
+    const data = await readData();
+    return (data.feed_post_replies ?? [])
+      .filter((reply) => reply.post_id === postId)
+      .sort((a, b) => a.created_at.localeCompare(b.created_at));
+  },
+
+  async getFeedReplyCounts(postIds: string[]) {
+    const wanted = new Set(postIds);
+    const data = await readData();
+    const counts: Record<string, number> = {};
+    for (const reply of data.feed_post_replies ?? []) {
+      if (!wanted.has(reply.post_id)) continue;
+      counts[reply.post_id] = (counts[reply.post_id] ?? 0) + 1;
+    }
+    return counts;
+  },
+
+  async addFeedPostReply(postId: string, authorId: string, body: string) {
+    const data = await readData();
+    data.feed_post_replies ??= [];
+    const reply: FeedPostReply = {
+      id: uuid(),
+      post_id: postId,
+      author_id: authorId,
+      body,
+      created_at: new Date().toISOString(),
+    };
+    data.feed_post_replies.push(reply);
+    await writeData(data);
+    return reply;
+  },
+
+  async deleteFeedPostReply(replyId: string) {
+    const data = await readData();
+    data.feed_post_replies = (data.feed_post_replies ?? []).filter((reply) => reply.id !== replyId);
     await writeData(data);
   },
 

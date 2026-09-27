@@ -3,6 +3,7 @@ import {
   resetNotificationRefreshForTests,
   shouldRefreshChatListOnNotification,
   shouldRefreshFeedOnNotification,
+  shouldRefreshPostThreadOnNotification,
   shouldRefreshThreadOnNotification,
   subscribeNotificationOpen,
 } from '@/lib/notification-refresh';
@@ -36,5 +37,7 @@ describe('notification refresh', () => {
     expect(shouldRefreshChatListOnNotification({ type: 'feed' })).toBe(false);
     expect(shouldRefreshThreadOnNotification({ type: 'chat', threadId: 't1' }, 't1')).toBe(true);
     expect(shouldRefreshThreadOnNotification({ type: 'chat', threadId: 't1' }, 't2')).toBe(false);
+    expect(shouldRefreshPostThreadOnNotification({ type: 'feed', postId: 'p1' }, 'p1')).toBe(true);
+    expect(shouldRefreshPostThreadOnNotification({ type: 'feed', postId: 'p1' }, 'p2')).toBe(false);
   });
 });

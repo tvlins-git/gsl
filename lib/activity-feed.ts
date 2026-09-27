@@ -5,6 +5,7 @@ import {
   loadFeedPosts,
   type FeedPostSummary,
 } from './feed-posts';
+import { formatReplyCount, loadFeedReplyCounts } from './feed-post-replies';
 import { formatPhotoCount, loadPhotoEventSummaries, albumThumbUris, type PhotoEventSummary } from './photo-events';
 import { isLocalMode, localStore } from './local-store';
 import { supabase } from './supabase';
@@ -25,6 +26,7 @@ export type ActivityItem = {
   imagePath?: string | null;
   thumbUris?: string[];
   photoCount?: number;
+  replyCount?: number;
 };
 
 export type ActivitySources = {
@@ -33,6 +35,7 @@ export type ActivitySources = {
   threads: Thread[];
   hostAssignments: HostAssignment[];
   feedPosts: FeedPostSummary[];
+  replyCounts: Record<string, number>;
 };
 
 const MONTH_NAMES = [
@@ -76,6 +79,7 @@ export function buildActivityItems(input: {
   threads: Thread[];
   hostAssignments?: HostAssignment[];
   feedPosts?: FeedPostSummary[];
+  replyCounts?: Record<string, number>;
   limit?: number;
 }): ActivityItem[] {
   const {
@@ -85,6 +89,7 @@ export function buildActivityItems(input: {
     threads,
     hostAssignments = [],
     feedPosts = [],
+    replyCounts = {},
     limit = 40,
   } = input;
   const items: ActivityItem[] = [];
@@ -181,18 +186,22 @@ export function buildActivityItems(input: {
 
   for (const post of feedPosts) {
     const hasImage = Boolean(post.image_path || post.imageUri);
+    const replyCount = replyCounts[post.id] ?? 0;
+    const tagSubtitle = formatFeedPostSubtitle(post, members);
+    const replyLabel = formatReplyCount(replyCount);
     items.push({
       id: `post-${post.id}`,
       kind: 'post',
       title: formatFeedPostTitle(post.body, hasImage),
-      subtitle: formatFeedPostSubtitle(post, members),
+      subtitle: replyLabel ? `${tagSubtitle} · ${replyLabel}` : tagSubtitle,
       timestamp: post.created_at,
-      path: '/',
+      path: `/post/${post.id}`,
       authorName: nameForUser(members, post.author_id),
       authorId: post.author_id,
       sourceId: post.id,
       imageUri: post.imageUri,
       imagePath: post.image_path,
+      replyCount,
     });
   }
 
@@ -210,7 +219,8 @@ export async function loadActivitySources(groupId: string): Promise<ActivitySour
       localStore.getHostAssignments(groupId),
       localStore.getFeedPosts(groupId),
     ]);
-    return { photoEvents, polls, threads, hostAssignments, feedPosts };
+    const replyCounts = await localStore.getFeedReplyCounts(feedPosts.map((post) => post.id));
+    return { photoEvents, polls, threads, hostAssignments, feedPosts, replyCounts };
   }
 
   const [photoEvents, pollsRes, threadsRes, hostsRes, feedPosts] = await Promise.all([
@@ -221,11 +231,14 @@ export async function loadActivitySources(groupId: string): Promise<ActivitySour
     loadFeedPosts(groupId),
   ]);
 
+  const replyCounts = await loadFeedReplyCounts(feedPosts.map((post) => post.id));
+
   return {
     photoEvents,
     polls: pollsRes.data ?? [],
     threads: threadsRes.data ?? [],
     hostAssignments: hostsRes.data ?? [],
     feedPosts,
+    replyCounts,
   };
 }

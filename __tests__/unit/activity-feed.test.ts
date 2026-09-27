@@ -260,12 +260,38 @@ describe('buildActivityItems', () => {
       kind: 'post',
       title: 'Hello GSL',
       subtitle: 'Tagged everyone',
-      path: '/',
+      path: '/post/post-1',
       authorName: 'Hr. Lins',
       authorId: 'user-1',
       sourceId: 'post-1',
       imagePath: null,
     });
+  });
+
+  it('appends reply counts to feed post subtitles', () => {
+    const items = buildActivityItems({
+      members,
+      photoEvents: [],
+      polls: [],
+      threads: [],
+      replyCounts: { 'post-1': 2 },
+      feedPosts: [
+        {
+          id: 'post-1',
+          group_id: 'group-1',
+          author_id: 'user-1',
+          body: 'Hello GSL',
+          image_path: null,
+          tag_all: false,
+          taggedUserIds: [],
+          imageUri: null,
+          created_at: '2026-09-09T10:00:00.000Z',
+        },
+      ],
+    });
+
+    expect(items[0].subtitle).toBe('Update · 2 replies');
+    expect(items[0].replyCount).toBe(2);
   });
 });
 

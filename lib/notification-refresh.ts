@@ -60,6 +60,10 @@ export function shouldRefreshThreadOnNotification(link: NotificationDeepLink, th
   return link.type === 'chat' && link.threadId === threadId;
 }
 
+export function shouldRefreshPostThreadOnNotification(link: NotificationDeepLink, postId: string) {
+  return link.type === 'feed' && link.postId === postId;
+}
+
 /** Test isolation only. */
 export function resetNotificationRefreshForTests() {
   listeners.clear();

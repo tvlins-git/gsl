@@ -1,18 +1,15 @@
 import React from 'react';
-import { StyleSheet } from 'react-native';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import FeedScreen from '@/app/(tabs)/index';
 import { deleteFeedPost } from '@/lib/feed-posts';
 import { deleteHostAssignment } from '@/lib/host-assignments';
 import { loadActivitySources } from '@/lib/activity-feed';
+import { router } from 'expo-router';
 
 jest.mock('expo-router', () => {
   const { useEffect } = require('react');
   return {
     router: { push: jest.fn() },
-    // Real useFocusEffect runs on focus, not during render. Calling the
-    // callback on every render re-invokes loadFeed → setState → render
-    // forever, which is what timed out this suite on CI after #17.
     useFocusEffect: (effect: () => void) => {
       useEffect(() => {
         const cleanup = effect();
@@ -124,11 +121,13 @@ jest.mock('@/lib/local-store', () => ({
 describe('FeedScreen post delete', () => {
   beforeEach(() => {
     (deleteFeedPost as jest.Mock).mockClear();
+    (router.push as jest.Mock).mockClear();
     (loadActivitySources as jest.Mock).mockResolvedValue({
       photoEvents: [],
       polls: [],
       threads: [],
       hostAssignments: [],
+      replyCounts: {},
       feedPosts: [
         {
           id: 'mine',
@@ -172,14 +171,10 @@ describe('FeedScreen post delete', () => {
     });
   });
 
-  it('also deletes from the post detail sheet', async () => {
+  it('opens the post thread screen from a feed post', async () => {
     render(<FeedScreen />);
     fireEvent.press(await screen.findByTestId('feed-item-post-mine'));
-    const detailPhoto = await screen.findByTestId('feed-post-detail-photo');
-    expect(detailPhoto.props.resizeMode).toBe('contain');
-    expect(StyleSheet.flatten(detailPhoto.props.style).height).not.toBe(280);
-    fireEvent.press(await screen.findByTestId('feed-post-delete'));
-    await waitFor(() => expect(deleteFeedPost).toHaveBeenCalled());
+    expect(router.push).toHaveBeenCalledWith('/post/mine');
   });
 });
 
@@ -211,6 +206,7 @@ describe('FeedScreen host delete', () => {
         },
       ],
       feedPosts: [],
+      replyCounts: {},
     });
   });
 
@@ -271,6 +267,7 @@ describe('FeedScreen album thumbs', () => {
       threads: [],
       hostAssignments: [],
       feedPosts: [],
+      replyCounts: {},
     });
   });
 
