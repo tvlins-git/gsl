@@ -37,7 +37,6 @@ import {
   mergeReplies,
   sendFeedPostReply,
   shouldSendFeedReplyPush,
-  sortRepliesChronologically,
 } from '@/lib/feed-post-replies';
 import { subscribeToFeedPostReplyInserts } from '@/lib/feed-post-reply-realtime';
 import { isLocalMode } from '@/lib/local-store';
@@ -120,6 +119,13 @@ export default function PostThreadScreen() {
   const memberMap = Object.fromEntries(members.map((m) => [m.user_id, m.display_name]));
   const avatarMap = Object.fromEntries(members.map((m) => [m.user_id, m.avatar_url]));
 
+  useEffect(() => {
+    setReplies([]);
+    setPost(null);
+    setMissing(false);
+    setLoading(true);
+  }, [id]);
+
   const loadThread = useCallback(async () => {
     if (!id || !member) return;
     try {
@@ -137,7 +143,8 @@ export default function PostThreadScreen() {
       }
       setMissing(false);
       setPost(loadedPost as FeedPostSummary);
-      setReplies(sortRepliesChronologically(loadedReplies));
+      // Merge so a realtime INSERT mid-fetch is not wiped by a stale replace.
+      setReplies((prev) => mergeReplies(prev, loadedReplies));
     } finally {
       setLoading(false);
     }

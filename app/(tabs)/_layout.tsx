@@ -5,8 +5,12 @@ import { GslNavTitle } from '@/components/GslNavTitle';
 import { APP_NAME } from '@/constants/brand';
 import { theme } from '@/constants/theme';
 import { SettingsAuthRedirect } from '@/components/SettingsAuthRedirect';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function TabLayout() {
+  const { loading, loggedOut, member } = useAuth();
+  const hideTabBar = !loading && loggedOut && !member;
+
   return (
     <>
       <SettingsAuthRedirect />
@@ -16,13 +20,15 @@ export default function TabLayout() {
         // which hides the selected tab on that bar.
         tabBarActiveTintColor: theme.colors.primary,
         tabBarInactiveTintColor: theme.colors.textMuted,
-        tabBarStyle: {
-          backgroundColor: theme.colors.surface,
-          borderTopColor: theme.colors.border,
-          borderTopWidth: 0.5,
-          paddingTop: 6,
-          height: Platform.OS === 'ios' ? 88 : 64,
-        },
+        tabBarStyle: hideTabBar
+          ? { display: 'none', height: 0, overflow: 'hidden' }
+          : {
+              backgroundColor: theme.colors.surface,
+              borderTopColor: theme.colors.border,
+              borderTopWidth: 0.5,
+              paddingTop: 6,
+              height: Platform.OS === 'ios' ? 88 : 64,
+            },
         tabBarShowLabel: true,
         tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
         headerStyle: {
@@ -39,6 +45,7 @@ export default function TabLayout() {
           headerTitle: () => <GslNavTitle title={APP_NAME} />,
           tabBarLabel: 'Feed',
           tabBarAccessibilityLabel: 'Feed',
+          href: hideTabBar ? null : undefined,
           tabBarIcon: ({ focused }) => (
             <SymbolView
               name={{ ios: 'house', android: 'home', web: 'home' }}
@@ -55,6 +62,7 @@ export default function TabLayout() {
           headerTitle: () => <GslNavTitle suffix="Photos" />,
           tabBarLabel: 'Photos',
           tabBarAccessibilityLabel: 'Photos',
+          href: hideTabBar ? null : undefined,
           tabBarIcon: ({ focused }) => (
             <SymbolView
               name={{ ios: 'photo.on.rectangle', android: 'photo_library', web: 'photo_library' }}
@@ -70,6 +78,7 @@ export default function TabLayout() {
           title: `${APP_NAME} · Plan`,
           headerTitle: () => <GslNavTitle suffix="Plan" />,
           tabBarLabel: 'Plan',
+          href: hideTabBar ? null : undefined,
           tabBarIcon: ({ focused }) => (
             <SymbolView
               name={{ ios: 'calendar', android: 'event', web: 'event' }}
@@ -85,6 +94,7 @@ export default function TabLayout() {
           title: `${APP_NAME} · Chat`,
           headerTitle: () => <GslNavTitle suffix="Chat" />,
           tabBarLabel: 'Chat',
+          href: hideTabBar ? null : undefined,
           tabBarIcon: ({ focused }) => (
             <SymbolView
               name={{ ios: 'message', android: 'chat', web: 'chat' }}
@@ -101,6 +111,7 @@ export default function TabLayout() {
           headerTitle: () => <GslNavTitle suffix="Hosts" />,
           tabBarLabel: 'Hosts',
           tabBarAccessibilityLabel: 'Hosts',
+          href: hideTabBar ? null : undefined,
           tabBarIcon: ({ focused }) => (
             <SymbolView
               name={{ ios: 'person.2', android: 'group', web: 'group' }}
@@ -113,8 +124,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="settings"
         options={{
-          title: `${APP_NAME} · Profile`,
-          headerTitle: () => <GslNavTitle suffix="Profile" />,
+          title: hideTabBar ? `${APP_NAME} · Login` : `${APP_NAME} · Profile`,
+          headerTitle: () => <GslNavTitle suffix={hideTabBar ? 'Login' : 'Profile'} />,
           tabBarLabel: 'Profile',
           tabBarAccessibilityLabel: 'Profile',
           tabBarIcon: ({ focused }) => (
