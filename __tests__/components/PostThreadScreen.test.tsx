@@ -151,5 +151,7 @@ describe('PostThreadScreen', () => {
 
     await waitFor(() => expect(sendFeedPostReply).toHaveBeenCalledWith('post-1', 'user-1', 'Thanks!'));
     expect(await screen.findByText('Thanks!')).toBeTruthy();
+    // Own reply shows a compact Delete caption (not a full-width action row).
+    expect(await screen.findByTestId(`delete-reply-${saved.id}`)).toBeTruthy();
   });
 });

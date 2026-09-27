@@ -336,19 +336,26 @@ export default function PostThreadScreen() {
               );
             }
             const isOwn = item.reply.author_id === member.user_id;
+            const canDeleteReply = canDeleteFeedPostReply(item.reply.author_id, member.user_id);
             return (
-              <View>
-                <MessageBubble
-                  body={item.reply.body}
-                  senderName={memberMap[item.reply.author_id] ?? 'Unknown'}
-                  senderAvatarUrl={avatarMap[item.reply.author_id]}
-                  createdAt={item.reply.created_at}
-                  isOwn={isOwn}
-                />
-                {canDeleteFeedPostReply(item.reply.author_id, member.user_id) ? (
+              <View
+                style={[styles.replyRow, isOwn ? styles.replyRowOwn : styles.replyRowOther]}
+                testID={`reply-row-${item.reply.id}`}
+              >
+                <View style={styles.replyBubbleCol}>
+                  <MessageBubble
+                    body={item.reply.body}
+                    senderName={memberMap[item.reply.author_id] ?? 'Unknown'}
+                    senderAvatarUrl={avatarMap[item.reply.author_id]}
+                    createdAt={item.reply.created_at}
+                    isOwn={isOwn}
+                  />
+                </View>
+                {canDeleteReply ? (
                   <Pressable
                     onPress={() => void handleDeleteReply(item.reply)}
-                    style={[styles.replyDelete, isOwn && styles.replyDeleteOwn]}
+                    hitSlop={8}
+                    style={[styles.replyDelete, isOwn ? styles.replyDeleteOwn : styles.replyDeleteOther]}
                     testID={`delete-reply-${item.reply.id}`}
                     accessibilityRole="button"
                     accessibilityLabel="Delete reply"
@@ -433,8 +440,10 @@ const styles = StyleSheet.create({
   deleteText: {
     color: theme.colors.danger,
     fontWeight: '600',
-    fontSize: 15,
-    paddingVertical: theme.spacing.xs,
+    fontSize: 13,
+    lineHeight: 16,
+    paddingVertical: 2,
+    alignSelf: 'flex-start',
   },
   threadLabel: {
     marginTop: theme.spacing.sm,
@@ -450,19 +459,38 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
     fontSize: 15,
   },
+  // Caption sits up-right of the bubble (beside top), not a full-width under-row.
+  replyRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 2,
+  },
+  replyRowOwn: {
+    justifyContent: 'flex-end',
+    paddingRight: theme.spacing.sm,
+  },
+  replyRowOther: {
+    justifyContent: 'flex-start',
+  },
+  replyBubbleCol: {
+    flexShrink: 1,
+    maxWidth: '82%',
+  },
   replyDelete: {
-    paddingHorizontal: theme.spacing.lg,
-    marginTop: -2,
-    marginBottom: theme.spacing.sm,
-    alignSelf: 'flex-start',
+    paddingTop: 10,
+    paddingHorizontal: 4,
   },
   replyDeleteOwn: {
-    alignSelf: 'flex-end',
+    marginLeft: 2,
+  },
+  replyDeleteOther: {
+    marginLeft: 2,
   },
   replyDeleteText: {
     color: theme.colors.textMuted,
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 11,
+    lineHeight: 13,
+    fontWeight: '500',
   },
   closeText: {
     color: theme.colors.textSecondary,
