@@ -30,6 +30,8 @@ export async function registerForPushNotifications(userId: string): Promise<stri
   const token = tokenData.data;
   const platform = Platform.OS as 'ios' | 'android' | 'web';
 
+  // Upsert for this user. DB trigger claim_device_token drops other users'
+  // rows for the same Expo token so one device maps to the current account.
   await supabase.from('device_tokens').upsert(
     { user_id: userId, expo_push_token: token, platform },
     { onConflict: 'user_id,expo_push_token' }

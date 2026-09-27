@@ -20,16 +20,37 @@ Deno.test('filterRecipients excludes sender', () => {
   assertEquals(filtered.every((t) => t.userId !== 'u2'), true);
 });
 
-Deno.test('filterRecipients skips tokens also registered to excluded users', () => {
+Deno.test('filterRecipients keeps shared tokens for non-author recipients', () => {
   const tokens = [
     { userId: 'diana', token: 'shared-phone' },
     { userId: 'lins', token: 'shared-phone' },
+    { userId: 'lins', token: 'lins-only' },
     { userId: 'test', token: 'test-phone' },
   ];
-  // Diana authored a message tagging Hr. Lins on a shared TestFlight device.
-  // Do not deliver to the shared token or she sees her own push.
+  // Diana authored a message tagging Hr. Lins. Author is excluded by user_id,
+  // but the shared token still delivers once as Lins (not dropped).
   const filtered = filterRecipients(tokens, ['diana'], ['lins', 'test']);
-  assertEquals(filtered.map((t) => t.userId), ['test']);
+  assertEquals(
+    filtered.map((t) => `${t.userId}:${t.token}`),
+    ['lins:shared-phone', 'lins:lins-only', 'test:test-phone']
+  );
+  assertEquals(filtered.every((t) => t.userId !== 'diana'), true);
+});
+
+Deno.test('filterRecipients: Diana has only shared tokens still gets push', () => {
+  const tokens = [
+    { userId: 'lins', token: 'shared-a' },
+    { userId: 'diana', token: 'shared-a' },
+    { userId: 'lins', token: 'shared-b' },
+    { userId: 'diana', token: 'shared-b' },
+    { userId: 'lins', token: 'lins-only' },
+  ];
+  // Hr. Lins → Diana: Diana has no unique token; shared ones must still deliver.
+  const filtered = filterRecipients(tokens, ['lins'], ['diana']);
+  assertEquals(
+    filtered.map((t) => `${t.userId}:${t.token}`),
+    ['diana:shared-a', 'diana:shared-b']
+  );
 });
 
 Deno.test('filterRecipients include list targets tagged users', () => {
@@ -158,9 +179,16 @@ Deno.test('resolveChatPushRecipients: untagged never targets tagged-only', () =>
   const untagged = resolveChatPushRecipients(tokens, prefs, [diana], [lins], false);
   assertEquals(untagged.map((r) => r.userId), []);
 
+  // Tagged: deliver to Lins on shared + unique tokens (author diana excluded by id).
   const tagged = resolveChatPushRecipients(tokens, prefs, [diana], [lins], true);
-  assertEquals(tagged.map((r) => `${r.userId}:${r.token}`), ['lins:lins-phone']);
+  assertEquals(
+    tagged.map((r) => `${r.userId}:${r.token}`),
+    ['lins:shared', 'lins:lins-phone']
+  );
 
   const everybody = resolveChatPushRecipients(tokens, prefs, [diana], null, true);
-  assertEquals(everybody.map((r) => `${r.userId}:${r.token}`), ['lins:lins-phone']);
+  assertEquals(
+    everybody.map((r) => `${r.userId}:${r.token}`),
+    ['lins:shared', 'lins:lins-phone']
+  );
 });
