@@ -52,20 +52,27 @@ export function FeedInlineThread({
       ) : (
         replies.map((reply) => {
           const isOwn = reply.author_id === currentUserId;
+          const canDelete =
+            Boolean(onDeleteReply) && canDeleteFeedPostReply(reply.author_id, currentUserId);
           return (
-            <View key={reply.id} style={styles.replyBlock}>
-              <MessageBubble
-                body={reply.body}
-                senderName={memberMap[reply.author_id] ?? 'Unknown'}
-                senderAvatarUrl={avatarMap[reply.author_id]}
-                createdAt={reply.created_at}
-                isOwn={isOwn}
-              />
-              {onDeleteReply && canDeleteFeedPostReply(reply.author_id, currentUserId) ? (
+            <View
+              key={reply.id}
+              style={[styles.replyRow, isOwn ? styles.replyRowOwn : styles.replyRowOther]}
+            >
+              <View style={styles.replyBubbleCol}>
+                <MessageBubble
+                  body={reply.body}
+                  senderName={memberMap[reply.author_id] ?? 'Unknown'}
+                  senderAvatarUrl={avatarMap[reply.author_id]}
+                  createdAt={reply.created_at}
+                  isOwn={isOwn}
+                />
+              </View>
+              {canDelete ? (
                 <Pressable
-                  onPress={() => onDeleteReply(reply)}
+                  onPress={() => onDeleteReply?.(reply)}
                   hitSlop={8}
-                  style={[styles.replyDelete, isOwn && styles.replyDeleteOwn]}
+                  style={styles.replyDelete}
                   testID={`inline-delete-reply-${reply.id}`}
                   accessibilityRole="button"
                   accessibilityLabel="Delete reply"
@@ -133,18 +140,26 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
     fontSize: 13,
   },
-  replyBlock: {
+  replyRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
     marginBottom: 2,
+  },
+  replyRowOwn: {
+    justifyContent: 'flex-end',
+    paddingRight: theme.spacing.sm,
+  },
+  replyRowOther: {
+    justifyContent: 'flex-start',
+  },
+  replyBubbleCol: {
+    flexShrink: 1,
+    maxWidth: '82%',
   },
   replyDelete: {
-    marginTop: -10,
-    marginBottom: 2,
-    paddingHorizontal: theme.spacing.lg + 28 + theme.spacing.sm,
-    alignSelf: 'flex-start',
-  },
-  replyDeleteOwn: {
-    alignSelf: 'flex-end',
-    paddingHorizontal: theme.spacing.lg,
+    paddingTop: 10,
+    paddingHorizontal: 4,
+    marginLeft: 2,
   },
   replyDeleteText: {
     color: theme.colors.textMuted,
