@@ -336,8 +336,9 @@ export default function PostThreadScreen() {
               );
             }
             const isOwn = item.reply.author_id === member.user_id;
+            const canDeleteReply = canDeleteFeedPostReply(item.reply.author_id, member.user_id);
             return (
-              <View>
+              <View style={styles.replyWrap} testID={`reply-row-${item.reply.id}`}>
                 <MessageBubble
                   body={item.reply.body}
                   senderName={memberMap[item.reply.author_id] ?? 'Unknown'}
@@ -345,16 +346,23 @@ export default function PostThreadScreen() {
                   createdAt={item.reply.created_at}
                   isOwn={isOwn}
                 />
-                {canDeleteFeedPostReply(item.reply.author_id, member.user_id) ? (
-                  <Pressable
-                    onPress={() => void handleDeleteReply(item.reply)}
-                    style={[styles.replyDelete, isOwn && styles.replyDeleteOwn]}
-                    testID={`delete-reply-${item.reply.id}`}
-                    accessibilityRole="button"
-                    accessibilityLabel="Delete reply"
+                {canDeleteReply ? (
+                  <View
+                    style={[
+                      styles.replyDeleteRow,
+                      isOwn ? styles.replyDeleteRowOwn : styles.replyDeleteRowOther,
+                    ]}
                   >
-                    <Text style={styles.replyDeleteText}>Delete</Text>
-                  </Pressable>
+                    <Pressable
+                      onPress={() => void handleDeleteReply(item.reply)}
+                      hitSlop={8}
+                      testID={`delete-reply-${item.reply.id}`}
+                      accessibilityRole="button"
+                      accessibilityLabel="Delete reply"
+                    >
+                      <Text style={styles.replyDeleteText}>Delete</Text>
+                    </Pressable>
+                  </View>
                 ) : null}
               </View>
             );
@@ -433,8 +441,10 @@ const styles = StyleSheet.create({
   deleteText: {
     color: theme.colors.danger,
     fontWeight: '600',
-    fontSize: 15,
-    paddingVertical: theme.spacing.xs,
+    fontSize: 13,
+    lineHeight: 16,
+    paddingVertical: 2,
+    alignSelf: 'flex-start',
   },
   threadLabel: {
     marginTop: theme.spacing.sm,
@@ -450,19 +460,28 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
     fontSize: 15,
   },
-  replyDelete: {
-    paddingHorizontal: theme.spacing.lg,
-    marginTop: -2,
-    marginBottom: theme.spacing.sm,
-    alignSelf: 'flex-start',
+  replyWrap: {
+    marginBottom: 2,
   },
-  replyDeleteOwn: {
-    alignSelf: 'flex-end',
+  // Caption tucked under the bubble’s trailing edge (not a full-width action row).
+  replyDeleteRow: {
+    marginTop: -8,
+    marginBottom: 2,
+    paddingHorizontal: theme.spacing.lg,
+  },
+  replyDeleteRowOwn: {
+    alignItems: 'flex-end',
+  },
+  replyDeleteRowOther: {
+    // Match MessageBubble: avatar 28 + gap sm before the bubble.
+    paddingLeft: theme.spacing.lg + 28 + theme.spacing.sm,
+    alignItems: 'flex-start',
   },
   replyDeleteText: {
     color: theme.colors.textMuted,
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 11,
+    lineHeight: 13,
+    fontWeight: '500',
   },
   closeText: {
     color: theme.colors.textSecondary,
