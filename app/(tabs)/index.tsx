@@ -1,5 +1,5 @@
 import { router, useFocusEffect, type Href } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, FlatList, Keyboard, StyleSheet, Text } from 'react-native';
 import { ActivityItem } from '@/components/ActivityItem';
 import { FeedComposer } from '@/components/FeedComposer';
@@ -24,6 +24,7 @@ import {
   shouldSendFeedReplyPush,
   sortRepliesChronologically,
 } from '@/lib/feed-post-replies';
+import { subscribeToFeedPostReplyInserts } from '@/lib/feed-post-reply-realtime';
 import { canDeleteHostAssignment, deleteHostAssignment } from '@/lib/host-assignments';
 import { isLocalMode } from '@/lib/local-store';
 import { shouldRefreshFeedOnNotification } from '@/lib/notification-refresh';
@@ -74,13 +75,64 @@ export default function FeedScreen() {
     setThreadLoading((prev) => ({ ...prev, [postId]: true }));
     try {
       const replies = sortRepliesChronologically(await listFeedPostReplies(postId));
-      setThreadReplies((prev) => ({ ...prev, [postId]: replies }));
+      setThreadReplies((prev) => ({
+        ...prev,
+        // Merge so a realtime INSERT that landed mid-fetch is not wiped.
+        [postId]: mergeReplies(prev[postId] ?? [], replies),
+      }));
     } catch (error) {
       Alert.alert('Could not load thread', formatUserFacingError(error, 'Could not load replies.'));
     } finally {
       setThreadLoading((prev) => ({ ...prev, [postId]: false }));
     }
   }, []);
+
+  const bumpReplyCount = useCallback((postId: string, delta: number) => {
+    setItems((prev) =>
+      prev.map((item) => {
+        if (item.kind !== 'post' || item.sourceId !== postId) return item;
+        return { ...item, replyCount: Math.max(0, (item.replyCount ?? 0) + delta) };
+      })
+    );
+  }, []);
+
+  const bumpReplyCountRef = useRef(bumpReplyCount);
+  bumpReplyCountRef.current = bumpReplyCount;
+
+  // Live reply inserts + chat-style poll while a thread is expanded on Feed.
+  useEffect(() => {
+    if (!expandedPostId || isLocalMode()) return undefined;
+
+    let stop: (() => void) | undefined;
+    try {
+      stop = subscribeToFeedPostReplyInserts(expandedPostId, (reply) => {
+        setThreadReplies((prev) => {
+          const before = prev[expandedPostId] ?? [];
+          const next = mergeReplies(before, [reply]);
+          if (next.length > before.length) {
+            bumpReplyCountRef.current(expandedPostId, next.length - before.length);
+          }
+          return { ...prev, [expandedPostId]: next };
+        });
+      });
+    } catch {
+      stop = undefined;
+    }
+
+    const interval = setInterval(() => {
+      void listFeedPostReplies(expandedPostId).then((rows) => {
+        setThreadReplies((prev) => ({
+          ...prev,
+          [expandedPostId]: mergeReplies(prev[expandedPostId] ?? [], rows),
+        }));
+      });
+    }, 8000);
+
+    return () => {
+      stop?.();
+      clearInterval(interval);
+    };
+  }, [expandedPostId]);
 
   const toggleThread = useCallback(
     (postId: string) => {
@@ -93,15 +145,6 @@ export default function FeedScreen() {
     },
     [loadThread]
   );
-
-  const bumpReplyCount = (postId: string, delta: number) => {
-    setItems((prev) =>
-      prev.map((item) => {
-        if (item.kind !== 'post' || item.sourceId !== postId) return item;
-        return { ...item, replyCount: Math.max(0, (item.replyCount ?? 0) + delta) };
-      })
-    );
-  };
 
   const handleSendInlineReply = async (postId: string, text: string) => {
     if (!member) return;

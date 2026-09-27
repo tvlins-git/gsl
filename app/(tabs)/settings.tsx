@@ -17,7 +17,6 @@ import { UserOptionRow } from '@/components/UserOptionRow';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   ADMIN_USER_ID,
-  DEFAULT_HARDCODED_USER,
   isAdminUser,
   type AppUser,
 } from '@/constants/hardcoded-user';
@@ -29,7 +28,6 @@ import {
 } from '@/lib/app-users';
 import {
   getGroupMembers,
-  getStoredUser,
   memberNotificationPreference,
   updateMemberContactEmail,
   updateMemberNotificationPreference,
@@ -56,7 +54,8 @@ export default function SettingsScreen() {
     useAuth();
   const [busy, setBusy] = useState(false);
   const [users, setUsers] = useState<AppUser[]>([]);
-  const [selectedUserId, setSelectedUserId] = useState(DEFAULT_HARDCODED_USER.id);
+  // Empty until the user taps a name — never pre-select Hr. Lins / last user.
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
   const [currentPassword, setCurrentPassword] = useState('');
@@ -117,8 +116,12 @@ export default function SettingsScreen() {
   );
 
   useEffect(() => {
-    if (!loggedOut && member) return;
-    getStoredUser().then((user) => setSelectedUserId(user.id));
+    // Fresh login screen: clear any prior radio selection.
+    if (loggedOut && !member) {
+      setSelectedUserId(null);
+      setPassword('');
+      setLoginError('');
+    }
   }, [loggedOut, member]);
 
   useEffect(() => {
@@ -135,10 +138,9 @@ export default function SettingsScreen() {
     setAvatarSuccess('');
   }, [member?.id, member?.notification_preference, member?.avatar_url]);
 
-  const selectedUser =
-    users.find((user) => user.id === selectedUserId) ??
-    users[0] ??
-    DEFAULT_HARDCODED_USER;
+  const selectedUser = selectedUserId
+    ? users.find((user) => user.id === selectedUserId) ?? null
+    : null;
   const signedInUser = resolveSignedInAppUser(member?.display_name);
   const isAdmin = isAdminUser(member) || isAdminUser(signedInUser);
 
@@ -146,6 +148,7 @@ export default function SettingsScreen() {
     setBusy(true);
     try {
       await signOut();
+      setSelectedUserId(null);
       setPassword('');
       setCurrentPassword('');
       setNewPassword('');
@@ -177,6 +180,10 @@ export default function SettingsScreen() {
   };
 
   const handleSignIn = async () => {
+    if (!selectedUser) {
+      setLoginError('Select a user first.');
+      return;
+    }
     if (!password.trim()) {
       setLoginError('Enter your password.');
       return;
@@ -780,16 +787,20 @@ export default function SettingsScreen() {
               />
               {loginError ? <Text style={styles.errorText}>{loginError}</Text> : null}
               <Pressable
-                style={[sharedStyles.primaryBtn, styles.loginBtn, busy && styles.btnDisabled]}
+                style={[
+                  sharedStyles.primaryBtn,
+                  styles.loginBtn,
+                  (busy || !selectedUser) && styles.btnDisabled,
+                ]}
                 onPress={handleSignIn}
-                disabled={busy}
+                disabled={busy || !selectedUser}
                 testID="sign-in-btn"
               >
                 {busy ? (
                   <ActivityIndicator color={theme.colors.onPrimary} />
                 ) : (
                   <Text style={sharedStyles.primaryBtnText}>
-                    Continue as {selectedUser.displayName}
+                    {selectedUser ? `Continue as ${selectedUser.displayName}` : 'Select a user'}
                   </Text>
                 )}
               </Pressable>

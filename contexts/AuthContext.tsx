@@ -7,9 +7,13 @@ import {
   clearLoggedOut,
   ensureHardcodedSession,
   getCurrentMember,
+  getStoredUser,
+  isLoggedOut,
+  setLocalModePersisted,
   setStoredUser,
   signInWithPassword,
   signOutUser,
+  wasLocalModePersisted,
 } from '@/lib/auth';
 import type { Member } from '@/lib/database.types';
 import { disableLocalMode, isLocalMode } from '@/lib/local-store';
@@ -49,6 +53,7 @@ async function bootstrapSession(
     if (!hadLocalPassword && typedPassword.trim()) {
       await setPasswordOverride(user.id, typedPassword.trim());
     }
+    await setLocalModePersisted(false);
     setSession(s);
     setLoggedOut(false);
     await refreshMember();
@@ -66,6 +71,58 @@ async function bootstrapSession(
   setMember(localMember);
   setLoggedOut(false);
   return { ok: true as const };
+}
+
+/**
+ * Restore a previous session after force-quit / relaunch.
+ * Never auto-login Hr. Lins; never wipe a valid session on boot.
+ */
+async function restoreSessionOnLaunch(
+  setSession: (s: Session | null) => void,
+  setMember: (m: Member | null) => void,
+  setLocalMode: (v: boolean) => void,
+  setLoggedOut: (v: boolean) => void,
+  refreshMember: () => Promise<void>
+): Promise<boolean> {
+  await ensureAppUsersLoaded();
+
+  if (await isLoggedOut()) {
+    disableLocalMode();
+    setSession(null);
+    setMember(null);
+    setLocalMode(false);
+    setLoggedOut(true);
+    return false;
+  }
+
+  const { data } = await supabase.auth.getSession();
+  if (data.session) {
+    await setLocalModePersisted(false);
+    disableLocalMode();
+    setSession(data.session);
+    setLocalMode(false);
+    setLoggedOut(false);
+    await refreshMember();
+    return true;
+  }
+
+  const storedUser = await getStoredUser();
+  if (storedUser && (await wasLocalModePersisted())) {
+    const localMember = await activateLocalMode(storedUser);
+    setSession(null);
+    setMember(localMember);
+    setLocalMode(true);
+    setLoggedOut(false);
+    return true;
+  }
+
+  // No persisted session — stay on login without calling signOut (storage is already empty).
+  disableLocalMode();
+  setSession(null);
+  setMember(null);
+  setLocalMode(false);
+  setLoggedOut(true);
+  return false;
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -145,12 +202,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let cancelled = false;
 
-    ensureAppUsersLoaded()
-      .then(async () => {
+    restoreSessionOnLaunch(setSession, setMember, setLocalMode, setLoggedOut, refreshMember)
+      .then((restored) => {
+        if (cancelled) return;
+        sessionUnlockedRef.current = restored;
+      })
+      .catch(() => {
         if (cancelled) return;
         sessionUnlockedRef.current = false;
         disableLocalMode();
-        await supabase.auth.signOut().catch(() => undefined);
         setSession(null);
         setMember(null);
         setLocalMode(false);

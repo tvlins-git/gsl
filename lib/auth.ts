@@ -1,7 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   ADMIN_USER_ID,
-  DEFAULT_HARDCODED_USER,
   type AppUser,
 } from '@/constants/hardcoded-user';
 import { ensureAppUsersLoaded, getAppUser } from './app-users';
@@ -26,6 +25,7 @@ import {
 
 const LOGGED_OUT_KEY = 'gsl_logged_out';
 const SELECTED_USER_KEY = 'gsl_selected_user_id';
+const LOCAL_MODE_KEY = 'gsl_local_mode';
 
 export async function isLoggedOut(): Promise<boolean> {
   return (await AsyncStorage.getItem(LOGGED_OUT_KEY)) === 'true';
@@ -35,19 +35,34 @@ export async function clearLoggedOut() {
   await AsyncStorage.removeItem(LOGGED_OUT_KEY);
 }
 
-export async function getStoredUser(): Promise<AppUser> {
+/** Last chosen login identity, or null when the user has never selected one. */
+export async function getStoredUser(): Promise<AppUser | null> {
   await ensureAppUsersLoaded();
   const id = await AsyncStorage.getItem(SELECTED_USER_KEY);
-  return (await getAppUser(id ?? '')) ?? DEFAULT_HARDCODED_USER;
+  if (!id) return null;
+  return (await getAppUser(id)) ?? null;
 }
 
 export async function setStoredUser(user: AppUser) {
   await AsyncStorage.setItem(SELECTED_USER_KEY, user.id);
 }
 
+export async function wasLocalModePersisted(): Promise<boolean> {
+  return (await AsyncStorage.getItem(LOCAL_MODE_KEY)) === 'true';
+}
+
+export async function setLocalModePersisted(active: boolean) {
+  if (active) {
+    await AsyncStorage.setItem(LOCAL_MODE_KEY, 'true');
+  } else {
+    await AsyncStorage.removeItem(LOCAL_MODE_KEY);
+  }
+}
+
 export async function signOutUser() {
   disableLocalMode();
-  await supabase.auth.signOut();
+  await setLocalModePersisted(false);
+  await supabase.auth.signOut().catch(() => undefined);
   await AsyncStorage.setItem(LOGGED_OUT_KEY, 'true');
 }
 
@@ -275,6 +290,7 @@ export function memberNotificationPreference(member: Member | null | undefined):
 export async function activateLocalMode(user: AppUser) {
   enableLocalMode();
   setActiveLocalUser(user);
+  await setLocalModePersisted(true);
   await localStore.hydrate();
   return createLocalMember();
 }
