@@ -91,8 +91,13 @@ export default function SettingsScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      // Re-read live members + the signed-in member row so notification
+      // preference and the Users list match public.members after login / other devices.
       refreshUsers().catch(() => undefined);
-    }, [refreshUsers])
+      if (!loggedOut) {
+        refreshMember().catch(() => undefined);
+      }
+    }, [refreshUsers, refreshMember, loggedOut])
   );
 
   useEffect(() => {
@@ -343,7 +348,8 @@ export default function SettingsScreen() {
     setNotifyError('');
     setNotifySuccess('');
     try {
-      await updateMemberNotificationPreference(member.id, notifyPref);
+      const saved = await updateMemberNotificationPreference(member.id, notifyPref);
+      setNotifyPref(memberNotificationPreference(saved));
       await refreshMember();
       setNotifySuccess('Notification preference saved.');
     } catch (err) {

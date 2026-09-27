@@ -47,7 +47,7 @@ async function bootstrapSession(
     return;
   }
 
-  const localMember = activateLocalMode(user);
+  const localMember = await activateLocalMode(user);
   setLocalMode(true);
   setMember(localMember);
   setLoggedOut(false);
@@ -97,7 +97,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { ok: true as const };
     } catch {
       await ensureAppUsersLoaded();
-      const localMember = activateLocalMode(user);
+      const localMember = await activateLocalMode(user);
       setLocalMode(true);
       setMember(localMember);
       setLoggedOut(false);
