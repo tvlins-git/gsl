@@ -56,6 +56,8 @@ cp .env.example .env
    ```
    Profile **Create user** calls `create-group-member` once. Profile **Delete** calls
    `delete-group-member` (admin-only) so the person is removed from `members` and Auth.
+   Profile **Users** lists live `public.members` for the signed-in group (merged with
+   this device's login roster), so members created on another phone appear here too.
    Feed/Hosts/Chat do **not** re-push the local login roster into `members` — that used
    to resurrect people deleted in Supabase while still cached in AsyncStorage.
 5. **Single user:** The app auto-signs in as **Hr. Lins** (no login screen). On first launch it creates the Supabase account if needed.
