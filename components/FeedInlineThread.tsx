@@ -1,6 +1,6 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FeedReplyRow } from '@/components/FeedReplyRow';
 import { MentionSuggestions } from '@/components/MentionSuggestions';
-import { MessageBubble } from '@/components/MessageBubble';
 import { useMentionField } from '@/components/useMentionField';
 import { UserAvatar } from '@/components/UserAvatar';
 import type { FeedPostReply, Member } from '@/lib/database.types';
@@ -55,33 +55,16 @@ export function FeedInlineThread({
           const canDelete =
             Boolean(onDeleteReply) && canDeleteFeedPostReply(reply.author_id, currentUserId);
           return (
-            <View
+            <FeedReplyRow
               key={reply.id}
-              style={[styles.replyRow, isOwn ? styles.replyRowOwn : styles.replyRowOther]}
-            >
-              <View style={styles.replyBubbleCol}>
-                <MessageBubble
-                  body={reply.body}
-                  senderName={memberMap[reply.author_id] ?? 'Unknown'}
-                  senderAvatarUrl={avatarMap[reply.author_id]}
-                  createdAt={reply.created_at}
-                  isOwn={isOwn}
-                  compact
-                />
-              </View>
-              {canDelete ? (
-                <Pressable
-                  onPress={() => onDeleteReply?.(reply)}
-                  hitSlop={8}
-                  style={styles.replyDelete}
-                  testID={`inline-delete-reply-${reply.id}`}
-                  accessibilityRole="button"
-                  accessibilityLabel="Delete reply"
-                >
-                  <Text style={styles.replyDeleteText}>Delete</Text>
-                </Pressable>
-              ) : null}
-            </View>
+              body={reply.body}
+              authorName={memberMap[reply.author_id] ?? 'Unknown'}
+              authorAvatarUrl={avatarMap[reply.author_id]}
+              createdAt={reply.created_at}
+              isOwn={isOwn}
+              onDelete={canDelete ? () => onDeleteReply?.(reply) : undefined}
+              testID={`inline-reply-${reply.id}`}
+            />
           );
         })
       )}
@@ -102,6 +85,8 @@ export function FeedInlineThread({
             style={styles.input}
             placeholder="Write a reply…"
             placeholderTextColor={theme.colors.textMuted}
+            multiline
+            textAlignVertical="top"
             {...mention.inputProps}
             testID={`${testID}-input`}
           />
@@ -141,36 +126,6 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
     fontSize: 13,
   },
-  replyRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 2,
-  },
-  replyRowOwn: {
-    justifyContent: 'flex-end',
-    paddingLeft: theme.spacing.md,
-    paddingRight: theme.spacing.sm,
-  },
-  replyRowOther: {
-    justifyContent: 'flex-start',
-    paddingLeft: theme.spacing.lg,
-    paddingRight: theme.spacing.md,
-  },
-  replyBubbleCol: {
-    flexShrink: 1,
-    maxWidth: '90%',
-  },
-  replyDelete: {
-    paddingTop: 10,
-    paddingHorizontal: 4,
-    marginLeft: 2,
-  },
-  replyDeleteText: {
-    color: theme.colors.textMuted,
-    fontSize: 11,
-    lineHeight: 13,
-    fontWeight: '500',
-  },
   composer: {
     paddingHorizontal: theme.spacing.lg,
     paddingTop: theme.spacing.sm,
@@ -186,12 +141,13 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.surface,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    borderRadius: theme.radius.pill,
+    borderRadius: theme.radius.lg,
     paddingHorizontal: theme.spacing.md,
-    paddingVertical: 8,
+    paddingVertical: 10,
     fontSize: 15,
     color: theme.colors.text,
-    maxHeight: 100,
+    minHeight: 40,
+    maxHeight: 120,
   },
   sendBtn: {
     backgroundColor: theme.colors.primary,
