@@ -52,9 +52,14 @@ export async function signOutUser() {
 }
 
 /** Sign in with an app user; returns session or null (caller enables local mode). */
-export async function ensureHardcodedSession(user: AppUser) {
+export async function ensureHardcodedSession(user: AppUser, typedPassword?: string) {
   const { email, displayName, role, id } = user;
-  const password = passwordForAuth(await getEffectivePassword(user));
+  const stored = await getEffectivePassword(user);
+  // Prefer the password the person typed (required for remote-only rows with
+  // empty local password). Fall back to the device-stored credential.
+  const rawPassword = typedPassword?.trim() || stored;
+  if (!rawPassword) return null;
+  const password = passwordForAuth(rawPassword);
   await setStoredUser(user);
 
   const { data: existing } = await supabase.auth.getSession();
@@ -260,8 +265,33 @@ export async function signInWithPassword(
   user: AppUser,
   password: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  if (!(await validateUserPassword(user, password))) {
+  const expected = await getEffectivePassword(user);
+
+  // Device has a local credential (seed / create / override) — compare here.
+  if (expected) {
+    if (!(await validateUserPassword(user, password))) {
+      return { ok: false, error: 'Incorrect password.' };
+    }
+    return { ok: true };
+  }
+
+  // Remote-only row (empty local password): Supabase Auth is the source of truth.
+  // Verify the typed password against Auth now so a wrong password cannot fall
+  // through into local mode.
+  if (!password.trim()) {
     return { ok: false, error: 'Incorrect password.' };
   }
+  if (isLocalMode()) {
+    return { ok: false, error: 'Incorrect password.' };
+  }
+
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: user.email,
+    password: passwordForAuth(password),
+  });
+  if (error || !data.session) {
+    return { ok: false, error: 'Incorrect password.' };
+  }
+  // Leave the session for ensureHardcodedSession to reuse.
   return { ok: true };
 }

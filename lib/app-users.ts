@@ -215,6 +215,72 @@ export async function deleteAppUser(
   return { ok: true };
 }
 
+/**
+ * Merge remote-derived login rows into the device roster (`gsl_app_users_v1`).
+ *
+ * - Adds accounts missing by display name (e.g. Diana created on another phone).
+ * - Never clears an existing local password / override for accounts already here.
+ * - Updates role / member ids / email gaps without replacing the whole list.
+ *
+ * Membership source of truth remains `public.members`; this cache only makes the
+ * logged-out Select-user picker reflect the live group after sign-in.
+ */
+export async function mergeIntoLoginRoster(incoming: AppUser[]): Promise<AppUser[]> {
+  const users = await ensureAppUsersLoaded();
+  if (!incoming.length) return users;
+
+  let changed = false;
+  const next = users.map((user) => ({ ...user }));
+
+  for (const remote of incoming) {
+    const key = remote.displayName.trim().toLowerCase();
+    if (!key) continue;
+
+    const existingIdx = next.findIndex(
+      (user) => user.displayName.trim().toLowerCase() === key
+    );
+
+    if (existingIdx < 0) {
+      next.push({
+        ...remote,
+        // Remote-only rows intentionally carry an empty local password —
+        // Supabase Auth is the cross-device source of truth.
+        password: remote.password || '',
+      });
+      changed = true;
+      continue;
+    }
+
+    const existing = next[existingIdx];
+    const updated: AppUser = {
+      ...existing,
+      role: remote.role === 'admin' ? 'admin' : existing.role,
+      displayName: remote.displayName.trim() || existing.displayName,
+      localMemberId: remote.localMemberId || existing.localMemberId,
+      localUserId: remote.localUserId || existing.localUserId,
+      email: existing.email || remote.email,
+      // Keep existing.password — never wipe a device-local credential.
+    };
+
+    if (
+      updated.role !== existing.role ||
+      updated.displayName !== existing.displayName ||
+      updated.localMemberId !== existing.localMemberId ||
+      updated.localUserId !== existing.localUserId ||
+      updated.email !== existing.email
+    ) {
+      next[existingIdx] = updated;
+      changed = true;
+    }
+  }
+
+  if (!changed) return users;
+
+  const normalized = ensureAdminPresent(next);
+  await persist(normalized);
+  return normalized;
+}
+
 export function resolveSignedInAppUser(memberDisplayName: string | null | undefined): AppUser | undefined {
   if (!memberDisplayName) return undefined;
   return getAppUsersSync().find((user) => user.displayName === memberDisplayName);

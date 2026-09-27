@@ -3,7 +3,7 @@ import {
   type AppUser,
   type AppUserRole,
 } from '@/constants/hardcoded-user';
-import { listAppUsers } from './app-users';
+import { listAppUsers, mergeIntoLoginRoster } from './app-users';
 import { getGroupMembers } from './auth';
 import type { Member } from './database.types';
 import { isLocalMode } from './local-store';
@@ -67,8 +67,8 @@ export function mergeMemberWithLocalUsers(member: Member, localUsers: AppUser[])
  * - Signed-in Supabase session: live `public.members` for the group (merged with
  *   local login rows so create/delete still have emails and local ids).
  *
- * This closes the multi-device gap where User A created on phone B exists in
- * `members` but never appears on phone A's Profile list.
+ * Also persists missing remote members into `gsl_app_users_v1` so logout →
+ * Select user shows the full group (not only accounts created on this phone).
  */
 export async function listManagedGroupUsers(groupId: string | null | undefined): Promise<AppUser[]> {
   if (!groupId || isLocalMode() || !isSupabaseConfigured()) {
@@ -80,5 +80,19 @@ export async function listManagedGroupUsers(groupId: string | null | undefined):
     return localUsers;
   }
 
-  return members.map((member) => mergeMemberWithLocalUsers(member, localUsers));
+  const merged = members.map((member) => mergeMemberWithLocalUsers(member, localUsers));
+  // Hydrate the device login roster for the Select-user picker after logout /
+  // reinstall. Does not wipe local passwords for accounts that already have one.
+  await mergeIntoLoginRoster(merged);
+  return merged;
+}
+
+/**
+ * Pull live `public.members` into the device login roster after a successful
+ * Supabase sign-in (or member refresh). Safe to call repeatedly.
+ */
+export async function hydrateLoginRosterFromGroup(
+  groupId: string | null | undefined
+): Promise<AppUser[]> {
+  return listManagedGroupUsers(groupId);
 }

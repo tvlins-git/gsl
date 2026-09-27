@@ -26,6 +26,7 @@ import {
   deleteAppUser,
   ensureAppUsersLoaded,
   listAppUsers,
+  mergeIntoLoginRoster,
   subscribeAppUsers,
 } from '@/lib/app-users';
 import { listManagedGroupUsers } from '@/lib/group-managed-users';
@@ -43,6 +44,34 @@ describe('app-users', () => {
     expect(users[0].id).toBe(ADMIN_USER_ID);
     expect(users[0].role).toBe('admin');
     expect(users[0].displayName).toBe('Hr. Lins');
+  });
+
+  it('merges remote-only members into the login roster without inventing passwords', async () => {
+    await ensureAppUsersLoaded();
+    const merged = await mergeIntoLoginRoster([
+      {
+        id: 'diana',
+        email: 'diana@gsl.local',
+        password: '',
+        displayName: 'Diana',
+        role: 'member',
+        localMemberId: 'fccd8a71-431d-42ad-a78e-15e3de5997b1',
+        localUserId: 'baa2d7bf-bf2f-4d6b-8b28-dca82b795422',
+      },
+      {
+        id: 'test',
+        email: 'test@gsl.local',
+        password: '',
+        displayName: 'Test',
+        role: 'member',
+        localMemberId: '0dc8a48e-29bf-4fd4-85d0-786802f1521f',
+        localUserId: '25b04bb9-a7e7-4b50-94f3-f7cd55bc73ac',
+      },
+    ]);
+
+    expect(merged.map((user) => user.displayName).sort()).toEqual(['Diana', 'Hr. Lins', 'Test']);
+    expect(merged.find((user) => user.displayName === 'Diana')?.password).toBe('');
+    expect(await listAppUsers()).toEqual(merged);
   });
 
   it('strips legacy Hr. Andersen from stored users', async () => {

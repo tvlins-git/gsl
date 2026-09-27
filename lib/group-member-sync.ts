@@ -39,7 +39,12 @@ export async function syncLoginAccountsIntoGroup(groupId: string): Promise<strin
   for (const user of users) {
     const name = user.displayName.trim().toLowerCase();
     if (!name || names.has(name)) continue;
-    const password = passwordForAuth(await getEffectivePassword(user));
+    // Remote-hydrated rows keep an empty local password — Auth already owns them.
+    // Never push those into create-group-member (would invent a fake password and
+    // could resurrect someone deleted from public.members).
+    const effective = await getEffectivePassword(user);
+    if (!effective) continue;
+    const password = passwordForAuth(effective);
     const { error: invokeError } = await supabase.functions.invoke('create-group-member', {
       body: {
         email: user.email,

@@ -29,6 +29,7 @@ import {
 import { getGroupMembers } from '@/lib/auth';
 import {
   appUserFromRemoteMember,
+  hydrateLoginRosterFromGroup,
   listManagedGroupUsers,
   mergeMemberWithLocalUsers,
 } from '@/lib/group-managed-users';
@@ -141,6 +142,62 @@ describe('group-managed-users', () => {
     expect(users.map((user) => user.displayName)).toEqual(['Diana', 'Hr. Lins', 'Test']);
     expect(users.find((user) => user.displayName === 'Diana')?.email).toBe('diana@gsl.local');
     expect(users.find((user) => user.displayName === 'Test')?.password).toBe('secret');
+  });
+
+  it('hydrates the device login roster from live members so logout Select-user shows Diana', async () => {
+    // Fresh install: only Hr. Lins seeded locally.
+    await ensureAppUsersLoaded();
+    expect((await listAppUsers()).map((user) => user.displayName)).toEqual(['Hr. Lins']);
+
+    (getGroupMembers as jest.Mock).mockResolvedValue([
+      member({
+        id: 'fccd8a71-431d-42ad-a78e-15e3de5997b1',
+        user_id: 'baa2d7bf-bf2f-4d6b-8b28-dca82b795422',
+        display_name: 'Diana',
+        role: 'member',
+      }),
+      member({ display_name: 'Hr. Lins', role: 'admin' }),
+      member({
+        id: '0dc8a48e-29bf-4fd4-85d0-786802f1521f',
+        user_id: '25b04bb9-a7e7-4b50-94f3-f7cd55bc73ac',
+        display_name: 'Test',
+        role: 'member',
+      }),
+    ]);
+
+    // Sign-in / Profile focus path: hydrate from public.members.
+    await hydrateLoginRosterFromGroup('4a1ae983-b5da-40db-b832-6791ac0629aa');
+
+    const roster = await listAppUsers();
+    expect(roster.map((user) => user.displayName).sort()).toEqual(['Diana', 'Hr. Lins', 'Test']);
+
+    const diana = roster.find((user) => user.displayName === 'Diana');
+    expect(diana?.password).toBe('');
+    expect(diana?.email).toBe('diana@gsl.local');
+
+    // Logged-out Select-user uses listManagedGroupUsers(null) → local roster.
+    const loginList = await listManagedGroupUsers(null);
+    expect(loginList.map((user) => user.displayName).sort()).toEqual(['Diana', 'Hr. Lins', 'Test']);
+  });
+
+  it('does not wipe an existing local password when hydrating the same display name', async () => {
+    await ensureAppUsersLoaded();
+    await createAppUser({ displayName: 'Test', password: 'secret' });
+
+    (getGroupMembers as jest.Mock).mockResolvedValue([
+      member({ display_name: 'Hr. Lins', role: 'admin' }),
+      member({
+        id: '0dc8a48e-29bf-4fd4-85d0-786802f1521f',
+        user_id: '25b04bb9-a7e7-4b50-94f3-f7cd55bc73ac',
+        display_name: 'Test',
+        role: 'member',
+      }),
+    ]);
+
+    await hydrateLoginRosterFromGroup('group-1');
+
+    const test = (await listAppUsers()).find((user) => user.displayName === 'Test');
+    expect(test?.password).toBe('secret');
   });
 
   it('falls back to the local roster in local mode', async () => {

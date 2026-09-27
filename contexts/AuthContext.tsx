@@ -12,6 +12,7 @@ import {
   signOutUser,
 } from '@/lib/auth';
 import type { Member } from '@/lib/database.types';
+import { hydrateLoginRosterFromGroup } from '@/lib/group-managed-users';
 import { disableLocalMode, isLocalMode } from '@/lib/local-store';
 import { registerForPushNotifications } from '@/lib/push-notifications';
 import { supabase } from '@/lib/supabase';
@@ -31,6 +32,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 async function bootstrapSession(
   user: AppUser,
+  typedPassword: string,
   setSession: (s: Session | null) => void,
   setMember: (m: Member | null) => void,
   setLocalMode: (v: boolean) => void,
@@ -39,7 +41,7 @@ async function bootstrapSession(
 ) {
   await ensureAppUsersLoaded();
 
-  const s = await ensureHardcodedSession(user);
+  const s = await ensureHardcodedSession(user, typedPassword);
   if (s) {
     setSession(s);
     setLoggedOut(false);
@@ -68,6 +70,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setMember(m);
     if (m && !isLocalMode()) {
       await registerForPushNotifications(m.user_id).catch(() => undefined);
+      // After any successful Supabase session, merge live public.members into
+      // the device login roster so logout → Select user shows Diana / Test / etc.
+      await hydrateLoginRosterFromGroup(m.group_id).catch(() => undefined);
     }
   }, []);
 
@@ -93,7 +98,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoggedOut(false);
     setLocalMode(false);
     try {
-      await bootstrapSession(user, setSession, setMember, setLocalMode, setLoggedOut, refreshMember);
+      await bootstrapSession(
+        user,
+        password,
+        setSession,
+        setMember,
+        setLocalMode,
+        setLoggedOut,
+        refreshMember
+      );
       return { ok: true as const };
     } catch {
       await ensureAppUsersLoaded();

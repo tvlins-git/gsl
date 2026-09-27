@@ -119,6 +119,30 @@ describe('syncLoginAccountsIntoGroup', () => {
     await expect(syncLoginAccountsIntoGroup('group-1')).resolves.toEqual([]);
     expect(supabase.functions.invoke).not.toHaveBeenCalled();
   });
+
+  it('skips remote-hydrated accounts with empty local password', async () => {
+    (listAppUsers as jest.Mock).mockResolvedValue([
+      {
+        id: 'hr-lins',
+        email: 'hr.lins@gsl.local',
+        displayName: 'Hr. Lins',
+        password: 'thomas',
+        role: 'admin',
+      },
+      {
+        id: 'diana',
+        email: 'diana@gsl.local',
+        displayName: 'Diana',
+        password: '',
+        role: 'member',
+      },
+    ]);
+    (getEffectivePassword as jest.Mock).mockImplementation(async (user: { password: string }) => user.password);
+    (supabase.from as jest.Mock).mockReturnValue(membersQuery(['Hr. Lins']));
+
+    await expect(syncLoginAccountsIntoGroup('group-1')).resolves.toEqual([]);
+    expect(supabase.functions.invoke).not.toHaveBeenCalled();
+  });
 });
 
 describe('deleteLoginAccountFromGroup', () => {
