@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { type ReactNode, useRef } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
 import { FeedPhoto } from '@/components/FeedPhoto';
@@ -10,6 +10,7 @@ import {
   ALBUM_FEED_THUMB_VISIBLE,
   albumThumbOverflow,
 } from '@/lib/album-previews';
+import { formatThreadExpandLabel } from '@/lib/feed-post-replies';
 import { formatRelativeTime } from '@/lib/time';
 import { theme } from '@/constants/theme';
 
@@ -17,6 +18,10 @@ interface ActivityItemProps {
   item: ActivityItemData;
   onPress: () => void;
   onDelete?: () => void;
+  /** Feed posts: expand/collapse the inline thread under this card. */
+  threadExpanded?: boolean;
+  onToggleThread?: () => void;
+  threadPanel?: ReactNode;
 }
 
 function AlbumThumbs({
@@ -52,10 +57,55 @@ function AlbumThumbs({
   );
 }
 
-export function ActivityItem({ item, onPress, onDelete }: ActivityItemProps) {
+function MetaDot() {
+  return <Text style={styles.meta}> · </Text>;
+}
+
+export function ActivityItem({
+  item,
+  onPress,
+  onDelete,
+  threadExpanded = false,
+  onToggleThread,
+  threadPanel,
+}: ActivityItemProps) {
   const swipeableRef = useRef<Swipeable>(null);
   const photoTestId = `feed-item-${item.id}-photo`;
   const thumbs = item.kind === 'post' ? [] : item.thumbUris ?? [];
+  const isPost = item.kind === 'post';
+  const replyCount = item.replyCount ?? 0;
+  const showThreadControl = isPost && typeof onToggleThread === 'function';
+
+  const meta = (
+    <View style={styles.metaLine}>
+      <Text style={styles.meta} numberOfLines={1}>
+        {item.subtitle}
+      </Text>
+      {showThreadControl ? (
+        <>
+          <MetaDot />
+          <Pressable
+            onPress={() => {
+              onToggleThread();
+            }}
+            hitSlop={6}
+            testID={`feed-item-${item.id}-thread-toggle`}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: threadExpanded }}
+            accessibilityLabel={formatThreadExpandLabel(replyCount, threadExpanded)}
+          >
+            <Text style={styles.threadToggle}>
+              {formatThreadExpandLabel(replyCount, threadExpanded)}
+            </Text>
+          </Pressable>
+        </>
+      ) : null}
+      <MetaDot />
+      <Text style={styles.meta} numberOfLines={1}>
+        {item.authorName} · {formatRelativeTime(item.timestamp)}
+      </Text>
+    </View>
+  );
 
   const row = (
     <Pressable
@@ -75,9 +125,7 @@ export function ActivityItem({ item, onPress, onDelete }: ActivityItemProps) {
           <Text style={styles.title} numberOfLines={item.kind === 'post' ? 2 : 1}>
             {item.title}
           </Text>
-          <Text style={styles.meta} numberOfLines={1}>
-            {item.subtitle} · {item.authorName} · {formatRelativeTime(item.timestamp)}
-          </Text>
+          {meta}
         </View>
         <AlbumThumbs
           uris={thumbs}
@@ -91,35 +139,38 @@ export function ActivityItem({ item, onPress, onDelete }: ActivityItemProps) {
     </Pressable>
   );
 
-  if (!onDelete) {
-    return <View style={styles.wrap}>{row}</View>;
-  }
+  const card = !onDelete ? (
+    row
+  ) : (
+    <Swipeable
+      ref={swipeableRef}
+      friction={2}
+      rightThreshold={40}
+      overshootRight={false}
+      enableTrackpadTwoFingerGesture
+      renderRightActions={(_progress, _drag, swipeable) => (
+        <Pressable
+          style={styles.deleteAction}
+          onPress={() => {
+            (swipeable ?? swipeableRef.current)?.close();
+            onDelete();
+          }}
+          testID={`delete-feed-item-${item.id}`}
+          accessibilityRole="button"
+          accessibilityLabel={`Delete ${activityKindLabel(item.kind).toLowerCase()}`}
+        >
+          <Text style={styles.deleteActionText}>Delete</Text>
+        </Pressable>
+      )}
+    >
+      {row}
+    </Swipeable>
+  );
 
   return (
     <View style={styles.wrap}>
-      <Swipeable
-        ref={swipeableRef}
-        friction={2}
-        rightThreshold={40}
-        overshootRight={false}
-        enableTrackpadTwoFingerGesture
-        renderRightActions={(_progress, _drag, swipeable) => (
-          <Pressable
-            style={styles.deleteAction}
-            onPress={() => {
-              (swipeable ?? swipeableRef.current)?.close();
-              onDelete();
-            }}
-            testID={`delete-feed-item-${item.id}`}
-            accessibilityRole="button"
-            accessibilityLabel={`Delete ${activityKindLabel(item.kind).toLowerCase()}`}
-          >
-            <Text style={styles.deleteActionText}>Delete</Text>
-          </Pressable>
-        )}
-      >
-        {row}
-      </Swipeable>
+      {card}
+      {threadExpanded ? threadPanel : null}
     </View>
   );
 }
@@ -169,9 +220,19 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: theme.colors.text,
   },
+  metaLine: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+  },
   meta: {
     fontSize: 13,
     color: theme.colors.textSecondary,
+  },
+  threadToggle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: theme.colors.primary,
   },
   thumbs: {
     flexDirection: 'row',

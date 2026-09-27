@@ -26,6 +26,12 @@ export function formatReplyCount(count: number) {
   return count === 1 ? '1 reply' : `${count} replies`;
 }
 
+/** Label for the Feed inline expand/collapse control. */
+export function formatThreadExpandLabel(count: number, expanded: boolean) {
+  if (expanded) return count > 0 ? 'Hide replies' : 'Hide';
+  return formatReplyCount(count) ?? 'Reply';
+}
+
 export function sortRepliesChronologically(replies: FeedPostReply[]): FeedPostReply[] {
   return [...replies].sort(
     (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()

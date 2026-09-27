@@ -268,7 +268,7 @@ describe('buildActivityItems', () => {
     });
   });
 
-  it('appends reply counts to feed post subtitles', () => {
+  it('exposes replyCount separately from the tag subtitle', () => {
     const items = buildActivityItems({
       members,
       photoEvents: [],
@@ -290,7 +290,7 @@ describe('buildActivityItems', () => {
       ],
     });
 
-    expect(items[0].subtitle).toBe('Update · 2 replies');
+    expect(items[0].subtitle).toBe('Update');
     expect(items[0].replyCount).toBe(2);
   });
 });
