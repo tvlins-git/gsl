@@ -12,8 +12,8 @@ import {
   View,
 } from 'react-native';
 import { FeedPhoto } from '@/components/FeedPhoto';
+import { FeedReplyRow } from '@/components/FeedReplyRow';
 import { MentionSuggestions } from '@/components/MentionSuggestions';
-import { MessageBubble } from '@/components/MessageBubble';
 import { useKeyboardInset } from '@/components/useKeyboardInset';
 import { useMentionField } from '@/components/useMentionField';
 import { Screen } from '@/components/ui/Screen';
@@ -338,33 +338,18 @@ export default function PostThreadScreen() {
             const isOwn = item.reply.author_id === member.user_id;
             const canDeleteReply = canDeleteFeedPostReply(item.reply.author_id, member.user_id);
             return (
-              <View
-                style={[styles.replyRow, isOwn ? styles.replyRowOwn : styles.replyRowOther]}
+              <FeedReplyRow
+                key={item.key}
+                body={item.reply.body}
+                authorName={memberMap[item.reply.author_id] ?? 'Unknown'}
+                authorAvatarUrl={avatarMap[item.reply.author_id]}
+                createdAt={item.reply.created_at}
+                isOwn={isOwn}
+                onDelete={
+                  canDeleteReply ? () => void handleDeleteReply(item.reply) : undefined
+                }
                 testID={`reply-row-${item.reply.id}`}
-              >
-                <View style={styles.replyBubbleCol}>
-                  <MessageBubble
-                    body={item.reply.body}
-                    senderName={memberMap[item.reply.author_id] ?? 'Unknown'}
-                    senderAvatarUrl={avatarMap[item.reply.author_id]}
-                    createdAt={item.reply.created_at}
-                    isOwn={isOwn}
-                    compact
-                  />
-                </View>
-                {canDeleteReply ? (
-                  <Pressable
-                    onPress={() => void handleDeleteReply(item.reply)}
-                    hitSlop={8}
-                    style={[styles.replyDelete, isOwn ? styles.replyDeleteOwn : styles.replyDeleteOther]}
-                    testID={`delete-reply-${item.reply.id}`}
-                    accessibilityRole="button"
-                    accessibilityLabel="Delete reply"
-                  >
-                    <Text style={styles.replyDeleteText}>Delete</Text>
-                  </Pressable>
-                ) : null}
-              </View>
+              />
             );
           }}
         />
@@ -379,6 +364,8 @@ export default function PostThreadScreen() {
               style={styles.input}
               placeholder="Reply… use @name to notify"
               placeholderTextColor={theme.colors.textMuted}
+              multiline
+              textAlignVertical="top"
               {...mention.inputProps}
               testID="reply-input"
             />
@@ -460,42 +447,6 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
     fontSize: 15,
   },
-  // Caption sits up-right of the bubble (beside top), not a full-width under-row.
-  replyRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 2,
-  },
-  replyRowOwn: {
-    justifyContent: 'flex-end',
-    paddingLeft: theme.spacing.md,
-    paddingRight: theme.spacing.sm,
-  },
-  replyRowOther: {
-    justifyContent: 'flex-start',
-    paddingLeft: theme.spacing.lg,
-    paddingRight: theme.spacing.md,
-  },
-  replyBubbleCol: {
-    flexShrink: 1,
-    maxWidth: '90%',
-  },
-  replyDelete: {
-    paddingTop: 10,
-    paddingHorizontal: 4,
-  },
-  replyDeleteOwn: {
-    marginLeft: 2,
-  },
-  replyDeleteOther: {
-    marginLeft: 2,
-  },
-  replyDeleteText: {
-    color: theme.colors.textMuted,
-    fontSize: 11,
-    lineHeight: 13,
-    fontWeight: '500',
-  },
   closeText: {
     color: theme.colors.textSecondary,
     fontWeight: '600',
@@ -522,11 +473,12 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.bg,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    borderRadius: theme.radius.pill,
+    borderRadius: theme.radius.lg,
     paddingHorizontal: theme.spacing.lg,
     paddingVertical: 10,
     fontSize: 16,
     color: theme.colors.text,
+    minHeight: 44,
     maxHeight: 120,
   },
   sendBtn: {
