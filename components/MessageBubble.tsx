@@ -9,6 +9,8 @@ interface MessageBubbleProps {
   senderAvatarUrl?: string | null;
   createdAt: string;
   isOwn: boolean;
+  /** Drop outer horizontal padding / use parent width — for rows that already inset the bubble. */
+  compact?: boolean;
 }
 
 export function MessageBubble({
@@ -17,14 +19,25 @@ export function MessageBubble({
   senderAvatarUrl,
   createdAt,
   isOwn,
+  compact = false,
 }: MessageBubbleProps) {
   return (
     <View
-      style={[styles.row, isOwn ? styles.ownRow : styles.otherRow]}
+      style={[
+        styles.row,
+        isOwn ? styles.ownRow : styles.otherRow,
+        compact && styles.rowCompact,
+      ]}
       testID="message-bubble"
     >
       {!isOwn ? <UserAvatar name={senderName} size={28} imageUri={senderAvatarUrl} /> : null}
-      <View style={[styles.bubble, isOwn ? styles.ownBubble : styles.otherBubble]}>
+      <View
+        style={[
+          styles.bubble,
+          compact && styles.bubbleCompact,
+          isOwn ? styles.ownBubble : styles.otherBubble,
+        ]}
+      >
         {!isOwn ? <Text style={styles.senderName}>{senderName}</Text> : null}
         <Text style={[styles.body, isOwn && styles.ownBody]}>{body}</Text>
         <Text style={[styles.time, isOwn && styles.ownTime]}>
@@ -43,6 +56,10 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     gap: theme.spacing.sm,
   },
+  rowCompact: {
+    paddingHorizontal: 0,
+    marginVertical: 2,
+  },
   ownRow: {
     justifyContent: 'flex-end',
   },
@@ -50,10 +67,14 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
   },
   bubble: {
-    maxWidth: '76%',
+    maxWidth: '88%',
     borderRadius: theme.radius.lg,
     paddingHorizontal: 14,
     paddingVertical: 10,
+  },
+  bubbleCompact: {
+    // Parent row already reserves space for Delete; use nearly full col width.
+    maxWidth: '100%',
   },
   ownBubble: {
     backgroundColor: theme.colors.primary,
