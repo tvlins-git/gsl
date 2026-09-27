@@ -80,9 +80,9 @@ export default function SettingsScreen() {
   const usersRefreshSeq = useRef(0);
 
   const refreshUsers = useCallback(async () => {
-    // When signed into Supabase, show live public.members for this group so a
-    // user created on another phone (e.g. Diana) appears here too. Local mode
-    // and the logged-out picker still use the device login roster.
+    // Signed in → live public.members for the group.
+    // Logged out → Edge Function list-login-accounts (public.members + Auth emails)
+    // every mount/focus so a fresh install shows Diana/Test, not only Hr. Lins.
     const seq = ++usersRefreshSeq.current;
     const groupId =
       !loggedOut && !localMode && member?.group_id ? member.group_id : null;
@@ -163,8 +163,8 @@ export default function SettingsScreen() {
       setNotifyError('');
       setNotifySuccess('');
       // Do not call refreshUsers() here — its closure may still see the signed-in
-      // groupId before React re-renders. Load the login roster explicitly and
-      // bump the seq so any in-flight live-members fetch cannot overwrite it.
+      // groupId before React re-renders. Load the login picker (live Edge Function
+      // list when configured) and bump the seq so stale fetches cannot overwrite it.
       const seq = ++usersRefreshSeq.current;
       const list = await listManagedGroupUsers(null);
       if (seq === usersRefreshSeq.current) {

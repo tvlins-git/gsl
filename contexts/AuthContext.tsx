@@ -15,6 +15,7 @@ import type { Member } from '@/lib/database.types';
 import { disableLocalMode, isLocalMode } from '@/lib/local-store';
 import { registerForPushNotifications } from '@/lib/push-notifications';
 import { supabase } from '@/lib/supabase';
+import { getEffectivePassword, setPasswordOverride } from '@/lib/user-passwords';
 
 interface AuthContextValue {
   session: Session | null;
@@ -31,6 +32,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 async function bootstrapSession(
   user: AppUser,
+  typedPassword: string,
   setSession: (s: Session | null) => void,
   setMember: (m: Member | null) => void,
   setLocalMode: (v: boolean) => void,
@@ -39,18 +41,29 @@ async function bootstrapSession(
 ) {
   await ensureAppUsersLoaded();
 
-  const s = await ensureHardcodedSession(user);
+  const hadLocalPassword = !!(await getEffectivePassword(user));
+  const s = await ensureHardcodedSession(user, typedPassword);
   if (s) {
+    if (!hadLocalPassword && typedPassword.trim()) {
+      await setPasswordOverride(user.id, typedPassword.trim());
+    }
     setSession(s);
     setLoggedOut(false);
     await refreshMember();
-    return;
+    return { ok: true as const };
+  }
+
+  // Cold-start remote account with a wrong password must not silently enter
+  // local mode as that person — Supabase rejected the credential.
+  if (!hadLocalPassword) {
+    return { ok: false as const, error: 'Incorrect password.' };
   }
 
   const localMember = await activateLocalMode(user);
   setLocalMode(true);
   setMember(localMember);
   setLoggedOut(false);
+  return { ok: true as const };
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -93,7 +106,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoggedOut(false);
     setLocalMode(false);
     try {
-      await bootstrapSession(user, setSession, setMember, setLocalMode, setLoggedOut, refreshMember);
+      const boot = await bootstrapSession(
+        user,
+        password,
+        setSession,
+        setMember,
+        setLocalMode,
+        setLoggedOut,
+        refreshMember
+      );
+      if (!boot.ok) {
+        sessionUnlockedRef.current = false;
+        setLoggedOut(true);
+        setSession(null);
+        setMember(null);
+        setLocalMode(false);
+        return boot;
+      }
       return { ok: true as const };
     } catch {
       await ensureAppUsersLoaded();

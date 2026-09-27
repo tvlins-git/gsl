@@ -41,6 +41,18 @@ describe('user-passwords', () => {
     await expect(validateUserPassword(user, 'wrong')).resolves.toBe(false);
   });
 
+  it('accepts a typed password when no local credential exists (cold-start remote user)', async () => {
+    const remoteOnly = {
+      ...HARDCODED_USERS[0],
+      id: 'diana',
+      email: 'diana@gsl.local',
+      displayName: 'Diana',
+      password: '',
+    };
+    await expect(validateUserPassword(remoteOnly, 'her-secret')).resolves.toBe(true);
+    await expect(validateUserPassword(remoteOnly, '')).resolves.toBe(false);
+  });
+
   it('resets password and validates against the new one', async () => {
     const user = HARDCODED_USERS[0];
     const result = await resetUserPassword(user, 'thomas', 'newpass', 'newpass');

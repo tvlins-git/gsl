@@ -32,6 +32,7 @@ import {
   listManagedGroupUsers,
   mergeMemberWithLocalUsers,
 } from '@/lib/group-managed-users';
+import { listLoginPickerUsers } from '@/lib/login-accounts';
 import { isLocalMode } from '@/lib/local-store';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import type { Member } from '@/lib/database.types';
@@ -42,6 +43,10 @@ jest.mock('@/lib/auth', () => ({
 
 jest.mock('@/lib/local-store', () => ({
   isLocalMode: jest.fn(() => false),
+}));
+
+jest.mock('@/lib/login-accounts', () => ({
+  listLoginPickerUsers: jest.fn(),
 }));
 
 function member(partial: Partial<Member> & Pick<Member, 'display_name' | 'role'>): Member {
@@ -65,6 +70,7 @@ describe('group-managed-users', () => {
     jest.clearAllMocks();
     (isLocalMode as jest.Mock).mockReturnValue(false);
     (isSupabaseConfigured as jest.Mock).mockReturnValue(true);
+    (listLoginPickerUsers as jest.Mock).mockImplementation(async () => listAppUsers());
   });
 
   it('maps a remote-only member like Diana into an AppUser with gsl.local email', () => {
@@ -138,6 +144,7 @@ describe('group-managed-users', () => {
     const users = await listManagedGroupUsers('4a1ae983-b5da-40db-b832-6791ac0629aa');
 
     expect(getGroupMembers).toHaveBeenCalledWith('4a1ae983-b5da-40db-b832-6791ac0629aa');
+    expect(listLoginPickerUsers).not.toHaveBeenCalled();
     expect(users.map((user) => user.displayName)).toEqual(['Diana', 'Hr. Lins', 'Test']);
     expect(users.find((user) => user.displayName === 'Diana')?.email).toBe('diana@gsl.local');
     expect(users.find((user) => user.displayName === 'Test')?.password).toBe('secret');
@@ -151,14 +158,38 @@ describe('group-managed-users', () => {
     const users = await listManagedGroupUsers('group-1');
 
     expect(getGroupMembers).not.toHaveBeenCalled();
+    expect(listLoginPickerUsers).not.toHaveBeenCalled();
     expect(users.map((user) => user.displayName)).toEqual(['Hr. Lins', 'Test']);
   });
 
-  it('falls back to the local roster when logged out (no group id)', async () => {
+  it('uses list-login-accounts picker when logged out (no group id)', async () => {
     await ensureAppUsersLoaded();
+    (listLoginPickerUsers as jest.Mock).mockResolvedValue([
+      {
+        id: ADMIN_USER_ID,
+        email: 'hr.lins@gsl.local',
+        password: 'thomas',
+        displayName: 'Hr. Lins',
+        role: 'admin',
+        localMemberId: 'a',
+        localUserId: 'b',
+      },
+      {
+        id: 'diana',
+        email: 'diana@gsl.local',
+        password: '',
+        displayName: 'Diana',
+        role: 'member',
+        localMemberId: 'fccd8a71-431d-42ad-a78e-15e3de5997b1',
+        localUserId: 'baa2d7bf-bf2f-4d6b-8b28-dca82b795422',
+      },
+    ]);
+
     const users = await listManagedGroupUsers(null);
+
     expect(getGroupMembers).not.toHaveBeenCalled();
-    expect(users).toEqual(await listAppUsers());
+    expect(listLoginPickerUsers).toHaveBeenCalled();
+    expect(users.map((user) => user.displayName)).toEqual(['Hr. Lins', 'Diana']);
   });
 
   it('includes a just-created user in the logged-out login roster', async () => {
@@ -166,7 +197,7 @@ describe('group-managed-users', () => {
     const created = await createAppUser({ displayName: 'Post Create', password: 'secret' });
     expect(created.ok).toBe(true);
 
-    // Simulates Profile create → Log out → Select user (groupId null).
+    // Default mock delegates to listAppUsers (local roster after create).
     const loginList = await listManagedGroupUsers(null);
     expect(loginList.map((user) => user.displayName)).toEqual(['Hr. Lins', 'Post Create']);
     expect(getGroupMembers).not.toHaveBeenCalled();
