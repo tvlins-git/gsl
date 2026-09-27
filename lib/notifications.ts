@@ -19,6 +19,7 @@ export function parseNotificationData(data: Record<string, unknown>): Notificati
     case 'photos':
       return { type: 'photos', eventId: data.eventId ? String(data.eventId) : undefined };
     case 'feed':
+    case 'feed_reply':
       return { type: 'feed', postId: data.postId ? String(data.postId) : undefined };
     default:
       return null;
@@ -36,6 +37,6 @@ export function getDeepLinkPath(link: NotificationDeepLink): string {
     case 'photos':
       return link.eventId ? `/photos?eventId=${link.eventId}` : '/photos';
     case 'feed':
-      return '/';
+      return link.postId ? `/post/${link.postId}` : '/';
   }
 }

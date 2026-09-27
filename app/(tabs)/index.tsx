@@ -1,9 +1,8 @@
 import { router, useFocusEffect, type Href } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Alert, FlatList, Keyboard, Modal, Pressable, StyleSheet, Text } from 'react-native';
+import { Alert, FlatList, Keyboard, StyleSheet, Text } from 'react-native';
 import { ActivityItem } from '@/components/ActivityItem';
 import { FeedComposer } from '@/components/FeedComposer';
-import { FeedPhoto } from '@/components/FeedPhoto';
 import { Screen } from '@/components/ui/Screen';
 import { useAuth } from '@/contexts/AuthContext';
 import { getGroupMembers } from '@/lib/auth';
@@ -17,7 +16,6 @@ import { canDeleteFeedPost, deleteFeedPost } from '@/lib/feed-posts';
 import { canDeleteHostAssignment, deleteHostAssignment } from '@/lib/host-assignments';
 import { shouldRefreshFeedOnNotification } from '@/lib/notification-refresh';
 import { useNotificationRefresh } from '@/lib/use-notification-refresh';
-import { formatRelativeTime } from '@/lib/time';
 import { formatUserFacingError } from '@/lib/user-error';
 import { feedColumn, sharedStyles, theme } from '@/constants/theme';
 
@@ -25,7 +23,6 @@ export default function FeedScreen() {
   const { member } = useAuth();
   const [items, setItems] = useState<ActivityItemData[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
-  const [selectedPost, setSelectedPost] = useState<ActivityItemData | null>(null);
   const [loading, setLoading] = useState(true);
 
   const loadFeed = useCallback(async () => {
@@ -43,6 +40,7 @@ export default function FeedScreen() {
         threads: sources.threads,
         hostAssignments: sources.hostAssignments,
         feedPosts: sources.feedPosts,
+        replyCounts: sources.replyCounts,
       })
     );
     setLoading(false);
@@ -65,7 +63,6 @@ export default function FeedScreen() {
         currentUserId: member.user_id,
         imagePath: item.imagePath,
       });
-      if (selectedPost?.id === item.id) setSelectedPost(null);
       await loadFeed();
     } catch (error) {
       Alert.alert('Could not delete', formatUserFacingError(error, 'Could not delete this post.'));
@@ -110,9 +107,6 @@ export default function FeedScreen() {
     return <Screen loading />;
   }
 
-  const canDeleteSelected =
-    selectedPost != null && canDeleteFeedPost(selectedPost.authorId, member.user_id);
-
   return (
     <Screen>
       <FlatList
@@ -130,10 +124,6 @@ export default function FeedScreen() {
             item={item}
             onPress={() => {
               Keyboard.dismiss();
-              if (item.kind === 'post') {
-                setSelectedPost(item);
-                return;
-              }
               router.push(item.path as Href);
             }}
             onDelete={feedItemOnDelete(item)}
@@ -145,46 +135,6 @@ export default function FeedScreen() {
           </Text>
         }
       />
-
-      <Modal
-        visible={selectedPost != null}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setSelectedPost(null)}
-      >
-        <Pressable style={sharedStyles.modalOverlay} onPress={() => setSelectedPost(null)}>
-          <Pressable style={sharedStyles.modalSheet} onPress={(e) => e.stopPropagation()}>
-            <Text style={sharedStyles.modalTitle}>{selectedPost?.authorName}</Text>
-            <Text style={styles.postMeta}>
-              {selectedPost?.subtitle}
-              {selectedPost ? ` · ${formatRelativeTime(selectedPost.timestamp)}` : ''}
-            </Text>
-            {selectedPost?.title ? <Text style={styles.postBody}>{selectedPost.title}</Text> : null}
-            {selectedPost?.imageUri ? (
-              <FeedPhoto
-                uri={selectedPost.imageUri}
-                style={styles.postImage}
-                testID="feed-post-detail-photo"
-              />
-            ) : null}
-            {canDeleteSelected && selectedPost ? (
-              <Pressable
-                onPress={() => {
-                  void handleDeletePost(selectedPost);
-                }}
-                testID="feed-post-delete"
-                accessibilityRole="button"
-                accessibilityLabel="Delete post"
-              >
-                <Text style={styles.deleteText}>Delete</Text>
-              </Pressable>
-            ) : null}
-            <Pressable onPress={() => setSelectedPost(null)} testID="feed-post-close">
-              <Text style={styles.closeText}>Close</Text>
-            </Pressable>
-          </Pressable>
-        </Pressable>
-      </Modal>
     </Screen>
   );
 }
@@ -194,31 +144,5 @@ const styles = StyleSheet.create({
     ...feedColumn,
     paddingTop: theme.spacing.md,
     paddingBottom: theme.spacing.xxl,
-  },
-  postMeta: {
-    fontSize: 14,
-    color: theme.colors.textSecondary,
-  },
-  postBody: {
-    fontSize: 16,
-    color: theme.colors.text,
-    lineHeight: 22,
-  },
-  postImage: {
-    borderRadius: theme.radius.md,
-  },
-  deleteText: {
-    textAlign: 'center',
-    color: theme.colors.danger,
-    fontWeight: '600',
-    fontSize: 15,
-    paddingVertical: theme.spacing.sm,
-  },
-  closeText: {
-    textAlign: 'center',
-    color: theme.colors.textSecondary,
-    fontWeight: '600',
-    fontSize: 15,
-    paddingVertical: theme.spacing.sm,
   },
 });

@@ -70,6 +70,13 @@ function RootLayoutNav() {
                 headerLeft: () => <HeaderBackButton />,
               }}
             />
+            <Stack.Screen
+              name="post/[id]"
+              options={{
+                headerTitle: () => <GslNavTitle suffix="Thread" />,
+                headerLeft: () => <HeaderBackButton />,
+              }}
+            />
           </Stack>
         </LoadingGate>
       </ThemeProvider>

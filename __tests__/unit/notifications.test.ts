@@ -19,7 +19,13 @@ describe('parseNotificationData', () => {
   it('parses feed notifications', () => {
     const link = parseNotificationData({ type: 'feed', postId: 'p1' });
     expect(link).toEqual({ type: 'feed', postId: 'p1' });
-    expect(getDeepLinkPath({ type: 'feed', postId: 'p1' })).toBe('/');
+    expect(getDeepLinkPath({ type: 'feed', postId: 'p1' })).toBe('/post/p1');
+  });
+
+  it('parses feed reply notifications as feed deep links', () => {
+    const link = parseNotificationData({ type: 'feed_reply', postId: 'p1', replyId: 'r1' });
+    expect(link).toEqual({ type: 'feed', postId: 'p1' });
+    expect(getDeepLinkPath(link!)).toBe('/post/p1');
   });
 });
 
@@ -30,5 +36,9 @@ describe('getDeepLinkPath', () => {
 
   it('builds hosts deep link', () => {
     expect(getDeepLinkPath({ type: 'hosts' })).toBe('/hosts');
+  });
+
+  it('builds feed tab path when postId is missing', () => {
+    expect(getDeepLinkPath({ type: 'feed' })).toBe('/');
   });
 });

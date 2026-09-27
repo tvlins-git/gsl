@@ -58,7 +58,7 @@ serve(async (req) => {
   });
 
   const targeted =
-    type === 'chat'
+    type === 'chat' || type === 'feed_reply'
       ? resolveChatPushRecipients(
           tokenRows,
           preferenceByUserId,
