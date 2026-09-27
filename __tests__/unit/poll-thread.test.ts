@@ -89,7 +89,7 @@ describe('poll thread helpers', () => {
     expect(audience.notifyUserIds).toEqual(['u3']);
   });
 
-  it('limits the chat push to people tagged in the message', () => {
+  it('limits the chat push to tagged people plus all-pref members', () => {
     const audience = planPollThreadAudience({
       members,
       unansweredMemberIds: ['m2'],
@@ -97,12 +97,12 @@ describe('poll thread helpers', () => {
       pushUnanswered: false,
       message: 'hi @Bea',
       mentionMembers: [
-        { user_id: 'u1', display_name: 'Hr. Lins' },
-        { user_id: 'u2', display_name: 'Ada' },
-        { user_id: 'u3', display_name: 'Bea' },
+        { user_id: 'u1', display_name: 'Hr. Lins', notification_preference: 'all' },
+        { user_id: 'u2', display_name: 'Ada', notification_preference: 'all' },
+        { user_id: 'u3', display_name: 'Bea', notification_preference: 'tagged' },
       ],
     });
-    expect(audience.notifyUserIds).toEqual(['u3']);
+    expect(audience.notifyUserIds).toEqual(['u2', 'u3']);
     expect(audience.nudgeUserIds).toEqual([]);
   });
 
@@ -114,11 +114,32 @@ describe('poll thread helpers', () => {
       pushUnanswered: true,
       message: '@Bea can you check with Ada?',
       mentionMembers: [
-        { user_id: 'u2', display_name: 'Ada' },
-        { user_id: 'u3', display_name: 'Bea' },
+        { user_id: 'u2', display_name: 'Ada', notification_preference: 'tagged' },
+        { user_id: 'u3', display_name: 'Bea', notification_preference: 'tagged' },
       ],
     });
     expect(audience.nudgeUserIds).toEqual(['u2']);
+    // Ada is already getting the unanswered nudge; Bea is tagged.
+    expect(audience.notifyUserIds).toEqual(['u3']);
+  });
+
+  it('skips tagged-only members for untagged poll chat pushes', () => {
+    const audience = planPollThreadAudience({
+      members: [
+        { id: 'm1', userId: 'u1' },
+        { id: 'm2', userId: 'u2' },
+        { id: 'm3', userId: 'u3' },
+      ],
+      unansweredMemberIds: [],
+      senderUserId: 'u1',
+      pushUnanswered: false,
+      message: 'Please review the dates',
+      mentionMembers: [
+        { user_id: 'u1', display_name: 'Hr. Lins', notification_preference: 'all' },
+        { user_id: 'u2', display_name: 'Ada', notification_preference: 'tagged' },
+        { user_id: 'u3', display_name: 'Bea', notification_preference: 'all' },
+      ],
+    });
     expect(audience.notifyUserIds).toEqual(['u3']);
   });
 

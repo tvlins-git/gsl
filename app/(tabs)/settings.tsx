@@ -365,21 +365,27 @@ export default function SettingsScreen() {
     }
   };
 
-  const handleSaveNotifyPref = async () => {
+  const persistNotifyPref = async (next: NotificationPreference) => {
     if (!member) return;
     setBusy(true);
     setNotifyError('');
     setNotifySuccess('');
     try {
-      const saved = await updateMemberNotificationPreference(member.id, notifyPref);
+      const saved = await updateMemberNotificationPreference(member.id, next);
       setNotifyPref(memberNotificationPreference(saved));
       await refreshMember();
       setNotifySuccess('Notification preference saved.');
     } catch (err) {
       setNotifyError(formatUserFacingError(err, 'Could not save preference. Try again.'));
+      // Revert radio to the last known saved value on failure.
+      setNotifyPref(memberNotificationPreference(member));
     } finally {
       setBusy(false);
     }
+  };
+
+  const handleSaveNotifyPref = async () => {
+    await persistNotifyPref(notifyPref);
   };
 
   if (loading) {
@@ -459,7 +465,8 @@ export default function SettingsScreen() {
             <View style={[styles.sectionCard, sharedStyles.card]}>
               <Text style={sharedStyles.sectionTitle}>Notifications</Text>
               <Text style={styles.sectionHint}>
-                Choose when GSL can send you a push. Your preference is stored on your member profile.
+                Choose when GSL can send you a push. Tapping an option saves it to your member profile
+                immediately (also used by live send-push).
               </Text>
               {NOTIFICATION_PREFERENCE_OPTIONS.map((option) => {
                 const selected = notifyPref === option.value;
@@ -468,9 +475,11 @@ export default function SettingsScreen() {
                     key={option.value}
                     style={[styles.notifyOption, selected && styles.notifyOptionSelected]}
                     onPress={() => {
+                      if (option.value === notifyPref || busy) return;
                       setNotifyPref(option.value);
                       setNotifyError('');
                       setNotifySuccess('');
+                      void persistNotifyPref(option.value);
                     }}
                     disabled={busy}
                     testID={`notify-pref-${option.value}`}

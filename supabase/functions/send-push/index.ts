@@ -4,8 +4,9 @@ import {
   buildExpoPushPayload,
   filterRecipients,
   filterRecipientsByPreference,
-  mergeRecipients,
+  inferTagNotification,
   parseNotificationPreference,
+  resolveChatPushRecipients,
   sendExpoPush,
   type NotificationPreference,
 } from './push.ts';
@@ -28,7 +29,7 @@ serve(async (req) => {
     .select('user_id, notification_preference')
     .eq('group_id', group_id);
 
-  const userIds = (members ?? []).map((m: { user_id: string }) => m.user_id);
+  const memberUserIds = (members ?? []).map((m: { user_id: string }) => m.user_id);
   const preferenceByUserId = new Map<string, NotificationPreference>();
   for (const member of members ?? []) {
     preferenceByUserId.set(
@@ -40,34 +41,32 @@ serve(async (req) => {
   const { data: tokens } = await supabase
     .from('device_tokens')
     .select('user_id, expo_push_token')
-    .in('user_id', userIds);
+    .in('user_id', memberUserIds);
 
   const tokenRows = (tokens ?? []).map((t: { user_id: string; expo_push_token: string }) => ({
     userId: t.user_id,
     token: t.expo_push_token,
   }));
   const excludeUserIds = Array.isArray(exclude_user_ids) ? exclude_user_ids : [];
+  const requestedUserIds = Array.isArray(user_ids) ? user_ids : null;
 
-  let targeted = filterRecipients(
-    tokenRows,
-    excludeUserIds,
-    Array.isArray(user_ids) ? user_ids : null
-  );
+  // Do not trust a bare client flag: untagged chat bodies must not count as tags.
+  const isTagEvent = inferTagNotification({
+    type,
+    tagNotification: tag_notification,
+    body,
+  });
 
-  // Chat @mentions often send only the tagged user_ids. Preference "all" still
-  // means every chat message from others — merge those members in (server-side
-  // so stale client rosters cannot omit them). Skip when tag_notification is
-  // false so targeted nudges (poll unanswered) stay narrowly addressed.
-  const isTagEvent = Boolean(tag_notification);
-  if (type === 'chat' && isTagEvent && Array.isArray(user_ids)) {
-    const allPrefUserIds = [...preferenceByUserId.entries()]
-      .filter(([, preference]) => preference === 'all')
-      .map(([userId]) => userId);
-    targeted = mergeRecipients(
-      targeted,
-      filterRecipients(tokenRows, excludeUserIds, allPrefUserIds)
-    );
-  }
+  const targeted =
+    type === 'chat'
+      ? resolveChatPushRecipients(
+          tokenRows,
+          preferenceByUserId,
+          excludeUserIds,
+          requestedUserIds,
+          isTagEvent
+        )
+      : filterRecipients(tokenRows, excludeUserIds, requestedUserIds);
 
   const recipients = filterRecipientsByPreference(
     targeted,

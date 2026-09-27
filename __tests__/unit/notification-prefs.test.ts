@@ -1,5 +1,6 @@
 import {
   filterRecipientsByPreference,
+  inferTagNotification,
   NOTIFICATION_PREFERENCE_DEFAULT,
   parseNotificationPreference,
   shouldReceivePushForPreference,
@@ -45,5 +46,24 @@ describe('notification preferences', () => {
     expect(
       filterRecipientsByPreference(recipients, prefs, true).map((r) => r.userId)
     ).toEqual(['u2', 'u3']);
+  });
+
+  it('infers tag events from chat body, not a bare client flag', () => {
+    expect(
+      inferTagNotification({ type: 'chat', tagNotification: true, body: 'Diana: Hi' })
+    ).toBe(false);
+    expect(
+      inferTagNotification({ type: 'chat', tagNotification: true, body: 'Diana: hi @Lins' })
+    ).toBe(true);
+    expect(
+      inferTagNotification({
+        type: 'chat',
+        tagNotification: true,
+        body: 'Diana: ping @everybody',
+      })
+    ).toBe(true);
+    expect(
+      inferTagNotification({ type: 'feed', tagNotification: true, body: 'Diana: photo' })
+    ).toBe(true);
   });
 });
