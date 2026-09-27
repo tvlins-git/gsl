@@ -16,12 +16,12 @@ export const NOTIFICATION_PREFERENCE_OPTIONS: {
   {
     value: 'tagged',
     label: 'Tagged only',
-    hint: 'Only when you are @mentioned, or when someone uses @everyone.',
+    hint: 'Only when you are @mentioned, or when someone uses @everyone / @everybody.',
   },
   {
     value: 'all',
     label: 'All messages',
-    hint: 'All chat and other activity the app already notifies about.',
+    hint: 'Every chat message from others, plus Feed tags (never your own posts).',
   },
 ];
 

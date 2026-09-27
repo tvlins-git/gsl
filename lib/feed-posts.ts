@@ -37,8 +37,10 @@ function createId() {
   });
 }
 
-const MENTION_TOKEN_RE = /@([\p{L}][\p{L}\p{N}._-]*)/gu;
+/** @mention tokens; require a non-name char before `@` so emails like a@b.co are not tags. */
+const MENTION_TOKEN_RE = /(^|[^\p{L}\p{N}])@([\p{L}][\p{L}\p{N}._-]*)/gu;
 const ACTIVE_MENTION_RE = /(^|[\s])@([\p{L}\p{N}._-]*)$/u;
+const TAG_ALL_TOKENS = new Set(['everyone', 'everybody']);
 
 export type FeedMentionMember = Pick<Member, 'user_id' | 'display_name'> & {
   contact_email?: string | null;
@@ -111,15 +113,19 @@ export function extractMentionTokens(body: string): string[] {
   const matcher = new RegExp(MENTION_TOKEN_RE.source, 'gu');
   let match: RegExpExecArray | null;
   while ((match = matcher.exec(body)) !== null) {
-    const token = match[1].replace(/[._-]+$/g, '');
+    const token = match[2].replace(/[._-]+$/g, '');
     if (token) tokens.push(token);
   }
   return tokens;
 }
 
+export function isTagAllMentionToken(token: string) {
+  return TAG_ALL_TOKENS.has(token.trim().toLowerCase());
+}
+
 export function parseFeedMentions(body: string, members: FeedMentionMember[]): FeedTagSelection {
   const tokens = extractMentionTokens(body);
-  if (tokens.some((token) => token.toLowerCase() === 'everyone')) {
+  if (tokens.some((token) => isTagAllMentionToken(token))) {
     return { tagAll: true };
   }
 
@@ -137,6 +143,11 @@ export function parseFeedMentions(body: string, members: FeedMentionMember[]): F
     }
   }
   return { tagAll: false, userIds };
+}
+
+/** Drop the author from a tag list so they are never stored/notified as tagged by their own post. */
+export function taggedUserIdsExcludingAuthor(userIds: string[], authorId: string) {
+  return userIds.filter((userId) => userId !== authorId);
 }
 
 export function getActiveFeedMention(body: string, cursor: number): ActiveFeedMention | null {
@@ -158,7 +169,7 @@ export function listFeedMentionSuggestions(
 ): FeedMentionSuggestion[] {
   const needle = query.trim().toLowerCase();
   const suggestions: FeedMentionSuggestion[] = [];
-  if (!needle || 'everyone'.startsWith(needle)) {
+  if (!needle || 'everyone'.startsWith(needle) || 'everybody'.startsWith(needle)) {
     suggestions.push({ id: 'everyone', label: 'everyone', insert: 'everyone' });
   }
   for (const member of members) {
@@ -350,7 +361,10 @@ export async function createFeedPost(input: CreateFeedPostInput): Promise<FeedPo
 
   const taggedUserIds = input.tagAll
     ? []
-    : input.taggedUserIds.filter((userId) => input.groupUserIds.includes(userId));
+    : taggedUserIdsExcludingAuthor(
+        input.taggedUserIds.filter((userId) => input.groupUserIds.includes(userId)),
+        input.authorId
+      );
 
   if (isLocalMode()) {
     const post = await localStore.createFeedPost({

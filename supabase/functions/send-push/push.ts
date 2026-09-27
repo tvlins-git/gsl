@@ -32,14 +32,34 @@ export function filterRecipients(
 ): PushRecipient[] {
   const exclude = new Set(excludeUserIds);
   const include = includeUserIds ? new Set(includeUserIds) : null;
+  // Same physical device often keeps one Expo token registered under every
+  // account that signed in there. Never deliver to a token that also belongs
+  // to an excluded user (e.g. the message author), or the author sees their
+  // own push while logged in as someone else on that phone.
+  const excludedTokens = new Set(
+    tokens.filter((t) => exclude.has(t.userId)).map((t) => t.token)
+  );
   const seen = new Set<string>();
   return tokens.filter((t) => {
     if (exclude.has(t.userId)) return false;
+    if (excludedTokens.has(t.token)) return false;
     if (include && !include.has(t.userId)) return false;
     if (seen.has(t.token)) return false;
     seen.add(t.token);
     return true;
   });
+}
+
+/** Merge recipient lists, keeping first occurrence of each token. */
+export function mergeRecipients(primary: PushRecipient[], extra: PushRecipient[]): PushRecipient[] {
+  const seen = new Set(primary.map((r) => r.token));
+  const merged = [...primary];
+  for (const recipient of extra) {
+    if (seen.has(recipient.token)) continue;
+    seen.add(recipient.token);
+    merged.push(recipient);
+  }
+  return merged;
 }
 
 export function filterRecipientsByPreference(

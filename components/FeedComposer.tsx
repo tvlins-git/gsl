@@ -14,7 +14,12 @@ import { useMentionField } from '@/components/useMentionField';
 import { UserAvatar } from '@/components/UserAvatar';
 import { theme } from '@/constants/theme';
 import type { Member } from '@/lib/database.types';
-import { canSubmitFeedPost, createFeedPost, parseFeedMentions } from '@/lib/feed-posts';
+import {
+  canSubmitFeedPost,
+  createFeedPost,
+  parseFeedMentions,
+  taggedUserIdsExcludingAuthor,
+} from '@/lib/feed-posts';
 import { isCameraPickerAvailable, pickImageUri, type ImagePickSource } from '@/lib/pick-image';
 import { formatUserFacingError } from '@/lib/user-error';
 
@@ -59,7 +64,9 @@ export function FeedComposer({ members, author, onPosted }: FeedComposerProps) {
         body: mention.body,
         imageUri,
         tagAll: tags.tagAll,
-        taggedUserIds: tags.tagAll ? [] : tags.userIds,
+        taggedUserIds: tags.tagAll
+          ? []
+          : taggedUserIdsExcludingAuthor(tags.userIds, author.user_id),
         groupUserIds: members.map((member) => member.user_id),
       });
       mention.setBody('');

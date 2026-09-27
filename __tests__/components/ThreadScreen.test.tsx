@@ -175,7 +175,7 @@ describe('ThreadScreen send', () => {
     expect(router.navigate).toHaveBeenCalledWith('/plan?pollId=poll-1');
   });
 
-  it('suggests members while typing @ and notifies only the tagged person', async () => {
+  it('suggests members while typing @ and notifies the tagged person (not the author)', async () => {
     render(<ThreadScreen />);
     expect(await screen.findByText('Already in the thread')).toBeTruthy();
 
@@ -190,6 +190,8 @@ describe('ThreadScreen send', () => {
       body: expect.objectContaining({
         type: 'chat',
         user_ids: ['user-2'],
+        exclude_user_ids: ['user-1'],
+        tag_notification: true,
         body: 'Hr. Lins: hi @Thomas',
       }),
     });

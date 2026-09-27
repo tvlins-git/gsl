@@ -4,7 +4,7 @@ import { isLocalMode, localStore } from './local-store';
 import { parseNotificationPreference } from './notification-prefs';
 import { supabase } from './supabase';
 
-/** `null` notifies the whole group. A list notifies only those people. */
+/** Tagged user ids for a chat body, never including the sender. `null` = @everyone/@everybody. */
 export function resolveChatNotifyUserIds(
   body: string,
   members: FeedMentionMember[],
@@ -16,7 +16,7 @@ export function resolveChatNotifyUserIds(
   return userIds.length > 0 ? userIds : null;
 }
 
-/** True when the message contains @everyone or at least one @name tag. */
+/** True when the message contains @everyone/@everybody or at least one @name tag of someone else. */
 export function isChatTagNotification(
   body: string,
   members: FeedMentionMember[],
@@ -31,24 +31,42 @@ export type ChatPushMember = FeedMentionMember & {
   notification_preference?: string | null;
 };
 
+/**
+ * Chat push audience (client hint; send-push still applies prefs + exclude).
+ *
+ * - tagged-only recipients: only for @them / @everyone (via tag_notification + user_ids)
+ * - all recipients: every chat message from others (union into user_ids when tagged)
+ * - author: never included (exclude_user_ids + filtered lists)
+ */
 export function resolveChatPushAudience(
   text: string,
   members: ChatPushMember[],
   senderId: string
 ): { userIds: string[] | null; tagNotification: boolean } {
-  const tagNotification = isChatTagNotification(text, members, senderId);
-  if (tagNotification) {
-    return {
-      userIds: resolveChatNotifyUserIds(text, members, senderId),
-      tagNotification: true,
-    };
+  const tags = parseFeedMentions(text, members);
+  const others = members.filter((member) => member.user_id !== senderId);
+
+  if (tags.tagAll) {
+    return { userIds: null, tagNotification: true };
   }
 
-  const userIds = members
+  const taggedIds = tags.userIds.filter((userId) => userId !== senderId);
+  if (taggedIds.length > 0) {
+    const tagged = new Set(taggedIds);
+    const userIds = others
+      .filter((member) => {
+        const preference = parseNotificationPreference(member.notification_preference);
+        if (preference === 'off') return false;
+        if (tagged.has(member.user_id)) return true;
+        return preference === 'all';
+      })
+      .map((member) => member.user_id);
+    return { userIds, tagNotification: true };
+  }
+
+  const userIds = others
     .filter(
-      (member) =>
-        member.user_id !== senderId &&
-        parseNotificationPreference(member.notification_preference) === 'all'
+      (member) => parseNotificationPreference(member.notification_preference) === 'all'
     )
     .map((member) => member.user_id);
 
