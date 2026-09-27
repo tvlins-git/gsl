@@ -52,9 +52,11 @@ export async function signOutUser() {
 }
 
 /** Sign in with an app user; returns session or null (caller enables local mode). */
-export async function ensureHardcodedSession(user: AppUser) {
+export async function ensureHardcodedSession(user: AppUser, typedPassword?: string) {
   const { email, displayName, role, id } = user;
-  const password = passwordForAuth(await getEffectivePassword(user));
+  const rawPassword =
+    typedPassword?.trim() || (await getEffectivePassword(user));
+  const password = passwordForAuth(rawPassword);
   await setStoredUser(user);
 
   const { data: existing } = await supabase.auth.getSession();

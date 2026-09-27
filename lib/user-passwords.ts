@@ -27,8 +27,22 @@ export async function getEffectivePassword(user: AppUser): Promise<string> {
   return overrides[user.id] ?? user.password;
 }
 
+/** Persist a known-good password after cold-start Supabase sign-in. */
+export async function setPasswordOverride(userId: string, password: string) {
+  const trimmed = password.trim();
+  if (!trimmed) return;
+  const overrides = await readOverrides();
+  overrides[userId] = trimmed;
+  await writeOverrides(overrides);
+}
+
 export async function validateUserPassword(user: AppUser, password: string): Promise<boolean> {
   const expected = await getEffectivePassword(user);
+  // No local credential yet (fresh install / remote-only account) — accept a
+  // non-empty typed password and let Supabase Auth verify it.
+  if (!expected) {
+    return password.trim().length > 0;
+  }
   return password === expected;
 }
 

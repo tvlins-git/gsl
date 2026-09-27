@@ -12,3 +12,7 @@ major_version = 15
 [studio]
 enabled = true
 port = 54323
+
+# Public login picker — anon clients call this while logged out.
+[functions.list-login-accounts]
+verify_jwt = false

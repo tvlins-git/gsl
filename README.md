@@ -52,12 +52,18 @@ cp .env.example .env
    supabase functions deploy send-push
    supabase functions deploy create-group-member
    supabase functions deploy delete-group-member
+   supabase functions deploy list-login-accounts
    supabase secrets set GOOGLE_CLOUD_VISION_API_KEY=<your-key>
    ```
    Profile **Create user** calls `create-group-member` once. Profile **Delete** calls
    `delete-group-member` (admin-only) so the person is removed from `members` and Auth.
-   Profile **Users** lists live `public.members` for the signed-in group (merged with
-   this device's login roster), so members created on another phone appear here too.
+   The **login Select-user** list (logged out) calls public Edge Function
+   `list-login-accounts` on every Profile mount/focus — it reads live
+   `public.members` for group **GSL** plus Auth emails — so a fresh TestFlight
+   install shows Hr. Lins / Diana / Test without a local AsyncStorage roster.
+   Profile **Users** (signed in) lists live `public.members` for the signed-in
+   group (merged with this device's login roster), so members created on another
+   phone appear here too.
    Feed/Hosts/Chat do **not** re-push the local login roster into `members` — that used
    to resurrect people deleted in Supabase while still cached in AsyncStorage.
 5. **Single user:** The app auto-signs in as **Hr. Lins** (no login screen). On first launch it creates the Supabase account if needed.

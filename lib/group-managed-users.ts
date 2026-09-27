@@ -6,6 +6,7 @@ import {
 import { listAppUsers } from './app-users';
 import { getGroupMembers } from './auth';
 import type { Member } from './database.types';
+import { listLoginPickerUsers } from './login-accounts';
 import { isLocalMode } from './local-store';
 import { isSupabaseConfigured } from './supabase';
 
@@ -61,18 +62,22 @@ export function mergeMemberWithLocalUsers(member: Member, localUsers: AppUser[])
 }
 
 /**
- * Profile → Users list source of truth.
+ * Profile → Users / login Select-user source of truth.
  *
- * - Local mode / logged out / no group: device AsyncStorage login roster.
- * - Signed-in Supabase session: live `public.members` for the group (merged with
- *   local login rows so create/delete still have emails and local ids).
- *
- * This closes the multi-device gap where User A created on phone B exists in
- * `members` but never appears on phone A's Profile list.
+ * - Local mode / Supabase not configured: device AsyncStorage login roster.
+ * - Logged out (no groupId): live group members via Edge Function
+ *   `list-login-accounts` (public.members + Auth emails), merged with local
+ *   passwords — so a fresh TestFlight install shows Diana/Test, not only Hr. Lins.
+ * - Signed-in Supabase session: live `getGroupMembers` for the group (merged
+ *   with local login rows so create/delete still have emails and local ids).
  */
 export async function listManagedGroupUsers(groupId: string | null | undefined): Promise<AppUser[]> {
-  if (!groupId || isLocalMode() || !isSupabaseConfigured()) {
+  if (isLocalMode() || !isSupabaseConfigured()) {
     return listAppUsers();
+  }
+
+  if (!groupId) {
+    return listLoginPickerUsers();
   }
 
   const [localUsers, members] = await Promise.all([listAppUsers(), getGroupMembers(groupId)]);
