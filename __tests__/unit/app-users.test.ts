@@ -26,7 +26,9 @@ import {
   deleteAppUser,
   ensureAppUsersLoaded,
   listAppUsers,
+  subscribeAppUsers,
 } from '@/lib/app-users';
+import { listManagedGroupUsers } from '@/lib/group-managed-users';
 
 describe('app-users', () => {
   beforeEach(() => {
@@ -79,6 +81,22 @@ describe('app-users', () => {
     expect(result.user.email).toContain('@gsl.local');
     const users = await listAppUsers();
     expect(users.some((user) => user.displayName === 'Fru Hansen')).toBe(true);
+  });
+
+  it('notifies subscribers when a user is created so the login list can refresh', async () => {
+    await ensureAppUsersLoaded();
+    const listener = jest.fn();
+    const unsubscribe = subscribeAppUsers(listener);
+
+    const result = await createAppUser({ displayName: 'Login Fresh', password: 'secret' });
+    expect(result.ok).toBe(true);
+    expect(listener).toHaveBeenCalled();
+
+    // Logged-out login picker uses listManagedGroupUsers(null) → local roster.
+    const loginList = await listManagedGroupUsers(null);
+    expect(loginList.some((user) => user.displayName === 'Login Fresh')).toBe(true);
+
+    unsubscribe();
   });
 
   it('prevents deleting the main admin', async () => {

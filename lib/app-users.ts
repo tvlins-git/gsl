@@ -12,9 +12,35 @@ const STORAGE_KEY = 'gsl_app_users_v1';
 
 let cachedUsers: AppUser[] | null = null;
 
+type AppUsersListener = () => void;
+const appUsersListeners = new Set<AppUsersListener>();
+
 /** Test helper — clears in-memory cache between jest cases. */
 export function __resetAppUsersCacheForTests() {
   cachedUsers = null;
+  appUsersListeners.clear();
+}
+
+/**
+ * Subscribe to local login-roster changes (create / delete / seed persist).
+ * Used by the Profile / login screen so the Select-user list invalidates
+ * immediately after Profile → Create user, without waiting for app restart.
+ */
+export function subscribeAppUsers(listener: AppUsersListener): () => void {
+  appUsersListeners.add(listener);
+  return () => {
+    appUsersListeners.delete(listener);
+  };
+}
+
+function notifyAppUsersChanged() {
+  appUsersListeners.forEach((listener) => {
+    try {
+      listener();
+    } catch {
+      // Listeners must not break persist.
+    }
+  });
 }
 
 function uuid() {
@@ -71,6 +97,7 @@ function ensureAdminPresent(users: AppUser[]): AppUser[] {
 async function persist(users: AppUser[]) {
   cachedUsers = users;
   await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(users));
+  notifyAppUsersChanged();
 }
 
 export async function ensureAppUsersLoaded(): Promise<AppUser[]> {

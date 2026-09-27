@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -25,6 +25,7 @@ import {
   createAppUser,
   deleteAppUser,
   resolveSignedInAppUser,
+  subscribeAppUsers,
 } from '@/lib/app-users';
 import {
   getGroupMembers,
@@ -74,25 +75,39 @@ export default function SettingsScreen() {
   const [notifyPref, setNotifyPref] = useState<NotificationPreference>('all');
   const [notifyError, setNotifyError] = useState('');
   const [notifySuccess, setNotifySuccess] = useState('');
+  // Ignore stale listManagedGroupUsers results so an in-flight signed-in
+  // getGroupMembers cannot overwrite the login roster after logout / create.
+  const usersRefreshSeq = useRef(0);
 
   const refreshUsers = useCallback(async () => {
     // When signed into Supabase, show live public.members for this group so a
     // user created on another phone (e.g. Diana) appears here too. Local mode
     // and the logged-out picker still use the device login roster.
-    const groupId = !localMode && member?.group_id ? member.group_id : null;
+    const seq = ++usersRefreshSeq.current;
+    const groupId =
+      !loggedOut && !localMode && member?.group_id ? member.group_id : null;
     const list = await listManagedGroupUsers(groupId);
+    if (seq !== usersRefreshSeq.current) return list;
     setUsers(list);
     return list;
-  }, [localMode, member?.group_id]);
+  }, [loggedOut, localMode, member?.group_id]);
 
   useEffect(() => {
     refreshUsers().catch(() => undefined);
   }, [refreshUsers, member, loggedOut]);
 
+  useEffect(() => {
+    // createAppUser / deleteAppUser persist the local roster — refresh so the
+    // login Select-user list picks up new names without force-quit.
+    return subscribeAppUsers(() => {
+      refreshUsers().catch(() => undefined);
+    });
+  }, [refreshUsers]);
+
   useFocusEffect(
     useCallback(() => {
-      // Re-read live members + the signed-in member row so notification
-      // preference and the Users list match public.members after login / other devices.
+      // Re-read live members (signed in) or the local login roster (logged out)
+      // so Profile Users and the login picker stay in sync after create / other devices.
       refreshUsers().catch(() => undefined);
       if (!loggedOut) {
         refreshMember().catch(() => undefined);
@@ -147,6 +162,14 @@ export default function SettingsScreen() {
       setAvatarSuccess('');
       setNotifyError('');
       setNotifySuccess('');
+      // Do not call refreshUsers() here — its closure may still see the signed-in
+      // groupId before React re-renders. Load the login roster explicitly and
+      // bump the seq so any in-flight live-members fetch cannot overwrite it.
+      const seq = ++usersRefreshSeq.current;
+      const list = await listManagedGroupUsers(null);
+      if (seq === usersRefreshSeq.current) {
+        setUsers(list);
+      }
     } finally {
       setBusy(false);
     }

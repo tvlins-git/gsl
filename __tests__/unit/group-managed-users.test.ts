@@ -160,4 +160,15 @@ describe('group-managed-users', () => {
     expect(getGroupMembers).not.toHaveBeenCalled();
     expect(users).toEqual(await listAppUsers());
   });
+
+  it('includes a just-created user in the logged-out login roster', async () => {
+    await ensureAppUsersLoaded();
+    const created = await createAppUser({ displayName: 'Post Create', password: 'secret' });
+    expect(created.ok).toBe(true);
+
+    // Simulates Profile create → Log out → Select user (groupId null).
+    const loginList = await listManagedGroupUsers(null);
+    expect(loginList.map((user) => user.displayName)).toEqual(['Hr. Lins', 'Post Create']);
+    expect(getGroupMembers).not.toHaveBeenCalled();
+  });
 });
