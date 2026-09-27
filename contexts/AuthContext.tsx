@@ -24,6 +24,8 @@ interface AuthContextValue {
   localMode: boolean;
   loggedOut: boolean;
   refreshMember: () => Promise<void>;
+  /** Apply a freshly saved member row immediately (e.g. notification preference). */
+  applyMember: (member: Member) => void;
   signOut: () => Promise<void>;
   signIn: (user: AppUser, password: string) => Promise<{ ok: true } | { ok: false; error: string }>;
 }
@@ -82,6 +84,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (m && !isLocalMode()) {
       await registerForPushNotifications(m.user_id).catch(() => undefined);
     }
+  }, []);
+
+  const applyMember = useCallback((next: Member) => {
+    setMember(next);
   }, []);
 
   const signOut = useCallback(async () => {
@@ -169,8 +175,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [refreshMember]);
 
   const value = useMemo(
-    () => ({ session, member, loading, localMode, loggedOut, refreshMember, signOut, signIn }),
-    [session, member, loading, localMode, loggedOut, refreshMember, signOut, signIn]
+    () => ({
+      session,
+      member,
+      loading,
+      localMode,
+      loggedOut,
+      refreshMember,
+      applyMember,
+      signOut,
+      signIn,
+    }),
+    [session, member, loading, localMode, loggedOut, refreshMember, applyMember, signOut, signIn]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

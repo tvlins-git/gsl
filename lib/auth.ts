@@ -225,23 +225,44 @@ export async function updateMemberNotificationPreference(
   preference: NotificationPreference
 ) {
   const next = parseNotificationPreference(preference);
-  if (isLocalMode()) {
-    return localStore.updateMemberNotificationPreference(memberId, next);
+
+  // Prefer the live members row whenever we have a Supabase session — never
+  // silently write only to AsyncStorage while the edge function still reads
+  // public.members (that made Profile look "saved" while pushes ignored prefs).
+  const { data: sessionData } = await supabase.auth.getSession();
+  const session = sessionData.session;
+  if (!session) {
+    if (isLocalMode()) {
+      return localStore.updateMemberNotificationPreference(memberId, next);
+    }
+    throw new Error('Not signed in.');
   }
+
+  const userId = session.user.id;
   const { data, error } = await supabase
     .from('members')
     .update({ notification_preference: next })
     .eq('id', memberId)
+    .eq('user_id', userId)
     .select('*')
     .single();
   if (error) throw error;
   if (!data) throw new Error('Could not save notification preference.');
-  // Guard against a silent no-op / stale row so Profile never shows success
+
+  // Re-read so a Prefer/return quirk or stale representation cannot report success
   // while public.members still has the previous value.
-  if (parseNotificationPreference(data.notification_preference) !== next) {
+  const { data: verified, error: verifyError } = await supabase
+    .from('members')
+    .select('*')
+    .eq('id', memberId)
+    .eq('user_id', userId)
+    .single();
+  if (verifyError) throw verifyError;
+  if (!verified) throw new Error('Could not verify notification preference.');
+  if (parseNotificationPreference(verified.notification_preference) !== next) {
     throw new Error('Notification preference did not save. Try again.');
   }
-  return data;
+  return verified;
 }
 
 export function memberNotificationPreference(member: Member | null | undefined): NotificationPreference {

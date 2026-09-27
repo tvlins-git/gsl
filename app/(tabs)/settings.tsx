@@ -52,7 +52,8 @@ import { APP_VERSION } from '@/constants/brand';
 import { feedColumn, sharedStyles, theme } from '@/constants/theme';
 
 export default function SettingsScreen() {
-  const { member, loggedOut, signOut, signIn, loading, localMode, refreshMember } = useAuth();
+  const { member, loggedOut, signOut, signIn, loading, localMode, refreshMember, applyMember } =
+    useAuth();
   const [busy, setBusy] = useState(false);
   const [users, setUsers] = useState<AppUser[]>([]);
   const [selectedUserId, setSelectedUserId] = useState(DEFAULT_HARDCODED_USER.id);
@@ -372,9 +373,18 @@ export default function SettingsScreen() {
     setNotifySuccess('');
     try {
       const saved = await updateMemberNotificationPreference(member.id, next);
-      setNotifyPref(memberNotificationPreference(saved));
+      const confirmed = memberNotificationPreference(saved);
+      setNotifyPref(confirmed);
+      applyMember(saved);
+      // Confirm AuthContext reload from public.members matches what we just wrote.
       await refreshMember();
-      setNotifySuccess('Notification preference saved.');
+      setNotifySuccess(
+        confirmed === 'tagged'
+          ? 'Saved: tagged only (@you / @everybody).'
+          : confirmed === 'off'
+            ? 'Saved: no push notifications.'
+            : 'Saved: all messages from others.'
+      );
     } catch (err) {
       setNotifyError(formatUserFacingError(err, 'Could not save preference. Try again.'));
       // Revert radio to the last known saved value on failure.
