@@ -5,7 +5,7 @@ import {
   loadFeedPosts,
   type FeedPostSummary,
 } from './feed-posts';
-import { formatReplyCount, loadFeedReplyCounts } from './feed-post-replies';
+import { loadFeedReplyCounts } from './feed-post-replies';
 import { formatPhotoCount, loadPhotoEventSummaries, albumThumbUris, type PhotoEventSummary } from './photo-events';
 import { isLocalMode, localStore } from './local-store';
 import { supabase } from './supabase';
@@ -187,13 +187,12 @@ export function buildActivityItems(input: {
   for (const post of feedPosts) {
     const hasImage = Boolean(post.image_path || post.imageUri);
     const replyCount = replyCounts[post.id] ?? 0;
-    const tagSubtitle = formatFeedPostSubtitle(post, members);
-    const replyLabel = formatReplyCount(replyCount);
     items.push({
       id: `post-${post.id}`,
       kind: 'post',
       title: formatFeedPostTitle(post.body, hasImage),
-      subtitle: replyLabel ? `${tagSubtitle} · ${replyLabel}` : tagSubtitle,
+      // Tag line only — reply count is a separate expand control on the row.
+      subtitle: formatFeedPostSubtitle(post, members),
       timestamp: post.created_at,
       path: `/post/${post.id}`,
       authorName: nameForUser(members, post.author_id),

@@ -4,6 +4,7 @@ import FeedScreen from '@/app/(tabs)/index';
 import { deleteFeedPost } from '@/lib/feed-posts';
 import { deleteHostAssignment } from '@/lib/host-assignments';
 import { loadActivitySources } from '@/lib/activity-feed';
+import { listFeedPostReplies, sendFeedPostReply } from '@/lib/feed-post-replies';
 import { router } from 'expo-router';
 
 jest.mock('expo-router', () => {
@@ -118,6 +119,59 @@ jest.mock('@/lib/local-store', () => ({
   localStore: {},
 }));
 
+jest.mock('@/components/FeedInlineThread', () => {
+  const { View, Text, Pressable } = require('react-native');
+  return {
+    FeedInlineThread: ({
+      postId,
+      replies,
+      onSend,
+      testID,
+    }: {
+      postId: string;
+      replies: { id: string; body: string }[];
+      onSend: (body: string) => void;
+      testID?: string;
+    }) => (
+      <View testID={testID ?? `feed-inline-thread-${postId}`}>
+        {replies.map((reply) => (
+          <Text key={reply.id}>{reply.body}</Text>
+        ))}
+        <Pressable
+          testID={`feed-inline-thread-${postId}-send`}
+          onPress={() => onSend('Inline reply')}
+        >
+          <Text>Send</Text>
+        </Pressable>
+      </View>
+    ),
+  };
+});
+
+jest.mock('@/lib/feed-post-replies', () => {
+  const actual = jest.requireActual('@/lib/feed-post-replies');
+  return {
+    ...actual,
+    listFeedPostReplies: jest.fn(async () => [
+      {
+        id: 'r1',
+        post_id: 'mine',
+        author_id: 'user-2',
+        body: 'Nice!',
+        created_at: '2026-09-19T12:30:00.000Z',
+      },
+    ]),
+    sendFeedPostReply: jest.fn(async (_postId: string, authorId: string, body: string) => ({
+      id: 'r-new',
+      post_id: 'mine',
+      author_id: authorId,
+      body,
+      created_at: '2026-09-19T13:00:00.000Z',
+    })),
+    deleteFeedPostReply: jest.fn().mockResolvedValue(undefined),
+  };
+});
+
 describe('FeedScreen post delete', () => {
   beforeEach(() => {
     (deleteFeedPost as jest.Mock).mockClear();
@@ -127,7 +181,7 @@ describe('FeedScreen post delete', () => {
       polls: [],
       threads: [],
       hostAssignments: [],
-      replyCounts: {},
+      replyCounts: { mine: 1 },
       feedPosts: [
         {
           id: 'mine',
@@ -175,6 +229,25 @@ describe('FeedScreen post delete', () => {
     render(<FeedScreen />);
     fireEvent.press(await screen.findByTestId('feed-item-post-mine'));
     expect(router.push).toHaveBeenCalledWith('/post/mine');
+  });
+
+  it('expands and collapses the inline thread under a feed post', async () => {
+    render(<FeedScreen />);
+    expect(await screen.findByText('1 reply')).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('feed-item-post-mine-thread-toggle'));
+    await waitFor(() => expect(listFeedPostReplies).toHaveBeenCalledWith('mine'));
+    expect(await screen.findByTestId('feed-inline-thread-mine')).toBeTruthy();
+    expect(screen.getByText('Nice!')).toBeTruthy();
+    expect(screen.getByText('Hide replies')).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('feed-inline-thread-mine-send'));
+    await waitFor(() =>
+      expect(sendFeedPostReply).toHaveBeenCalledWith('mine', 'user-1', 'Inline reply')
+    );
+
+    fireEvent.press(screen.getByTestId('feed-item-post-mine-thread-toggle'));
+    await waitFor(() => expect(screen.queryByTestId('feed-inline-thread-mine')).toBeNull());
   });
 });
 

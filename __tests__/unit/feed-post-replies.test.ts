@@ -4,6 +4,7 @@ import {
   canSubmitFeedPostReply,
   createOptimisticReply,
   formatReplyCount,
+  formatThreadExpandLabel,
   listFeedPostReplies,
   mergeReplies,
   sendFeedPostReply,
@@ -68,6 +69,14 @@ describe('feed post reply helpers', () => {
     expect(formatReplyCount(0)).toBeNull();
     expect(formatReplyCount(1)).toBe('1 reply');
     expect(formatReplyCount(3)).toBe('3 replies');
+  });
+
+  it('labels the feed expand/collapse control', () => {
+    expect(formatThreadExpandLabel(0, false)).toBe('Reply');
+    expect(formatThreadExpandLabel(1, false)).toBe('1 reply');
+    expect(formatThreadExpandLabel(2, false)).toBe('2 replies');
+    expect(formatThreadExpandLabel(2, true)).toBe('Hide replies');
+    expect(formatThreadExpandLabel(0, true)).toBe('Hide');
   });
 
   it('merges optimistic replies with saved rows', () => {

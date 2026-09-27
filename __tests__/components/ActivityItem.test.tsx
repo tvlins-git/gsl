@@ -140,4 +140,51 @@ describe('ActivityItem', () => {
     fireEvent.press(screen.getByTestId('delete-feed-item-post-1'));
     expect(onDelete).toHaveBeenCalled();
   });
+
+  it('toggles the inline thread from the reply count without opening the row', () => {
+    const onPress = jest.fn();
+    const onToggleThread = jest.fn();
+    render(
+      <ActivityItem
+        item={{
+          ...item,
+          id: 'post-hi',
+          kind: 'post',
+          title: 'Hi',
+          subtitle: 'Update',
+          replyCount: 1,
+          sourceId: 'hi',
+        }}
+        onPress={onPress}
+        onToggleThread={onToggleThread}
+        threadExpanded={false}
+      />
+    );
+    expect(screen.getByText('1 reply')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('feed-item-post-hi-thread-toggle'));
+    expect(onToggleThread).toHaveBeenCalled();
+    expect(onPress).not.toHaveBeenCalled();
+  });
+
+  it('renders the expanded thread panel under the card', () => {
+    const { Text } = require('react-native');
+    render(
+      <ActivityItem
+        item={{
+          ...item,
+          id: 'post-hi',
+          kind: 'post',
+          title: 'Hi',
+          subtitle: 'Update',
+          replyCount: 1,
+        }}
+        onPress={() => {}}
+        onToggleThread={() => {}}
+        threadExpanded
+        threadPanel={<Text testID="inline-panel">panel</Text>}
+      />
+    );
+    expect(screen.getByText('Hide replies')).toBeTruthy();
+    expect(screen.getByTestId('inline-panel')).toBeTruthy();
+  });
 });
