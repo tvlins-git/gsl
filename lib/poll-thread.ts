@@ -106,7 +106,12 @@ export function planPollThreadAudience(input: {
   if (input.message && input.mentionMembers) {
     const tags = parseFeedMentions(input.message, input.mentionMembers);
     if (!tags.tagAll && tags.userIds.length > 0) {
-      const mentioned = new Set(tags.userIds);
+      // Mentioned people always get the chat push; send-push also merges
+      // preference "all" when tag_notification is true. Keep the mention list
+      // (minus the sender) so tagged-only targets stay accurate.
+      const mentioned = new Set(
+        tags.userIds.filter((userId) => userId !== input.senderUserId)
+      );
       notifyUserIds = notifyUserIds.filter((userId) => mentioned.has(userId));
     }
   }

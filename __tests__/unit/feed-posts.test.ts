@@ -15,6 +15,7 @@ import {
   parseFeedMentions,
   resolveFeedPushTargets,
   shouldSendFeedPush,
+  taggedUserIdsExcludingAuthor,
 } from '@/lib/feed-posts';
 import { isLocalMode, localStore } from '@/lib/local-store';
 import { uploadJpegToPhotos } from '@/lib/photo-upload';
@@ -111,6 +112,10 @@ describe('feed post helpers', () => {
     ).toEqual({ userIds: ['user-2'], excludeUserIds: ['user-1'] });
   });
 
+  it('strips the author from stored tag lists', () => {
+    expect(taggedUserIdsExcludingAuthor(['user-1', 'user-2'], 'user-1')).toEqual(['user-2']);
+  });
+
   it('skips push when nobody is tagged', () => {
     const targets = resolveFeedPushTargets({
       tagAll: false,
@@ -174,6 +179,7 @@ describe('feed mention parsing', () => {
   it('treats @everyone as tag_all even with other names', () => {
     expect(parseFeedMentions('hello @everyone and @Alice', members)).toEqual({ tagAll: true });
     expect(parseFeedMentions('Hello @EVERYONE', members)).toEqual({ tagAll: true });
+    expect(parseFeedMentions('ping @everybody', members)).toEqual({ tagAll: true });
   });
 
   it('matches display-name tokens, slugs, and email local parts', () => {
@@ -196,6 +202,14 @@ describe('feed mention parsing', () => {
     expect(
       parseFeedMentions('hi @Løg', [{ user_id: 'user-4', display_name: 'Hr. Løg' }])
     ).toEqual({ tagAll: false, userIds: ['user-4'] });
+  });
+
+  it('does not treat email addresses in the body as @mentions', () => {
+    expect(extractMentionTokens('email me at diana@gsl.local please')).toEqual([]);
+    expect(parseFeedMentions('email me at diana@gsl.local please', members)).toEqual({
+      tagAll: false,
+      userIds: [],
+    });
   });
 
   it('does not tag when there are no member mentions', () => {
