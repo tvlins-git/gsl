@@ -23,7 +23,7 @@ A private cross-platform mobile app for the **GSL** friend group. Built with Exp
 
 ### Prerequisites
 
-- Node.js 20+
+- Node.js 24+ (Vercel / `engines` pin)
 - [Expo CLI](https://docs.expo.dev/get-started/installation/)
 - [Supabase CLI](https://supabase.com/docs/guides/cli) (optional, for local dev)
 - [EAS CLI](https://docs.expo.dev/build/setup/) (for builds)
