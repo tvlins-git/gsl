@@ -5,6 +5,11 @@ export type Invitee = {
   name: string;
 };
 
+export function parseBearerToken(authorization: string | null): string | null {
+  const match = authorization?.match(/^Bearer\s+(\S+)$/i);
+  return match?.[1] ?? null;
+}
+
 export function filterYesMaybeWithEmail(
   rows: { response: string; contact_email: string | null; display_name: string }[]
 ): Invitee[] {
